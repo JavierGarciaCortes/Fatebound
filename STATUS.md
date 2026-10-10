@@ -2,11 +2,11 @@
 
 Última actualización: 2026-10-10
 
-Rama de trabajo: `feature/project-foundation`
+Rama de trabajo: `feature/sqlite-storage`
 
 ## Estado general
 
-Fatebound 2.0 está en fase de fundamentos. El scaffold de Electron, Vue 3 y TypeScript existe, y el proceso main ya resuelve y valida una ubicación de almacenamiento antes de abrir la interfaz. Todavía no hay SQLite, mundos instalados, motor de reglas, gestión de partidas ni interfaz final. La futura aplicación podrá iniciarse legítimamente sin mundos y permitirá que el usuario importe los suyos.
+Fatebound 2.0 está en fase de fundamentos. El scaffold de Electron, Vue 3 y TypeScript existe, y el proceso main ya resuelve y valida una ubicación de almacenamiento, abre SQLite y aplica sus migraciones antes de abrir la interfaz. Todavía no hay esquema del juego, mundos instalados, motor de reglas, gestión de partidas ni interfaz final. La futura aplicación podrá iniciarse legítimamente sin mundos y permitirá que el usuario importe los suyos.
 
 Una decisión documentada no equivale a funcionalidad implementada. Todo lo descrito como **propuesto** en `docs/ARCHITECTURE.md` continúa pendiente de desarrollo y verificación.
 
@@ -22,11 +22,17 @@ Una decisión documentada no equivale a funcionalidad implementada. Todo lo desc
 - [x] Separación documental entre distribución pública sin contenido protegido, importación personal y compilación privada autorizada.
 - [x] Requisitos de las futuras plantillas originales de mundos, sin cerrar todavía el formato Markdown.
 - [x] Resolvedor central de rutas: `.fatebound-dev/data/` en desarrollo y `data/` junto al ejecutable portable en distribución.
-- [x] Rutas reservadas para SQLite, copias de seguridad, recursos de mundos y exportaciones, sin crear ni abrir la base de datos.
+- [x] Ruta SQLite central resuelta como `getActiveStoragePaths().databaseFile`, sin rutas fijas ni escritura en la extracción temporal.
 - [x] Prueba real de escritura mediante archivo temporal exclusivo y limpieza posterior.
 - [x] Flujo nativo Reintentar / Elegir otra carpeta / Salir antes de crear la ventana principal.
 - [x] Carpeta alternativa validada y limitada a la sesión, sin migración ni descubrimiento automático de datos.
-- [x] Nueve pruebas automatizadas para resolución, permisos, reintento, alternativa, cancelación, salida y limpieza.
+- [x] Apertura de SQLite exclusivamente en main después de validar la carpeta y antes de mostrar la ventana principal.
+- [x] Uso de `node:sqlite`, incluido en Electron 39, sin addon nativo externo ni reconstrucción ABI adicional.
+- [x] Configuración portable `journal_mode=DELETE`, `synchronous=EXTRA`, claves foráneas, extensiones deshabilitadas, `trusted_schema=OFF`, temporales en memoria y espera de bloqueos.
+- [x] Migraciones SQL ordenadas, versionadas y transaccionales, con rechazo de historiales incompatibles.
+- [x] Migración inicial limitada a la tabla técnica `fatebound_schema_migrations`; no se ha creado el esquema del juego.
+- [x] Cierre idempotente de la conexión durante `will-quit` y antes de terminar la verificación del portable.
+- [x] Dieciséis pruebas automatizadas para rutas, permisos, apertura, persistencia, migraciones, reapertura, errores y cierre, siempre sobre directorios temporales aislados.
 - [x] Target `portable` x64 de electron-builder configurado para generar `dist/Fatebound.exe` sin instalador obligatorio.
 - [x] Identidad de plantilla sustituida por `com.fatebound.app`, autor/producto `Fatebound` y `Fatebound.exe`; eliminadas la publicación de ejemplo y la configuración de actualizaciones.
 - [x] Lista pública de recursos limitada a `resources/icon.png` y `resources/branding/`, conservando nombres, rutas relativas y contenido.
@@ -39,11 +45,11 @@ La documentación y el scaffold existente se han revisado con las comprobaciones
 
 ## Trabajo actualmente en curso
 
-La implementación y la validación básica del almacenamiento portable están completadas. El resolvedor, la comprobación de escritura, el target de Windows y el flujo de recuperación se han verificado mediante pruebas automatizadas, inspección del artefacto y pruebas manuales confirmadas en Windows. La ejecución desde un pendrive físico y desde otro ordenador sigue pendiente.
+La infraestructura inicial de SQLite portable está implementada. La base se crea o abre en la ruta activa, las migraciones se ejecutan antes de la interfaz y un fallo impide continuar. La implementación automatizada usa almacenamiento temporal aislado; la verificación del artefacto portable y sus resultados se detallan al final de este archivo. La ejecución desde un pendrive físico y desde otro ordenador sigue pendiente.
 
 ## Siguiente tarea prioritaria
 
-**Integrar inicialmente SQLite portable**, creando y abriendo la base de datos exclusivamente desde el proceso main en la ruta central `data/fatebound.sqlite`, con una migración inicial y pruebas que no utilicen datos reales del usuario.
+**Diseñar e implementar la primera estrategia de copia de seguridad y recuperación de SQLite**, antes de ampliar el esquema con datos del juego, incluyendo el caso de una extracción insegura de la unidad.
 
 ## Pendientes por fases
 
@@ -55,8 +61,8 @@ La implementación y la validación básica del almacenamiento portable están c
 
 ### Fase 2 — Persistencia y versiones
 
-- Incorporar SQLite sin servidor y sus migraciones.
-- Implementar repositorios, transacciones, copias de seguridad y recuperación.
+- Implementar repositorios de aplicación y transacciones sobre la conexión SQLite existente.
+- Implementar copias de seguridad y recuperación ante corrupción o extracción insegura.
 - Implementar mundos y versiones publicadas inmutables.
 - Vincular personajes y campañas a una versión concreta del mundo.
 - Permitir una instalación válida sin mundos y registrar de forma idempotente los mundos importados.
@@ -92,13 +98,13 @@ La implementación y la validación básica del almacenamiento portable están c
 - La interfaz visible es la pantalla de demostración de electron-vite.
 - La portabilidad todavía no se ha validado desde un pendrive físico ni desde otro ordenador.
 - `Fatebound.exe` no tiene firma Authenticode; el certificado y el proceso de firma para distribución están pendientes.
-- No existe almacenamiento persistente; las rutas de SQLite y de los futuros directorios están reservadas, pero no se crean sus contenidos.
-- El proyecto no declara una versión mínima de Node.js.
+- `node:sqlite` continúa clasificado como API en desarrollo activo en Node 22; la compatibilidad queda ligada y verificada contra la versión de Node incluida en Electron 39.
+- `journal_mode=DELETE` con `synchronous=EXTRA` reduce el riesgo, pero no garantiza integridad si se retira físicamente una unidad durante una escritura ni sustituye las futuras copias de seguridad.
+- No existen todavía copias de seguridad, recuperación ante corrupción ni comprobación de integridad al arrancar.
 
 ## Decisiones pendientes
 
 - Política de copias de seguridad y recuperación ante extracción insegura de una unidad.
-- Estrategia de journal y recuperación de SQLite adecuada para almacenamiento extraíble.
 - Esquema y versionado del contrato de importación Markdown.
 - Organización concreta de las plantillas originales y estrategia de compatibilidad para importar, validar, editar y exportar sin pérdida.
 - Identificadores, numeración y ciclo de publicación de versiones de mundos.
@@ -111,16 +117,17 @@ La implementación y la validación básica del almacenamiento portable están c
 
 ## Validación de esta actualización
 
-- `npm test`: superado, 9 pruebas.
-- `npm run lint`: superado.
-- `npm run typecheck`: superado.
-- `npm run build:win`: superado fuera del sandbox tras un primer intento bloqueado al iniciar `esbuild` (`spawn EPERM`). Generó `D:\Proyectos\Fatebound\dist\Fatebound.exe` (87.094.672 bytes; SHA-256 `508DA77B5C675EC229F17CE370404382E89CD45EBCEC34D806B13A092DDE1265`).
-- Inspección directa del portable con 7-Zip: ocho recursos públicos presentes con sus rutas esperadas; recursos de Ronin ausentes.
-- Comparación SHA-256 entre los ocho recursos originales y los empaquetados: coinciden.
+- `npm test`: superado, 16 pruebas; las siete nuevas pruebas SQLite cubren creación, configuración, persistencia, migración pendiente, rollback, versión futura, error de apertura y cierre activo.
+- `npm run lint`: superado con código 0; ESLint conserva 507 avisos históricos de Prettier por finales de línea CRLF en archivos anteriores.
+- `npm run typecheck`: superado para main/preload y renderer.
+- `npm run build`: superado fuera del sandbox; el primer intento dentro del entorno restringido fue bloqueado al iniciar `esbuild` con `spawn EPERM`.
+- `npm run build:win`: superado fuera del sandbox. Generó `D:\Proyectos\Fatebound\dist\Fatebound.exe` (87.099.876 bytes; SHA-256 `3730C6E695FD252AF6B46F525C84B37378CAC293D242C70E7819F34349C207E4`).
+- Inspección de `app.asar`: el bundle main contiene `require("node:sqlite")`, la configuración `DELETE`/`EXTRA` y el modo de verificación; no contiene `better-sqlite3` ni un binario `sqlite3.node`, porque SQLite forma parte del runtime Electron.
+- Ejecución automatizada del `Fatebound.exe` portable real desde una carpeta temporal: código 0, base de 12.288 bytes creada en `data/fatebound.sqlite` junto al ejecutable, migración 1 presente y `PRAGMA integrity_check = ok`. La carpeta temporal se eliminó al terminar.
+- La misma verificación sobre `win-unpacked` también terminó con código 0. Los intentos iniciales con código 9/1 no llegaron a Fatebound porque el entorno del agente imponía `ELECTRON_RUN_AS_NODE=1`; al retirarla del proceso hijo, ambos artefactos funcionaron.
+- `node:sqlite` se comprobó además en el runtime instalado Electron 39.8.10 / Node 22.22.1 / SQLite 3.51.2 y en Node de desarrollo 22.23.2 / SQLite 3.51.3.
 - `Get-AuthenticodeSignature dist\Fatebound.exe`: `NotSigned`; no se configuró firma en esta tarea.
-- Inspección de `PORTABLE_EXECUTABLE_DIR`: electron-builder lo establece desde `$EXEDIR`, el bundle de main lo consume y la prueba automatizada confirma que prevalece sobre la ruta temporal de extracción.
-- `git diff --check` y revisión final de `git diff` / `git status`: superadas; los cambios corresponden al resolvedor previo, su documentación y esta configuración portable.
-- Prueba manual de `Fatebound.exe` en Windows, confirmada por el equipo: apertura correcta, `data/` junto al ejecutable, funcionamiento desde otra carpeta, limpieza de archivos temporales, detección del conflicto de escritura y funcionamiento de Reintentar / Elegir otra carpeta / Salir.
+- `git diff --check` y revisión final de `git diff` / `git status`: superadas; no hay cambios ajenos al alcance ni archivos temporales residuales.
 - Ejecución desde un pendrive físico y desde otro ordenador: no realizada todavía.
 
 ## Registro de cambios
@@ -140,3 +147,7 @@ La implementación y la validación básica del almacenamiento portable están c
 - Configurado el portable x64 de Windows con identidad de Fatebound y sin instalador obligatorio ni actualizaciones automáticas.
 - Limitado y verificado el contenido público a los recursos gráficos propios; Ronin permanece en el repositorio, pero fuera del artefacto.
 - Completada la validación manual básica del almacenamiento portable y establecido SQLite portable como siguiente prioridad.
+- Integrado `node:sqlite` exclusivamente en main con apertura previa a la ventana y cierre durante la salida.
+- Añadidas migraciones SQL transaccionales y una primera migración limitada al control de versiones.
+- Adoptados `journal_mode=DELETE` y `synchronous=EXTRA` para priorizar recuperación y durabilidad en almacenamiento extraíble.
+- Añadidas pruebas aisladas de apertura, persistencia, migraciones, reapertura, errores y cierre.

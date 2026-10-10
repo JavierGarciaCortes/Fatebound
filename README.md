@@ -2,7 +2,7 @@
 
 Fatebound es una aplicación de escritorio para Windows destinada a jugar RPG narrativos en solitario. El objetivo es ofrecer una experiencia local y portable: las reglas, los mundos, las partidas y sus crónicas podrán viajar junto a la aplicación y el juego no dependerá de un servidor ni de conexión a Internet.
 
-El repositorio se encuentra en una fase inicial de fundamentos. Actualmente contiene el scaffold funcional de Electron y Vue; la persistencia, el motor de juego, la importación de mundos y las interfaces definitivas todavía no están implementados.
+El repositorio se encuentra en una fase inicial de fundamentos. Actualmente contiene el scaffold funcional de Electron y Vue y la infraestructura inicial de persistencia SQLite portable; el esquema del juego, el motor, la importación de mundos y las interfaces definitivas todavía no están implementados.
 
 ## Tecnologías
 
@@ -12,14 +12,14 @@ El repositorio se encuentra en una fase inicial de fundamentos. Actualmente cont
 - electron-vite 5 y Vite 7
 - ESLint y Prettier
 - electron-builder
-- SQLite como almacenamiento principal planificado, todavía no instalado
+- SQLite integrado en Electron mediante `node:sqlite`
 
 ## Requisitos de desarrollo
 
 - Node.js y npm.
 - Un entorno Windows para validar el objetivo de distribución de la aplicación.
 
-El proyecto no declara todavía una versión mínima de Node.js. La base actual se ha comprobado con Node.js 22 y npm 10. `package-lock.json` debe mantenerse para obtener instalaciones reproducibles.
+El proyecto requiere Node.js 22.18 o posterior para disponer de las opciones de `node:sqlite` usadas por la infraestructura. La base actual se ha comprobado con Node.js 22.23.2 y npm 10. `package-lock.json` debe mantenerse para obtener instalaciones reproducibles.
 
 ## Instalación y comandos
 
@@ -36,7 +36,7 @@ Los comandos siguientes proceden de `package.json`:
 | `npm run dev`          | Inicia Electron con recarga durante el desarrollo.             |
 | `npm run start`        | Abre en modo preview una compilación ya generada.              |
 | `npm run lint`         | Ejecuta ESLint.                                                |
-| `npm test`             | Ejecuta las pruebas automatizadas del almacenamiento portable. |
+| `npm test`             | Ejecuta las pruebas del almacenamiento portable y SQLite.      |
 | `npm run typecheck`    | Comprueba los tipos de main, preload y renderer.               |
 | `npm run build`        | Comprueba tipos y genera la aplicación con electron-vite.      |
 | `npm run build:unpack` | Genera una distribución sin empaquetar.                        |
@@ -53,11 +53,11 @@ El ejecutable generado actualmente no tiene firma Authenticode. Windows puede mo
 
 La aplicación conserva los tres contextos de Electron:
 
-- `src/main/`: ciclo de vida, ventanas y, en el futuro, servicios de aplicación, SQLite y acceso controlado a archivos.
+- `src/main/`: ciclo de vida, ventanas, conexión SQLite y, en el futuro, servicios de aplicación y acceso controlado a archivos.
 - `src/preload/`: frontera segura y tipada entre Electron y la interfaz.
 - `src/renderer/`: interfaz Vue sin acceso directo a SQLite o al sistema de archivos.
 
-El proceso main ya contiene un resolvedor central de rutas portables y valida la escritura antes de abrir la ventana principal. La arquitectura futura añadirá servicios de dominio y repositorios detrás de contratos IPC mínimos. Los recursos incluidos serán de solo lectura; los datos mutables se guardarán en una ubicación resuelta en tiempo de ejecución, nunca en rutas absolutas específicas de un equipo ni dentro de `app.asar`.
+El proceso main contiene un resolvedor central de rutas portables, valida la escritura y abre SQLite antes de mostrar la ventana principal. La arquitectura futura añadirá servicios de dominio y repositorios detrás de contratos IPC mínimos. Los recursos incluidos serán de solo lectura; los datos mutables se guardan en una ubicación resuelta en tiempo de ejecución, nunca en rutas absolutas específicas de un equipo ni dentro de `app.asar`.
 
 Consulta [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) para ver el diseño propuesto y sus límites.
 
@@ -67,8 +67,16 @@ El almacenamiento se prepara íntegramente en el proceso main:
 
 - en desarrollo se utiliza `.fatebound-dev/data/` dentro del proyecto, aislado de cualquier instalación real y excluido de Git;
 - en una distribución se utiliza `data/` junto al ejecutable portable; el launcher de electron-builder comunica su directorio original mediante `PORTABLE_EXECUTABLE_DIR`, evitando la carpeta temporal en la que se extrae la aplicación;
-- se reservan rutas centrales para la futura base de datos, copias de seguridad, mundos importados y exportaciones, pero no se crea ni se abre SQLite;
+- la conexión SQLite se crea o abre exclusivamente en main mediante `getActiveStoragePaths().databaseFile`, después de validar la carpeta y antes de mostrar la ventana;
 - antes de abrir la interfaz se crea un archivo temporal exclusivo, se escribe en él y se elimina para comprobar permisos reales.
+
+La base se guarda como `data/fatebound.sqlite`. En desarrollo queda bajo `.fatebound-dev/data/`; en el portable queda junto a `Fatebound.exe`, nunca en el directorio temporal donde el launcher extrae la aplicación. La migración inicial crea únicamente `fatebound_schema_migrations`: todavía no existen tablas de mundos, personajes, clanes, campañas o eventos.
+
+Cada migración tiene versión, nombre y SQL integrados en la aplicación. Las pendientes se aplican en orden y cada una usa su propia transacción `BEGIN IMMEDIATE`/`COMMIT`; un fallo ejecuta `ROLLBACK` y bloquea el arranque. También se rechaza una base cuya historia sea más nueva o no coincida con la aplicación.
+
+Para favorecer la recuperación en unidades extraíbles se usa el journal clásico `DELETE` con `synchronous=EXTRA`, además de claves foráneas activas, extensiones deshabilitadas, `trusted_schema=OFF`, temporales en memoria y una espera de bloqueos de cinco segundos. Esta elección reduce los archivos persistentes auxiliares y conserva el rollback journal junto a la base si una escritura se interrumpe, a costa de más operaciones de sincronización y menor rendimiento que WAL. No hace segura la extracción física durante una escritura: deben cerrarse Fatebound y las escrituras pendientes antes de retirar la unidad.
+
+Fatebound usa `node:sqlite`, integrado en el Node 22 de Electron 39, en vez de añadir un addon nativo externo. Esto elimina reconstrucciones por ABI y reglas especiales de `asar`; la API todavía está clasificada por Node como desarrollo activo, por lo que la versión de Electron permanece controlada y el portable se prueba directamente. El argumento técnico `--verify-portable-sqlite` permite que el ejecutable abra, migre y cierre la base sin mostrar la ventana, pensado únicamente para esa comprobación automatizable.
 
 Si la prueba falla, un diálogo nativo permite **Reintentar**, **Elegir otra carpeta** o **Salir**. La carpeta alternativa también se valida, solo se conserva durante la sesión y no provoca copias, migraciones ni búsquedas de datos anteriores. Fatebound nunca cambia automáticamente a otra ubicación.
 
@@ -109,6 +117,9 @@ El formato deberá permitir importar, validar, editar y exportar un mundo sin p�
 - Resolución central de rutas de almacenamiento para desarrollo y aplicación distribuida.
 - Comprobación real de escritura con limpieza del archivo temporal y flujo seguro de recuperación.
 - Pruebas automatizadas del resolvedor y del arranque sin usar carpetas reales del usuario.
+- Apertura y cierre de SQLite exclusivamente en main, con configuración conservadora para almacenamiento extraíble.
+- Migraciones SQL versionadas y transaccionales con una única migración técnica inicial.
+- Pruebas SQLite aisladas para creación, persistencia, migraciones, reapertura, errores y cierre.
 - Recursos de marca y las imágenes de clanes de Ronin presentes en el repositorio, sin mover ni renombrar.
 - Target portable x64 de Windows con identidad de Fatebound y recursos públicos incluidos mediante una lista explícita.
 - Artefacto `dist/Fatebound.exe` generado e inspeccionado sin contenido de Ronin ni configuración de actualización automática.
@@ -117,7 +128,7 @@ El formato deberá permitir importar, validar, editar y exportar un mundo sin p�
 
 ### Planificado
 
-- SQLite, migraciones, copias de seguridad y versionado inmutable de mundos.
+- Copias de seguridad, recuperación y repositorios del dominio sobre SQLite.
 - Validación del portable desde un pendrive físico y desde otro ordenador.
 - Instalaciones válidas sin mundos, importación personal y protección frente al borrado accidental.
 - Separación de compilaciones públicas sin contenido protegido y compilaciones privadas autorizadas.

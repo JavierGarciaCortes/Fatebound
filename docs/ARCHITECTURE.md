@@ -1,10 +1,10 @@
 # Arquitectura de Fatebound 2.0
 
-Estado del documento: arquitectura propuesta con el resolvedor y el empaquetado portable de Windows ya implementados.
+Estado del documento: arquitectura propuesta con el resolvedor, SQLite inicial y el empaquetado portable de Windows ya implementados.
 
 Última actualización: 2026-10-10.
 
-Este documento describe la dirección aprobada para Fatebound y marca expresamente lo que todavía no existe. No define un esquema SQL ni implica que los subsistemas propuestos estén implementados.
+Este documento describe la dirección aprobada para Fatebound y marca expresamente lo que todavía no existe. La única tabla actual controla migraciones; no se ha definido el esquema SQL del juego ni se consideran implementados los demás subsistemas propuestos.
 
 ## 1. Punto de partida real
 
@@ -17,9 +17,10 @@ El repositorio contiene actualmente:
 - recursos de marca y 36 imágenes de combinaciones de dados para los clanes de Ronin;
 - un target `portable` x64 de electron-builder que genera `dist/Fatebound.exe` sin instalador obligatorio;
 - un empaquetado público con lista explícita de recursos propios; la variante privada todavía no está configurada;
-- un resolvedor central y una comprobación de escritura ejecutados en main antes de crear la ventana principal.
+- un resolvedor central, una comprobación de escritura y una conexión SQLite ejecutados en main antes de crear la ventana principal;
+- migraciones SQL versionadas y transaccionales con una única migración técnica inicial.
 
-No están implementados SQLite, el dominio, el importador, el editor, el motor de reglas, las campañas, las crónicas ni la integración de IA.
+No están implementados el esquema de persistencia del juego, los repositorios del dominio, el importador, el editor, el motor de reglas, las campañas, las crónicas ni la integración de IA.
 
 ## 2. Principios
 
@@ -56,11 +57,10 @@ El preload expone una superficie pequeña agrupada por capacidades, por ejemplo 
 
 ### 3.3 Main — aplicación
 
-El proceso main ya es dueño de la resolución de rutas, la comprobación de escritura y el flujo nativo de recuperación. También será dueño de:
+El proceso main ya es dueño de la resolución de rutas, la comprobación de escritura, la conexión SQLite, sus migraciones, su cierre y el flujo nativo de recuperación. También será dueño de:
 
 - validación de solicitudes IPC;
 - casos de uso y transacciones;
-- conexión a SQLite;
 - lectura y escritura de archivos;
 - importación, exportación y copias de seguridad;
 - coordinación del motor de reglas.
@@ -73,9 +73,9 @@ El dominio modelará mundos, versiones, técnicas, efectos, personajes, clanes, 
 
 ### 3.5 Infraestructura
 
-Adaptadores concretos implementarán repositorios SQLite, almacenes de recursos, importación Markdown y exportación. Las dependencias apuntan hacia contratos del dominio o la aplicación, de modo que puedan probarse sin abrir una ventana de Electron.
+La infraestructura inicial implementa el ciclo de vida de SQLite y sus migraciones sin depender del renderer. Adaptadores concretos implementarán repositorios SQLite, almacenes de recursos, importación Markdown y exportación. Las dependencias apuntan hacia contratos del dominio o la aplicación, de modo que puedan probarse sin abrir una ventana de Electron.
 
-Las capas de dominio e infraestructura continúan siendo propuestas. La frontera de procesos, el resolvedor portable y la validación previa de escritura ya están implementados.
+Las capas de dominio y repositorios continúan siendo propuestas. La frontera de procesos, el resolvedor portable, la validación previa de escritura y la base SQLite inicial ya están implementados.
 
 ## 4. Datos portables y SQLite
 
@@ -93,13 +93,13 @@ Las rutas centrales actuales son:
 ```text
 <directorio-del-ejecutable-portable>/
   data/
-    fatebound.sqlite   reservado; no se crea ni se abre todavía
+    fatebound.sqlite   base creada o abierta durante el arranque
     worlds/            recursos importados futuros
     exports/           exportaciones futuras
     backups/           copias de seguridad futuras
 ```
 
-Solo el directorio de datos puede crearse durante la comprobación. Los subdirectorios y el archivo SQLite son rutas reservadas para consumidores futuros, no almacenamiento implementado.
+La comprobación de permisos crea el directorio de datos si falta. Después, y solo si la ubicación es válida, SQLite crea o abre `fatebound.sqlite`. Los subdirectorios siguen siendo rutas reservadas para consumidores futuros y no se crean en esta fase.
 
 ### 4.2 Comprobación de escritura y recuperación
 
@@ -111,7 +111,7 @@ Si la prueba falla, un diálogo nativo ofrece exactamente:
 - **Elegir otra carpeta:** abre el selector del sistema, valida la carpeta elegida y la usa solo durante la sesión.
 - **Salir:** termina la aplicación sin activar almacenamiento ni abrir la ventana Vue.
 
-Cancelar el selector vuelve al diálogo de decisión. No existe fallback automático. La ventana principal se crea una sola vez y únicamente después de activar una ubicación válida; los eventos de activación de Electron se ignoran mientras no haya almacenamiento preparado.
+Cancelar el selector vuelve al diálogo de decisión. No existe fallback automático. La ventana principal se crea una sola vez y únicamente después de activar una ubicación válida, abrir SQLite y aplicar sus migraciones; los eventos de activación de Electron se ignoran mientras no haya una conexión abierta.
 
 La orquestación está separada de Electron para poder probar reintentos, alternativas y salida con dobles controlados. La prueba de escritura real usa un directorio temporal del sistema y lo elimina al finalizar; ninguna prueba toca carpetas reales del usuario.
 
@@ -130,24 +130,28 @@ Fatebound.exe en una carpeta cualquiera
   -> <directorio original>/data/
 ```
 
-La prueba automatizada usa directorios temporales controlados y confirma que `PORTABLE_EXECUTABLE_DIR` prevalece sobre un `process.execPath` que simula la extracción temporal. La ejecución manual del `.exe` y sus diálogos nativos continúa pendiente.
+La prueba automatizada usa directorios temporales controlados y confirma que `PORTABLE_EXECUTABLE_DIR` prevalece sobre un `process.execPath` que simula la extracción temporal. El argumento técnico `--verify-portable-sqlite` permite ejecutar el artefacto real en una carpeta temporal: abre la ruta portable, aplica migraciones, cierra la conexión y sale sin crear una ventana.
 
 ### 4.4 SQLite
 
-**Propuesta no implementada:** SQLite será el almacén principal y su conexión pertenecerá exclusivamente al proceso main. La ubicación de la base de datos procederá del resolvedor portable.
+**Implementado en su nivel inicial:** Fatebound usa `DatabaseSync` de `node:sqlite`, integrado en el Node 22 que distribuye Electron 39. Se ha preferido frente a un addon externo como `better-sqlite3` porque evita binarios `.node`, reconstrucciones ABI y configuración especial de `asar`, lo que reduce los puntos de fallo del portable. La contrapartida conocida es que Node 22 clasifica todavía esta API como desarrollo activo; por eso `package.json` exige Node 22.18 o posterior y la compatibilidad se valida también ejecutando el portable, no solo bajo Node de desarrollo.
 
-La persistencia cubrirá los conceptos de mundos, versiones, traducciones, tablas de contenido, técnicas, efectos, personajes, clanes, campañas y eventos. Esto no define aún tablas ni un esquema físico.
+`src/main/storage/sqlite-storage.ts` es el único propietario de la conexión activa. Recibe la ruta de `getActiveStoragePaths().databaseFile`, la resuelve sin sustituirla por una ubicación fija, configura SQLite y llama al migrador. Ni preload ni renderer exponen SQLite. Si la apertura, la configuración o una migración fallan, la conexión parcial se cierra, se muestra un error nativo y la ventana principal no se crea. La conexión normal se cierra de forma idempotente en `will-quit`.
 
-Se requieren:
+La configuración inicial es deliberadamente conservadora para almacenamiento extraíble:
 
-- migraciones ordenadas y transaccionales;
-- verificación de versión al abrir;
-- copias de seguridad antes de migraciones destructivas;
-- recuperación explícita ante corrupción o extracción insegura de la unidad;
-- restricciones que impidan modificar contenido publicado;
-- operaciones idempotentes para registrar mundos importados e instalar contenido autorizado por el perfil de compilación.
+- `journal_mode=DELETE`: usa un rollback journal transitorio junto a la base y evita mantener los archivos `-wal` y `-shm` de WAL. Un journal interrumpido puede recuperarse al volver a abrir; nunca debe separarse ni borrarse manualmente.
+- `synchronous=EXTRA`: añade a `FULL` la sincronización del directorio después de eliminar el rollback journal. Aumenta escrituras y latencia, pero prioriza durabilidad ante pérdida de alimentación o extracción inesperada.
+- claves foráneas activas, extensiones cargables deshabilitadas, literales de cadena con comillas dobles deshabilitados y `trusted_schema=OFF`.
+- `temp_store=MEMORY`, para que los temporales no transaccionales no dependan de la carpeta temporal del sistema, y un timeout de bloqueos de cinco segundos.
 
-La modalidad de journal de SQLite se decidirá después de probar su comportamiento en unidades extraíbles; no se presupone WAL.
+Esta configuración no puede garantizar durabilidad si el sistema operativo, el controlador o la propia unidad informan de una sincronización antes de persistir los datos, ni puede hacer segura la retirada física durante una escritura. Sigue pendiente probar una unidad extraíble real e implementar copias de seguridad, comprobaciones de integridad y recuperación explícita.
+
+`src/main/storage/sqlite-migrations.ts` contiene un manifiesto ordenado de migraciones con versión, nombre y SQL. Al abrir se compara toda la historia aplicada con el manifiesto integrado; una versión futura, un hueco o un nombre distinto bloquean el arranque. Cada migración pendiente se ejecuta de forma independiente con `BEGIN IMMEDIATE`, registra su versión dentro de la misma transacción y termina con `COMMIT`; cualquier error ejecuta `ROLLBACK`.
+
+La migración 1, `initialize_migration_tracking`, crea únicamente `fatebound_schema_migrations`, con versión, nombre y fecha de aplicación. No existen tablas de mundos, personajes, clanes, campañas, eventos ni contenido de Ronin. Las migraciones futuras deberán conservar el mismo orden, y antes de que alguna sea destructiva habrá que implementar la política de copias de seguridad.
+
+Referencias técnicas de la decisión: [API `node:sqlite` de Node 22.20](https://nodejs.org/download/release/v22.20.0/docs/api/sqlite.html), [PRAGMA de SQLite](https://www.sqlite.org/pragma.html) y [archivos temporales y journals](https://www.sqlite.org/tempfiles.html).
 
 ## 5. Mundos, versiones y recursos
 
@@ -267,9 +271,9 @@ El preload genérico y `sandbox: false` del scaffold actual son brechas conocida
 ## 13. Orden de implementación recomendado
 
 1. **Implementado:** resolver y probar la raíz de datos portable y el flujo ante falta de escritura.
-2. **Configurado e inspeccionado; validación manual pendiente:** generar el portable de Windows y validar su comportamiento en ejecución.
+2. **Implementado y validado:** generar el portable de Windows y validar su comportamiento en ejecución.
 3. Definir contratos IPC mínimos y endurecer la ventana.
-4. Introducir SQLite, migraciones y repositorios sin contenido de juego.
+4. **Implementado parcialmente:** introducir SQLite y migraciones sin contenido de juego; siguen pendientes los repositorios.
 5. Diseñar el formato de mundos y sus plantillas originales.
 6. Incorporar importación, validación, edición, exportación y publicación inmutable.
 7. Implementar motor, campañas, eventos y exportación.

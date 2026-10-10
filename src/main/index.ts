@@ -4,8 +4,14 @@ import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 import { initializePortableStorage } from './storage/electron-storage-startup.ts'
 import { activateStoragePaths, hasActiveStoragePaths } from './storage/portable-storage.ts'
+import {
+  closeActiveSqliteDatabase,
+  hasOpenActiveSqliteDatabase,
+  openActiveSqliteDatabase
+} from './storage/sqlite-storage.ts'
 
 let mainWindow: BrowserWindow | null = null
+const PORTABLE_SQLITE_VERIFICATION_ARGUMENT = '--verify-portable-sqlite'
 
 function createWindow(): void {
   if (mainWindow && !mainWindow.isDestroyed()) {
@@ -57,6 +63,14 @@ async function startApplication(): Promise<void> {
   }
 
   activateStoragePaths(storageResult.paths)
+  openActiveSqliteDatabase()
+
+  if (process.argv.includes(PORTABLE_SQLITE_VERIFICATION_ARGUMENT)) {
+    closeActiveSqliteDatabase()
+    app.exit(0)
+    return
+  }
+
   createWindow()
 }
 
@@ -78,7 +92,7 @@ app.whenReady().then(() => {
   ipcMain.on('ping', () => console.log('pong'))
 
   app.on('activate', function () {
-    if (!hasActiveStoragePaths()) return
+    if (!hasActiveStoragePaths() || !hasOpenActiveSqliteDatabase()) return
 
     // On macOS it's common to re-create a window in the app when the
     // dock icon is clicked and there are no other windows open.
@@ -86,13 +100,23 @@ app.whenReady().then(() => {
   })
 
   void startApplication().catch((error: unknown) => {
-    console.error('Unable to initialize Fatebound storage', error)
+    console.error('Unable to initialize the Fatebound SQLite database', error)
+
+    if (process.argv.includes(PORTABLE_SQLITE_VERIFICATION_ARGUMENT)) {
+      app.exit(1)
+      return
+    }
+
     dialog.showErrorBox(
-      'Fatebound',
-      'No se pudo inicializar el almacenamiento. La aplicación se cerrará sin abrir datos.'
+      'Fatebound no puede abrir sus datos',
+      'No se pudo crear, abrir o actualizar la base de datos SQLite. Fatebound se cerrará sin mostrar la ventana principal para evitar trabajar sin persistencia.'
     )
     app.quit()
   })
+})
+
+app.on('will-quit', () => {
+  closeActiveSqliteDatabase()
 })
 
 // Quit when all windows are closed, except on macOS. There, it's common
