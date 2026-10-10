@@ -1,10 +1,10 @@
 # Arquitectura de Fatebound 2.0
 
-Estado del documento: arquitectura propuesta con el resolvedor, SQLite inicial y el empaquetado portable de Windows ya implementados.
+Estado del documento: arquitectura propuesta con el resolvedor, la seguridad SQLite y el empaquetado portable de Windows ya implementados.
 
 Última actualización: 2026-10-10.
 
-Este documento describe la dirección aprobada para Fatebound y marca expresamente lo que todavía no existe. La única tabla actual controla migraciones; no se ha definido el esquema SQL del juego ni se consideran implementados los demás subsistemas propuestos.
+Este documento describe la dirección aprobada para Fatebound y marca expresamente lo que todavía no existe. La única tabla actual controla migraciones; no se ha definido el esquema SQL del juego ni se consideran implementados los demás subsistemas propuestos. La dirección específica de paquetes se mantiene en [WORLD_FORMAT.md](WORLD_FORMAT.md) y la de interfaz en [DESIGN_SYSTEM.md](DESIGN_SYSTEM.md).
 
 ## 1. Punto de partida real
 
@@ -18,9 +18,10 @@ El repositorio contiene actualmente:
 - un target `portable` x64 de electron-builder que genera `dist/Fatebound.exe` sin instalador obligatorio;
 - un empaquetado público con lista explícita de recursos propios; la variante privada todavía no está configurada;
 - un resolvedor central, una comprobación de escritura y una conexión SQLite ejecutados en main antes de crear la ventana principal;
-- migraciones SQL versionadas y transaccionales con una única migración técnica inicial.
+- migraciones SQL versionadas y transaccionales con una única migración técnica inicial;
+- integridad, copias previas a migraciones, copias automáticas y retención segura ejecutadas exclusivamente en main.
 
-No están implementados el esquema de persistencia del juego, los repositorios del dominio, el importador, el editor, el motor de reglas, las campañas, las crónicas ni la integración de IA.
+No están implementados la nueva interfaz, el esquema de persistencia del juego, los repositorios del dominio, el importador, el editor, el motor de reglas, las campañas, las crónicas ni la integración de IA.
 
 ## 2. Principios
 
@@ -30,6 +31,9 @@ No están implementados el esquema de persistencia del juego, los repositorios d
 - **Contenido no confiable:** Markdown, metadatos e imágenes importados son datos que deben validarse; nunca se ejecutan.
 - **Distribución responsable:** la compilación pública puede funcionar sin mundos y no incorpora contenido protegido de terceros sin autorización.
 - **Versiones inmutables:** una versión publicada no se edita; una modificación genera una versión derivada.
+- **Experiencia de aventura:** la interfaz sigue la dirección «RPG cinematográfico + diario de aventuras» y no presenta el juego como un dashboard técnico.
+- **Tema sin privilegios:** un mundo puede transformar la atmósfera mediante datos y recursos declarativos validados, nunca mediante código o acceso nativo.
+- **Compatibilidad acumulativa:** ampliar el motor no rompe mundos ni partidas anteriores sin una estrategia explícita de compatibilidad y migración.
 - **Trazabilidad:** las acciones relevantes de una partida producen eventos utilizables en una crónica.
 - **Control del jugador:** una IA opcional puede proponer, pero no modificar reglas ni estado de juego sin confirmación.
 
@@ -51,9 +55,11 @@ flowchart LR
 
 Vue representa vistas, formularios y estados de interacción. Puede solicitar operaciones mediante la API del preload, pero no conoce rutas físicas, consultas SQL ni módulos de Node. Las respuestas que recibe son DTO tipados y sin detalles internos innecesarios.
 
+La siguiente fase sustituirá la demo actual por una shell con navegación, selección visual de mundos, temas demostrativos, estados vacíos honestos para personajes y partidas y un panel de ajustes. La interfaz identificará las demostraciones no jugables y podrá consultar un diagnóstico limitado del almacenamiento, pero no simulará editor, campañas o reglas que todavía no existan.
+
 ### 3.2 Preload — frontera nativa
 
-El preload expone una superficie pequeña agrupada por capacidades, por ejemplo mundos, campañas, crónicas y exportación. Cada llamada tiene tipos compartidos y límites claros. No se expondrán `ipcRenderer`, identificadores de canal arbitrarios ni primitivas generales de archivos.
+El preload expone una superficie pequeña agrupada por capacidades, por ejemplo diagnóstico, mundos, campañas, crónicas y exportación. Cada llamada tiene tipos compartidos y límites claros. No se expondrán `ipcRenderer`, identificadores de canal arbitrarios, primitivas generales de archivos, SQL ni la conexión SQLite. La primera ampliación será un contrato de solo lectura con los datos mínimos del diagnóstico de almacenamiento.
 
 ### 3.3 Main — aplicación
 
@@ -76,6 +82,12 @@ El dominio modelará mundos, versiones, técnicas, efectos, personajes, clanes, 
 La infraestructura inicial implementa el ciclo de vida de SQLite y sus migraciones sin depender del renderer. Adaptadores concretos implementarán repositorios SQLite, almacenes de recursos, importación Markdown y exportación. Las dependencias apuntan hacia contratos del dominio o la aplicación, de modo que puedan probarse sin abrir una ventana de Electron.
 
 Las capas de dominio y repositorios continúan siendo propuestas. La frontera de procesos, el resolvedor portable, la validación previa de escritura y la base SQLite inicial ya están implementados.
+
+### 3.6 Sistema visual
+
+La presentación se divide en una shell estable de Fatebound, un tema declarativo del mundo y contenido narrativo. La shell conserva navegación, estados, foco, contraste, confirmaciones y operaciones sensibles. Los temas podrán aportar paletas, ilustraciones, fondos, símbolos, texturas y opciones tipográficas controladas, pero no componentes Vue, JavaScript, CSS arbitrario ni recursos remotos.
+
+Legibilidad, sesiones largas, navegación clara, reducción de movimiento y adaptación al tamaño de ventana son restricciones arquitectónicas de la interfaz, no detalles ornamentales. Los temas ficticios de la primera shell sirven para probar el sistema visual y se etiquetarán como demostraciones, sin implicar que exista un mundo jugable.
 
 ## 4. Datos portables y SQLite
 
@@ -205,6 +217,16 @@ Los artefactos públicos y privados tendrán nombres y procesos de salida inequ�
 
 El importador impedirá escapes de directorio, enlaces inseguros, extensiones no admitidas y archivos que excedan los límites configurados. La publicación congelará las referencias de esa versión; una sustitución de recursos creará otra versión.
 
+### 5.3 Hoja de ruta mecánica y compatibilidad
+
+**Dirección aprobada, todavía no implementada:** las capacidades del motor evolucionarán en tres fases acumulativas.
+
+1. **Mundos compatibles con Ronin:** comparten las mecánicas fundamentales y personalizan mediante datos ambientación, nombres, tablas, técnicas, imágenes y presentación. Ronin, Paladín y Shaolin son ejemplos de perfiles previstos.
+2. **Mundos Ronin ampliados:** añaden capacidades compatibles con el modelo anterior. Robot y Soldado son ejemplos de perfiles previstos. Los mundos de la fase 1 deben seguir funcionando sin modificaciones obligatorias.
+3. **Mundos avanzados:** incorporan subsistemas especializados, especialmente de combate. Naves espaciales es el ejemplo de referencia, con sistemas, escudos y armamento, sin invalidar los mundos o partidas anteriores.
+
+El formato del paquete, la versión del mundo y el conjunto de capacidades mecánicas se versionarán como conceptos distintos. Las ampliaciones preferirán capacidades aditivas y valores por defecto compatibles. Cualquier cambio que necesite transformar mundos o partidas existentes exigirá detección explícita de versión, migración protegida, copias recuperables, pruebas con versiones anteriores y un resultado comprensible para el usuario. No se aceptará una ruptura implícita.
+
 ## 6. Ronin como mundo instalable
 
 Ronin, de Tiago Junges, no es un requisito para ejecutar Fatebound. Se contemplan tres escenarios separados:
@@ -219,9 +241,9 @@ El registro de un Ronin importado y la instalación desde una compilación priva
 
 Actualmente solo existen los recursos gráficos indicados; no se ha importado el reglamento ni se ha instalado contenido de Ronin en SQLite. Las condiciones de licencia y atribución deberán resolverse para cualquier compilación que lo preinstale. Una contraseña no modifica esas condiciones y no forma parte del diseño.
 
-## 7. Importador Markdown y editor
+## 7. Paquetes de mundos, importador y editor
 
-**Propuesta no implementada:** el formato de intercambio combinará Markdown legible con metadatos estructurados y versionados. Fatebound incluirá plantillas y ejemplos originales, sin textos, tablas ni reglas copiadas de Ronin o de otros terceros.
+**Dirección aprobada, todavía no implementada:** los mundos se distribuirán mediante paquetes ZIP instalables. La extensión propuesta es `.fateworld`, pendiente de especificación técnica definitiva. Cada paquete podrá combinar Markdown legible, YAML estructurado, imágenes, recursos visuales y un tema declarativo versionado. Fatebound incluirá plantillas y ejemplos originales, sin textos, tablas ni reglas copiadas de Ronin o de otros terceros.
 
 Las futuras plantillas deberán documentar, como requisitos mínimos:
 
@@ -232,18 +254,18 @@ Las futuras plantillas deberán documentar, como requisitos mínimos:
 - efectos mecánicos, parámetros y condiciones;
 - referencias relativas a imágenes y otros recursos.
 
-El mismo modelo deberá poder importarse, validarse, editarse y exportarse sin pérdida de información. El contrato exacto —sintaxis, esquema, organización de archivos, manifiestos y estrategia de versiones— se diseñará en una tarea posterior; este documento no lo fija todavía.
+El mismo modelo deberá poder importarse, validarse, editarse y exportarse sin pérdida de información. Varias versiones podrán coexistir y los personajes y campañas conservarán su vínculo exacto. El contrato exacto —sintaxis, esquema, organización de archivos, manifiestos, capacidades y estrategia de versiones— se diseñará en una tarea posterior; ni este documento ni la estructura ilustrativa de `WORLD_FORMAT.md` lo fijan todavía.
 
 El flujo previsto es:
 
-1. seleccionar un paquete o documento y copiarlo a un área temporal controlada;
-2. analizar metadatos y Markdown sin ejecutar scripts;
-3. validar esquema, referencias, tamaños y tipos de recursos;
+1. seleccionar un paquete y copiarlo a un área temporal controlada;
+2. inspeccionar el ZIP y analizar metadatos, YAML y Markdown sin ejecutar scripts;
+3. validar esquema, versión, capacidades, rutas, referencias, tamaños y tipos de recursos;
 4. mostrar errores y una vista previa normalizada;
 5. crear un borrador editable;
 6. publicar una versión inmutable mediante una transacción.
 
-El editor modifica borradores o crea una versión derivada. El texto natural explica ambientación y reglas a las personas, pero no se convierte ni evalúa como código. HTML activo, JavaScript y rutas remotas no se consideran confiables.
+El editor modifica borradores o crea una versión derivada. Al principio los paquetes podrán prepararse con procesos propios sin construir un editor visual avanzado. El texto natural explica ambientación y reglas a las personas, pero no se convierte ni evalúa como código. HTML activo, JavaScript, CSS arbitrario y rutas remotas no se consideran confiables.
 
 ## 8. Motor de reglas y efectos
 
@@ -296,12 +318,13 @@ El preload genérico y `sandbox: false` del scaffold actual son brechas conocida
 
 1. **Implementado:** resolver y probar la raíz de datos portable y el flujo ante falta de escritura.
 2. **Implementado y validado:** generar el portable de Windows y validar su comportamiento en ejecución.
-3. Definir contratos IPC mínimos y endurecer la ventana.
-4. **Implementado parcialmente:** introducir SQLite y migraciones sin contenido de juego; siguen pendientes los repositorios.
-5. Diseñar el formato de mundos y sus plantillas originales.
-6. Incorporar importación, validación, edición, exportación y publicación inmutable.
-7. Implementar motor, campañas, eventos y exportación.
-8. Configurar y verificar el perfil privado separado cuando exista autorización para su contenido.
-9. Añadir interfaces finales e integración opcional de IA.
+3. **Siguiente prioridad:** sustituir la demo por la primera interfaz funcional: shell compartido, navegación, selección visual de mundos de demostración, temas declarativos, estados futuros honestos, marca y diagnóstico de almacenamiento de solo lectura mediante IPC mínimo; comprobar el resultado en el portable.
+4. Completar el endurecimiento de la ventana, retirar las API genéricas del preload y activar el sandbox cuando los contratos requeridos sean compatibles.
+5. **Implementado parcialmente:** SQLite, migraciones, integridad, copias y retención ya existen sin contenido de juego; siguen pendientes los repositorios, la exportación manual y la restauración explícita.
+6. Cerrar en una tarea específica el contrato versionado de paquetes de mundos y crear plantillas originales.
+7. Incorporar importación, validación, edición, exportación y publicación inmutable.
+8. Implementar progresivamente el motor compatible, las campañas, los eventos y la exportación.
+9. Configurar y verificar el perfil privado separado cuando exista autorización para su contenido.
+10. Añadir las fases mecánicas extendida y avanzada y, solo después, la integración opcional de IA.
 
 `STATUS.md` es la fuente para la prioridad inmediata y el resultado real de cada fase.

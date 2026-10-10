@@ -4,6 +4,12 @@ Fatebound es una aplicación de escritorio para Windows destinada a jugar RPG na
 
 El repositorio se encuentra en una fase inicial de fundamentos. Actualmente contiene el scaffold funcional de Electron y Vue, la persistencia SQLite portable, comprobaciones de integridad, copias previas a migraciones y copias automáticas con retención segura; el esquema del juego, el motor, la importación de mundos y las interfaces definitivas todavía no están implementados.
 
+## Visión de producto
+
+Fatebound debe sentirse como jugar una aventura, no como administrar una base de datos. Su dirección de experiencia es **«RPG cinematográfico + diario de aventuras»**: una interfaz moderna, evocadora y cómoda que permita explorar mundos distintos durante sesiones largas sin sacrificar legibilidad, accesibilidad ni navegación sencilla.
+
+La aplicación tendrá una navegación común y reconocible, mientras cada mundo podrá transformar la atmósfera mediante un tema declarativo validado. Paletas, ilustraciones, fondos, símbolos, texturas y opciones tipográficas podrán variar; la claridad de interacción, el contraste y el control del jugador permanecerán constantes. La dirección detallada está en [docs/DESIGN_SYSTEM.md](docs/DESIGN_SYSTEM.md).
+
 ## Tecnologías
 
 - Electron 39
@@ -59,7 +65,7 @@ La aplicación conserva los tres contextos de Electron:
 
 El proceso main contiene un resolvedor central de rutas portables, valida la escritura y abre SQLite antes de mostrar la ventana principal. La arquitectura futura añadirá servicios de dominio y repositorios detrás de contratos IPC mínimos. Los recursos incluidos serán de solo lectura; los datos mutables se guardan en una ubicación resuelta en tiempo de ejecución, nunca en rutas absolutas específicas de un equipo ni dentro de `app.asar`.
 
-Consulta [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) para ver el diseño propuesto y sus límites.
+Consulta [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) para ver la arquitectura y sus límites, [docs/WORLD_FORMAT.md](docs/WORLD_FORMAT.md) para la dirección del formato instalable y [docs/DESIGN_SYSTEM.md](docs/DESIGN_SYSTEM.md) para la dirección visual.
 
 ## Almacenamiento portable
 
@@ -97,7 +103,9 @@ La validación manual básica en Windows está completada: el ejecutable se abre
 
 ## Mundos y distribución
 
-Fatebound debe poder distribuirse públicamente sin mundos instalados y sin incorporar contenido protegido de terceros. Una instalación vacía será un estado válido: el usuario podrá importar sus propios mundos desde Markdown, incluido Ronin para uso personal cuando disponga legítimamente de ese contenido.
+Fatebound debe poder distribuirse públicamente sin mundos instalados y sin incorporar contenido protegido de terceros. Una instalación vacía será un estado válido: el usuario podrá instalar sus propios paquetes de mundos, incluido Ronin para uso personal cuando disponga legítimamente de ese contenido.
+
+La dirección aprobada es distribuir cada mundo como un paquete ZIP instalable. La extensión propuesta es `.fateworld`, pendiente de especificación técnica definitiva. El paquete combinará Markdown, YAML, imágenes, recursos visuales y un tema declarativo; se validará como contenido no confiable y nunca podrá ejecutar código. Varias versiones de un mundo podrán coexistir, y personajes y campañas conservarán su vínculo con la versión exacta con la que fueron creados. Inicialmente los paquetes se prepararán fuera de Fatebound: no es necesario construir primero un editor visual avanzado.
 
 Ronin, de Tiago Junges, no forma parte obligatoria de la distribución pública. Cuando el usuario lo instale, Fatebound conservará intacta su versión importada, creará versiones nuevas para las modificaciones y la protegerá frente al borrado accidental en el gestor de mundos. Sus reglas, contenido y recursos permanecerán separados de las partidas.
 
@@ -106,6 +114,22 @@ Se contempla una compilación privada distinta, con Ronin preinstalado. Esa vari
 El repositorio conserva actualmente recursos gráficos en `resources/worlds/ronin/`, incluidas las 36 combinaciones `1_1.png` a `6_6.png` de clanes. Su presencia en el repositorio no implica que deban incorporarse a una distribución pública: el target portable actual los excluye expresamente. La posible compilación privada todavía no está configurada. El contenido estructurado de Ronin no se ha importado ni instalado en una base de datos.
 
 Los demás mundos serán independientes y seguirán el mismo modelo de importación, validación, edición, versionado y exportación. El contenido importado se tratará siempre como datos, no como código ejecutable.
+
+### Evolución mecánica prevista
+
+La evolución del motor se plantea en tres fases compatibles, todas todavía pendientes de implementación:
+
+1. **Mundos compatibles con Ronin:** comparten sus mecánicas fundamentales y cambian ambientación, nombres, tablas, técnicas, imágenes y presentación mediante datos. Ronin, Paladín y Shaolin son los perfiles de referencia.
+2. **Mundos Ronin ampliados:** añaden capacidades mecánicas compatibles sin obligar a modificar los mundos de la fase 1. Robot y Soldado son los perfiles de referencia.
+3. **Mundos avanzados:** incorporan subsistemas especializados, especialmente de combate. Naves espaciales es el perfil de referencia, con sistemas, escudos y armamento.
+
+Una ampliación nunca deberá romper mundos o partidas existentes sin una estrategia explícita de compatibilidad, pruebas y migración.
+
+## Dirección visual y primera interfaz
+
+La primera interfaz funcional sustituirá la demo actual de electron-vite por una shell Electron/Vue con pantalla principal, navegación, selección visual de mundos y temas demostrativos que cambien realmente el aspecto. Cualquier mundo que solo sirva como demostración visual estará identificado como tal. Personajes y partidas podrán aparecer como secciones preparadas para el futuro, pero no simularán operaciones inexistentes.
+
+Los ajustes incluirán un diagnóstico real y limitado del almacenamiento SQLite, consultado mediante contratos IPC/preload seguros y de solo lectura. La interfaz reutilizará el branding de `resources/branding/` cuando proceda y deberá comprobarse también en el portable de Windows. Esta prioridad no incluye todavía editor de mundos, campañas, reglas avanzadas ni restauración de copias.
 
 ## Plantillas de mundos
 
@@ -143,9 +167,11 @@ El formato deberá permitir importar, validar, editar y exportar un mundo sin p�
 - Artefacto `dist/Fatebound.exe` generado e inspeccionado sin contenido de Ronin ni configuración de actualización automática.
 - Validación manual básica del portable en Windows, incluida la ubicación de `data/` y el flujo completo ante conflictos de escritura.
 - Documentación de producto, estado y arquitectura propuesta.
+- Visión de producto, dirección visual, formato instalable de mundos y hoja de ruta mecánica documentados, todavía sin implementación de interfaz o contenido.
 
 ### Planificado
 
+- Primera interfaz funcional con shell de navegación, selector visual, temas demostrativos y diagnóstico seguro de SQLite.
 - Exportación manual de copias a otra unidad, recuperación explícita y repositorios del dominio sobre SQLite.
 - Validación del portable desde un pendrive físico y desde otro ordenador.
 - Instalaciones válidas sin mundos, importación personal y protección frente al borrado accidental.
