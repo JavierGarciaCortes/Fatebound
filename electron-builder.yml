@@ -1,43 +1,31 @@
-appId: com.electron.app
-productName: fatebound
+appId: com.fatebound.app
+productName: Fatebound
 directories:
   buildResources: build
+  output: dist
 files:
   - '!**/.vscode/*'
   - '!src/*'
+  - '!resources/**'
   - '!electron.vite.config.{js,ts,mjs,cjs}'
   - '!{.eslintcache,eslint.config.mjs,.prettierignore,.prettierrc.yaml,dev-app-update.yml,CHANGELOG.md,README.md}'
   - '!{.env,.env.*,.npmrc,pnpm-lock.yaml}'
   - '!{tsconfig.json,tsconfig.node.json,tsconfig.web.json}'
-asarUnpack:
-  - resources/**
+extraResources:
+  - from: resources
+    to: resources
+    filter:
+      - icon.png
+      - branding/*.png
+      - branding/*.ico
 win:
-  executableName: fatebound
-nsis:
-  artifactName: ${name}-${version}-setup.${ext}
-  shortcutName: ${productName}
-  uninstallDisplayName: ${productName}
-  createDesktopShortcut: always
-mac:
-  entitlementsInherit: build/entitlements.mac.plist
-  extendInfo:
-    - NSCameraUsageDescription: Application requests access to the device's camera.
-    - NSMicrophoneUsageDescription: Application requests access to the device's microphone.
-    - NSDocumentsFolderUsageDescription: Application requests access to the user's Documents folder.
-    - NSDownloadsFolderUsageDescription: Application requests access to the user's Downloads folder.
-  notarize: false
-dmg:
-  artifactName: ${name}-${version}.${ext}
-linux:
   target:
-    - AppImage
-    - snap
-    - deb
-  maintainer: electronjs.org
-  category: Utility
-appImage:
-  artifactName: ${name}-${version}.${ext}
+    - target: portable
+      arch:
+        - x64
+  executableName: Fatebound
+  icon: build/icon.ico
+portable:
+  artifactName: Fatebound.${ext}
+  requestExecutionLevel: user
 npmRebuild: false
-publish:
-  provider: generic
-  url: https://example.com/auto-updates

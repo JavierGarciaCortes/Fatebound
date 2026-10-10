@@ -1,13 +1,13 @@
 {
   "name": "fatebound",
   "version": "1.0.0",
-  "description": "An Electron application with Vue and TypeScript",
+  "description": "Aplicación de escritorio portable para RPG narrativos en solitario",
+  "author": "Fatebound",
   "main": "./out/main/index.js",
-  "author": "example.com",
-  "homepage": "https://electron-vite.org",
   "scripts": {
     "format": "prettier --write .",
     "lint": "eslint --cache .",
+    "test": "node --test --experimental-test-isolation=none --experimental-strip-types --disable-warning=MODULE_TYPELESS_PACKAGE_JSON src/main/storage/portable-storage.test.ts",
     "typecheck:node": "tsc --noEmit -p tsconfig.node.json --composite false",
     "typecheck:web": "vue-tsc --noEmit -p tsconfig.web.json --composite false",
     "typecheck": "npm run typecheck:node && npm run typecheck:web",

@@ -1,6 +1,6 @@
 # Arquitectura de Fatebound 2.0
 
-Estado del documento: propuesta arquitectónica sobre el scaffold existente.
+Estado del documento: arquitectura propuesta con el resolvedor y el empaquetado portable de Windows ya implementados.
 
 Última actualización: 2026-10-10.
 
@@ -15,10 +15,11 @@ El repositorio contiene actualmente:
 - un renderer Vue con la pantalla de demostración de electron-vite;
 - TypeScript estricto, ESLint, Prettier, electron-vite y electron-builder;
 - recursos de marca y 36 imágenes de combinaciones de dados para los clanes de Ronin;
-- una configuración de Windows basada en NSIS, no una distribución portable;
-- un único perfil de empaquetado que todavía no separa artefactos públicos y privados.
+- un target `portable` x64 de electron-builder que genera `dist/Fatebound.exe` sin instalador obligatorio;
+- un empaquetado público con lista explícita de recursos propios; la variante privada todavía no está configurada;
+- un resolvedor central y una comprobación de escritura ejecutados en main antes de crear la ventana principal.
 
-No están implementados SQLite, el resolvedor de rutas portables, el dominio, el importador, el editor, el motor de reglas, las campañas, las crónicas ni la integración de IA.
+No están implementados SQLite, el dominio, el importador, el editor, el motor de reglas, las campañas, las crónicas ni la integración de IA.
 
 ## 2. Principios
 
@@ -55,9 +56,8 @@ El preload expone una superficie pequeña agrupada por capacidades, por ejemplo 
 
 ### 3.3 Main — aplicación
 
-El proceso main es dueño de:
+El proceso main ya es dueño de la resolución de rutas, la comprobación de escritura y el flujo nativo de recuperación. También será dueño de:
 
-- resolución de rutas;
 - validación de solicitudes IPC;
 - casos de uso y transacciones;
 - conexión a SQLite;
@@ -75,32 +75,64 @@ El dominio modelará mundos, versiones, técnicas, efectos, personajes, clanes, 
 
 Adaptadores concretos implementarán repositorios SQLite, almacenes de recursos, importación Markdown y exportación. Las dependencias apuntan hacia contratos del dominio o la aplicación, de modo que puedan probarse sin abrir una ventana de Electron.
 
-Todas las subsecciones 3.1 a 3.5 describen el objetivo; salvo la separación física inicial de procesos, todavía no están implementadas.
+Las capas de dominio e infraestructura continúan siendo propuestas. La frontera de procesos, el resolvedor portable y la validación previa de escritura ya están implementados.
 
 ## 4. Datos portables y SQLite
 
 ### 4.1 Resolución de rutas
 
-**Propuesta no implementada:** un único servicio del proceso main resolverá las ubicaciones. Ningún consumidor construirá rutas absolutas ni dependerá de la letra de una unidad.
+**Implementado:** `src/main/storage/portable-storage.ts` es la fuente central de rutas. Recibe el contexto de ejecución y produce rutas absolutas resueltas en tiempo de ejecución, sin codificar una letra de unidad ni una ubicación específica de un ordenador.
 
-- En desarrollo, el directorio mutable se resolverá desde una raíz conocida del proyecto, con una ubicación ignorada por Git.
-- En una distribución portable, la raíz se resolverá desde la ubicación que el launcher portable proporcione para el ejecutable, no desde el directorio temporal de extracción.
-- Los datos mutables vivirán fuera de `app.asar` y de los recursos integrados.
-- Si la ubicación no es escribible, la aplicación fallará de forma segura e informará al jugador; no cambiará silenciosamente a una carpeta de otro equipo.
+- En desarrollo usa `<appPath>/.fatebound-dev/data/`, una ubicación local ignorada por Git e independiente de instalaciones reales.
+- En una aplicación empaquetada prefiere el directorio indicado por `PORTABLE_EXECUTABLE_DIR`. El launcher portable de electron-builder establece esa variable con `$EXEDIR`, el directorio original de `Fatebound.exe`, antes de extraer y abrir la aplicación. Así, la ruta no depende del directorio temporal. Si la variable no existe, el resolvedor usa el directorio de `process.execPath`.
+- En ambos casos los datos mutables viven fuera de `app.asar` y de los recursos integrados.
+- Una carpeta elegida manualmente se convierte en la raíz de datos solo durante esa sesión; no se persiste, no se inspecciona en busca de datos anteriores y no provoca movimientos ni copias.
 
-La estructura conceptual será equivalente a:
+Las rutas centrales actuales son:
 
 ```text
-<raíz-portable>/
-  data/          SQLite y estado administrado
-  worlds/        recursos de mundos y versiones externas
-  exports/       crónicas exportadas
-  backups/       copias de seguridad recuperables
+<directorio-del-ejecutable-portable>/
+  data/
+    fatebound.sqlite   reservado; no se crea ni se abre todavía
+    worlds/            recursos importados futuros
+    exports/           exportaciones futuras
+    backups/           copias de seguridad futuras
 ```
 
-Los nombres exactos y la política de copias se aprobarán antes de implementarlos.
+Solo el directorio de datos puede crearse durante la comprobación. Los subdirectorios y el archivo SQLite son rutas reservadas para consumidores futuros, no almacenamiento implementado.
 
-### 4.2 SQLite
+### 4.2 Comprobación de escritura y recuperación
+
+**Implementado:** antes de crear la ventana principal, main crea el directorio si falta e intenta escribir un archivo temporal exclusivo con un nombre aleatorio. Después elimina el archivo. Un fallo de escritura o de limpieza invalida la ubicación.
+
+Si la prueba falla, un diálogo nativo ofrece exactamente:
+
+- **Reintentar:** comprueba de nuevo la misma ubicación.
+- **Elegir otra carpeta:** abre el selector del sistema, valida la carpeta elegida y la usa solo durante la sesión.
+- **Salir:** termina la aplicación sin activar almacenamiento ni abrir la ventana Vue.
+
+Cancelar el selector vuelve al diálogo de decisión. No existe fallback automático. La ventana principal se crea una sola vez y únicamente después de activar una ubicación válida; los eventos de activación de Electron se ignoran mientras no haya almacenamiento preparado.
+
+La orquestación está separada de Electron para poder probar reintentos, alternativas y salida con dobles controlados. La prueba de escritura real usa un directorio temporal del sistema y lo elimina al finalizar; ninguna prueba toca carpetas reales del usuario.
+
+### 4.3 Distribución portable de Windows
+
+**Implementado y verificado por construcción e inspección:** `electron-builder.yml` define un target `portable` x64 con identidad `com.fatebound.app`, nombre de producto y ejecutable `Fatebound`, y nivel de ejecución de usuario. `npm run build:win` produce `dist/Fatebound.exe`; no configura instalador obligatorio, publicación ni actualización automática.
+
+El artefacto actual no tiene firma Authenticode. La identidad legal, el certificado y la custodia de sus credenciales deberán resolverse antes de una distribución pública firmada; no se incorporan secretos ni certificados al repositorio.
+
+El ejecutable portable se autoextrae para ejecutar Electron, pero esa ubicación temporal no es la raíz de datos. La cadena comprobada es:
+
+```text
+Fatebound.exe en una carpeta cualquiera
+  -> launcher: PORTABLE_EXECUTABLE_DIR = directorio original del ejecutable
+  -> main: resolvePortableStoragePaths(...)
+  -> <directorio original>/data/
+```
+
+La prueba automatizada usa directorios temporales controlados y confirma que `PORTABLE_EXECUTABLE_DIR` prevalece sobre un `process.execPath` que simula la extracción temporal. La ejecución manual del `.exe` y sus diálogos nativos continúa pendiente.
+
+### 4.4 SQLite
 
 **Propuesta no implementada:** SQLite será el almacén principal y su conexión pertenecerá exclusivamente al proceso main. La ubicación de la base de datos procederá del resolvedor portable.
 
@@ -131,9 +163,11 @@ Personajes y campañas conservan el identificador exacto de la versión del mund
 
 ### 5.1 Recursos incluidos y perfiles de distribución
 
-Los recursos distribuidos con la aplicación permanecen en el paquete como fuente de solo lectura. `resources/branding/` contiene la marca. `resources/worlds/ronin/clans/` contiene actualmente las imágenes existentes `1_1.png` a `6_6.png`; esos nombres y archivos no se alteran en esta fase, pero su presencia en el repositorio no autoriza su inclusión automática en un artefacto público.
+Los recursos distribuidos con la aplicación permanecen en el paquete como fuente de solo lectura. El target público implementado usa `extraResources` con una lista explícita: incluye `resources/icon.png` y los siete archivos de `resources/branding/`, conservando nombres y rutas relativas bajo `process.resourcesPath/resources/`. La inspección del portable y la comparación de hashes confirmaron los ocho archivos.
 
-**Propuesta no implementada:** cada perfil de compilación utilizará una lista explícita de contenido autorizado y un manifiesto versionado con sus recursos y sumas de comprobación. La compilación pública incluirá únicamente recursos propios o autorizados y podrá no contener ningún mundo. Una compilación privada podrá añadir contenido preinstalado permitido sin cambiar las garantías del producto. Nunca se escribirá sobre una copia incluida.
+`resources/worlds/ronin/clans/` conserva en el repositorio las imágenes existentes `1_1.png` a `6_6.png`, sin alteraciones, pero la lista pública las excluye y la inspección confirmó que no aparecen en `Fatebound.exe`.
+
+**Propuesta no implementada:** una compilación privada podrá añadir contenido preinstalado permitido mediante un perfil separado y verificable, sin cambiar las garantías del producto. También queda pendiente definir un manifiesto versionado de recursos y sumas de comprobación. Nunca se escribirá sobre una copia incluida.
 
 Los artefactos públicos y privados tendrán nombres y procesos de salida inequívocos, y se verificará su contenido antes de distribuirlos. No se utilizarán contraseñas, cifrado superficial u ocultación como mecanismo para resolver permisos de licencia.
 
@@ -232,13 +266,14 @@ El preload genérico y `sandbox: false` del scaffold actual son brechas conocida
 
 ## 13. Orden de implementación recomendado
 
-1. Resolver y probar la raíz portable en desarrollo y distribución Windows.
-2. Definir contratos IPC mínimos y endurecer la ventana.
-3. Introducir SQLite, migraciones y repositorios sin contenido de juego.
-4. Diseñar el formato de mundos y sus plantillas originales.
-5. Incorporar importación, validación, edición, exportación y publicación inmutable.
-6. Implementar motor, campañas, eventos y exportación.
-7. Separar y verificar los perfiles de compilación pública y privada.
-8. Añadir interfaces finales e integración opcional de IA.
+1. **Implementado:** resolver y probar la raíz de datos portable y el flujo ante falta de escritura.
+2. **Configurado e inspeccionado; validación manual pendiente:** generar el portable de Windows y validar su comportamiento en ejecución.
+3. Definir contratos IPC mínimos y endurecer la ventana.
+4. Introducir SQLite, migraciones y repositorios sin contenido de juego.
+5. Diseñar el formato de mundos y sus plantillas originales.
+6. Incorporar importación, validación, edición, exportación y publicación inmutable.
+7. Implementar motor, campañas, eventos y exportación.
+8. Configurar y verificar el perfil privado separado cuando exista autorización para su contenido.
+9. Añadir interfaces finales e integración opcional de IA.
 
 `STATUS.md` es la fuente para la prioridad inmediata y el resultado real de cada fase.
