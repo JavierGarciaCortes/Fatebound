@@ -1,13 +1,26 @@
 import { createHash, randomUUID } from 'node:crypto'
 import { createReadStream } from 'node:fs'
-import { mkdir, mkdtemp, readdir, rename, rm, stat, writeFile } from 'node:fs/promises'
+import {
+  mkdir,
+  mkdtemp,
+  readFile,
+  readdir,
+  rename,
+  rm,
+  stat,
+  statfs,
+  unlink,
+  writeFile
+} from 'node:fs/promises'
 import { dirname, join, resolve } from 'node:path'
 import { backup, DatabaseSync, type DatabaseSyncOptions } from 'node:sqlite'
 import { validateSqliteDatabase } from './sqlite-integrity.ts'
 
 const BACKUP_DATABASE_FILE = 'fatebound.sqlite'
 const BACKUP_MANIFEST_FILE = 'manifest.json'
-const BACKUP_FORMAT_VERSION = 1
+const BACKUP_STAGING_MARKER = '.fatebound-backup-staging'
+const BACKUP_FORMAT_VERSION = 2
+const BACKUP_APPLICATION = 'fatebound'
 
 const READ_ONLY_DATABASE_OPTIONS: DatabaseSyncOptions = {
   allowExtension: false,
@@ -18,10 +31,11 @@ const READ_ONLY_DATABASE_OPTIONS: DatabaseSyncOptions = {
   allowUnknownNamedParameters: false
 }
 
-export type SqliteBackupReason = 'pre-migration' | 'automatic' | 'manual'
+export type SqliteBackupReason = 'pre-migration' | 'protected' | 'automatic' | 'manual'
 
 export interface SqliteBackupManifest {
-  readonly formatVersion: 1
+  readonly formatVersion: 2
+  readonly application: typeof BACKUP_APPLICATION
   readonly id: string
   readonly createdAt: string
   readonly reason: SqliteBackupReason
@@ -50,9 +64,10 @@ export interface CreateSqliteBackupOptions {
   readonly now?: () => Date
   readonly backupDatabase?: SqliteBackupFunction
   readonly verifyDatabase?: (databaseFile: string) => void
+  readonly getAvailableBytes?: (directory: string) => Promise<bigint | null>
 }
 
-function formatDirectoryTimestamp(createdAt: string): string {
+export function formatBackupDirectoryTimestamp(createdAt: string): string {
   return createdAt.slice(0, 19).replaceAll('-', '').replaceAll(':', '') + 'Z'
 }
 
@@ -109,7 +124,50 @@ export async function cleanupSqliteBackupTemporaryDirectories(
       throw new Error('Refusing to clean a SQLite backup path outside the backup directory')
     }
 
+    try {
+      const marker = await readFile(join(temporaryDirectory, BACKUP_STAGING_MARKER), 'utf8')
+      if (marker !== `${BACKUP_APPLICATION}\n`) continue
+    } catch {
+      continue
+    }
+
     await rm(temporaryDirectory, { recursive: true, force: true })
+  }
+}
+
+async function getFilesystemAvailableBytes(directory: string): Promise<bigint | null> {
+  try {
+    const filesystem = await statfs(directory, { bigint: true })
+    return filesystem.bavail * filesystem.bsize
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException).code
+    if (code === 'ENOSYS' || code === 'ENOTSUP') return null
+    throw error
+  }
+}
+
+async function assertEnoughSpaceForBackup(
+  sourceDatabase: DatabaseSync,
+  backupsDirectory: string,
+  getAvailableBytes: (directory: string) => Promise<bigint | null>
+): Promise<void> {
+  const sourceFile = sourceDatabase.location()
+
+  if (!sourceFile || sourceFile === ':memory:') {
+    throw new Error('SQLite backups require a file-backed source database')
+  }
+
+  const [sourceStats, availableBytes] = await Promise.all([
+    stat(sourceFile, { bigint: true }),
+    getAvailableBytes(backupsDirectory)
+  ])
+
+  if (availableBytes !== null && availableBytes < sourceStats.size) {
+    const error = new Error(
+      `Not enough free space to create the SQLite backup (${availableBytes} available, ${sourceStats.size} required)`
+    ) as NodeJS.ErrnoException
+    error.code = 'ENOSPC'
+    throw error
   }
 }
 
@@ -130,26 +188,36 @@ export async function createSqliteBackup(
   const createdAt = (options.now ?? (() => new Date()))().toISOString()
   const backupDatabase = options.backupDatabase ?? runNodeSqliteBackup
   const verifyDatabase = options.verifyDatabase ?? verifySqliteBackupFile
+  const getAvailableBytes = options.getAvailableBytes ?? getFilesystemAvailableBytes
 
   assertSafeBackupId(id)
-  await mkdir(resolvedBackupsDirectory, { recursive: true })
-  await cleanupSqliteBackupTemporaryDirectories(resolvedBackupsDirectory)
-
-  const temporaryDirectory = await mkdtemp(join(resolvedBackupsDirectory, '.partial-'))
-  const temporaryDatabaseFile = join(temporaryDirectory, BACKUP_DATABASE_FILE)
-  const temporaryManifestFile = join(temporaryDirectory, BACKUP_MANIFEST_FILE)
-  const finalDirectory = join(
-    resolvedBackupsDirectory,
-    `backup-${formatDirectoryTimestamp(createdAt)}-${options.reason}-${id}`
-  )
+  let temporaryDirectory: string | undefined
 
   try {
+    await mkdir(resolvedBackupsDirectory, { recursive: true })
+    await cleanupSqliteBackupTemporaryDirectories(resolvedBackupsDirectory)
+    await assertEnoughSpaceForBackup(sourceDatabase, resolvedBackupsDirectory, getAvailableBytes)
+
+    temporaryDirectory = await mkdtemp(join(resolvedBackupsDirectory, '.partial-'))
+    const temporaryDatabaseFile = join(temporaryDirectory, BACKUP_DATABASE_FILE)
+    const temporaryManifestFile = join(temporaryDirectory, BACKUP_MANIFEST_FILE)
+    const temporaryStagingMarker = join(temporaryDirectory, BACKUP_STAGING_MARKER)
+    const finalDirectory = join(
+      resolvedBackupsDirectory,
+      `backup-${formatBackupDirectoryTimestamp(createdAt)}-${options.reason}-${id}`
+    )
+
+    await writeFile(temporaryStagingMarker, `${BACKUP_APPLICATION}\n`, {
+      encoding: 'utf8',
+      flag: 'wx'
+    })
     await backupDatabase(sourceDatabase, temporaryDatabaseFile)
     verifyDatabase(temporaryDatabaseFile)
 
     const databaseStats = await stat(temporaryDatabaseFile)
     const manifest: SqliteBackupManifest = Object.freeze({
       formatVersion: BACKUP_FORMAT_VERSION,
+      application: BACKUP_APPLICATION,
       id,
       createdAt,
       reason: options.reason,
@@ -163,6 +231,7 @@ export async function createSqliteBackup(
       encoding: 'utf8',
       flag: 'wx'
     })
+    await unlink(temporaryStagingMarker)
     await rename(temporaryDirectory, finalDirectory)
 
     return {
@@ -173,7 +242,9 @@ export async function createSqliteBackup(
     }
   } catch (error) {
     try {
-      await rm(temporaryDirectory, { recursive: true, force: true })
+      if (temporaryDirectory) {
+        await rm(temporaryDirectory, { recursive: true, force: true })
+      }
     } catch (cleanupError) {
       throw new AggregateError(
         [error, cleanupError],

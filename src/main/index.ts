@@ -12,6 +12,9 @@ import {
 import { acquireSingleInstanceLock } from './single-instance.ts'
 
 let mainWindow: BrowserWindow | null = null
+let shutdownStarted = false
+let shutdownComplete = false
+let automaticBackupWarningVisible = false
 const PORTABLE_SQLITE_VERIFICATION_ARGUMENT = '--verify-portable-sqlite'
 
 function createWindow(): void {
@@ -64,10 +67,36 @@ async function startApplication(): Promise<void> {
   }
 
   activateStoragePaths(storageResult.paths)
-  await openActiveSqliteDatabase()
+  await openActiveSqliteDatabase({
+    onAutomaticBackupError(error) {
+      console.error('Automatic SQLite backup maintenance failed', error)
+
+      if (
+        shutdownStarted ||
+        automaticBackupWarningVisible ||
+        process.argv.includes(PORTABLE_SQLITE_VERIFICATION_ARGUMENT)
+      ) {
+        return
+      }
+
+      automaticBackupWarningVisible = true
+      void dialog
+        .showMessageBox({
+          type: 'warning',
+          title: 'Copia de seguridad no completada',
+          message: 'Fatebound no ha podido crear o mantener la copia automática de SQLite.',
+          detail:
+            'La base de datos principal y las copias anteriores no se han sustituido. Puedes seguir usando Fatebound, pero conviene revisar el espacio disponible y la unidad antes de continuar.',
+          buttons: ['Entendido']
+        })
+        .finally(() => {
+          automaticBackupWarningVisible = false
+        })
+    }
+  })
 
   if (process.argv.includes(PORTABLE_SQLITE_VERIFICATION_ARGUMENT)) {
-    closeActiveSqliteDatabase()
+    await closeActiveSqliteDatabase()
     app.exit(0)
     return
   }
@@ -117,8 +146,21 @@ function registerApplicationLifecycle(): void {
     })
   })
 
-  app.on('will-quit', () => {
-    closeActiveSqliteDatabase()
+  app.on('before-quit', (event) => {
+    if (shutdownComplete) return
+
+    event.preventDefault()
+    if (shutdownStarted) return
+    shutdownStarted = true
+
+    void closeActiveSqliteDatabase()
+      .catch((error: unknown) => {
+        console.error('Unable to close the Fatebound SQLite database safely', error)
+      })
+      .finally(() => {
+        shutdownComplete = true
+        app.quit()
+      })
   })
 
   // Quit when all windows are closed, except on macOS. There, it's common

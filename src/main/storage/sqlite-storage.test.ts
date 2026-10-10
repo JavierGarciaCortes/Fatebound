@@ -38,7 +38,7 @@ async function withTemporaryDatabase(
   try {
     await run(join(dataDirectory, 'fatebound.sqlite'), testRoot, backupsDirectory)
   } finally {
-    closeActiveSqliteDatabase()
+    await closeActiveSqliteDatabase()
     await rm(testRoot, { recursive: true, force: true })
   }
 }
@@ -516,17 +516,13 @@ test('opens the active portable path and closes the connection idempotently', as
     await mkdir(paths.dataDirectory)
     activateStoragePaths(paths)
 
-    const database = await openActiveSqliteDatabase()
-
-    assert.equal(database.location(), paths.databaseFile)
+    await openActiveSqliteDatabase()
     assert.equal(hasOpenActiveSqliteDatabase(), true)
 
-    closeActiveSqliteDatabase()
-    closeActiveSqliteDatabase()
+    await closeActiveSqliteDatabase()
+    await closeActiveSqliteDatabase()
 
-    assert.equal(database.isOpen, false)
     assert.equal(hasOpenActiveSqliteDatabase(), false)
-    assert.throws(() => database.prepare('SELECT 1'), /database is not open/)
   })
 })
 

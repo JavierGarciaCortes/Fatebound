@@ -2,7 +2,7 @@
 
 Fatebound es una aplicación de escritorio para Windows destinada a jugar RPG narrativos en solitario. El objetivo es ofrecer una experiencia local y portable: las reglas, los mundos, las partidas y sus crónicas podrán viajar junto a la aplicación y el juego no dependerá de un servidor ni de conexión a Internet.
 
-El repositorio se encuentra en una fase inicial de fundamentos. Actualmente contiene el scaffold funcional de Electron y Vue, la persistencia SQLite portable y su primera capa de integridad y copias previas a migraciones; el esquema del juego, el motor, la importación de mundos y las interfaces definitivas todavía no están implementados.
+El repositorio se encuentra en una fase inicial de fundamentos. Actualmente contiene el scaffold funcional de Electron y Vue, la persistencia SQLite portable, comprobaciones de integridad, copias previas a migraciones y copias automáticas con retención segura; el esquema del juego, el motor, la importación de mundos y las interfaces definitivas todavía no están implementados.
 
 ## Tecnologías
 
@@ -77,9 +77,15 @@ La apertura, la configuración, las comprobaciones y las migraciones son fases s
 
 Cada migración tiene versión, nombre y SQL integrados en la aplicación. Las pendientes se aplican en orden y cada una usa su propia transacción `BEGIN IMMEDIATE`/`COMMIT`; un fallo ejecuta `ROLLBACK` para esa migración, conserva la copia previa y bloquea el arranque. También se rechaza una base cuya historia sea más nueva o no coincida con la aplicación. Una base completamente nueva aplica su migración inicial sin generar una copia vacía innecesaria.
 
-Las copias se crean mediante `backup()` de `node:sqlite`, nunca copiando el archivo abierto. Cada copia se prepara en un directorio temporal único dentro de `data/backups/`, se valida con las comprobaciones completa y de claves foráneas y solo entonces se publica como un directorio inmutable con `fatebound.sqlite` y `manifest.json`. El manifiesto contiene identificador, fecha UTC, motivo, versión del esquema, tamaño y SHA-256, sin rutas absolutas. Los restos temporales se limpian al intentar una nueva copia y una copia publicada nunca se sobrescribe.
+Las copias se crean mediante `backup()` de `node:sqlite`, nunca copiando el archivo abierto. Cada copia se prepara en un directorio temporal único y marcado dentro de `data/backups/`, se valida con las comprobaciones completa y de claves foráneas y solo entonces se publica como un directorio inmutable con `fatebound.sqlite` y `manifest.json`. El manifiesto v2 identifica a Fatebound y contiene identificador, fecha UTC, motivo, versión del esquema, tamaño y SHA-256, sin rutas absolutas. Antes de comenzar se consulta el espacio disponible cuando el sistema lo permite; `ENOSPC` y los errores de E/S cancelan la candidata sin tocar la base ni las copias publicadas. Solo se limpian restos temporales con el marcador propio y una copia publicada nunca se sobrescribe.
 
-Esta primera fase solo crea copias protegidas antes de migrar una base existente. Todavía no hay copias periódicas, retención automática, exportación a otra unidad ni interfaz de restauración. La futura retención partirá de seis copias automáticas y dos protegidas, conservará la última copia válida y nunca restaurará datos sin confirmación explícita. Como `data/backups/` comparte dispositivo con la base, estas copias no protegen frente a la pérdida o avería física del pendrive.
+Las escrituras ordinarias futuras deben pasar por la transacción central de `sqlite-storage.ts`. Esta confirma el cambio antes de marcar la base como pendiente y no cuenta una transacción revertida. Después del último cambio confirmado se arma un único temporizador de dos minutos; no existe un sondeo ni una copia periódica sin cambios. Tras una copia automática válida se exige un intervalo mínimo de treinta minutos antes de la siguiente. El marcador de cambio pendiente se guarda atómicamente en `data/backups/.automatic-backup-state.json`, de modo que cerrar y volver a abrir Fatebound no pierde una copia pendiente.
+
+Una cola del proceso main serializa escrituras, copias y cierre. Nunca se inician dos copias a la vez ni una nueva durante el cierre; si una ya está en curso, el cierre espera a que finalice antes de cerrar SQLite. Un fallo automático se muestra como advertencia no fatal y conserva la base y todas las copias anteriores. La copia obligatoria previa a una migración mantiene el comportamiento estricto: si no puede publicarse, la migración no comienza.
+
+Después de publicar y verificar una copia nueva se aplica la retención: se conservan como máximo seis automáticas gestionadas y dos protegidas (`pre-migration` o futuras operaciones importantes). Las copias `manual` nunca se eliminan y tampoco se elimina la última copia válida. Antes de borrar se vuelven a comprobar propiedad, estructura exacta, manifiesto, tamaño, SHA-256 e integridad SQLite. Manifiestos v1 anteriores, manifiestos inválidos, directorios con archivos extra y rutas desconocidas quedan fuera de la retención. No hay un límite fijo arbitrario de espacio ni se borran copias para intentar hacer sitio antes de publicar otra.
+
+Todavía no hay exportación a otra unidad ni interfaz de restauración. La restauración seguirá siendo manual y explícita: Fatebound no sustituye datos silenciosamente. Como `data/backups/` comparte dispositivo con la base, estas copias no protegen frente a la pérdida o avería física del pendrive.
 
 Para favorecer la recuperación en unidades extraíbles se usa el journal clásico `DELETE` con `synchronous=EXTRA`, además de claves foráneas activas, extensiones deshabilitadas, `trusted_schema=OFF`, temporales en memoria y una espera de bloqueos de cinco segundos. Esta elección reduce los archivos persistentes auxiliares y conserva el rollback journal junto a la base si una escritura se interrumpe, a costa de más operaciones de sincronización y menor rendimiento que WAL. No hace segura la extracción física durante una escritura: deben cerrarse Fatebound y las escrituras pendientes antes de retirar la unidad.
 
@@ -129,6 +135,8 @@ El formato deberá permitir importar, validar, editar y exportar un mundo sin p�
 - Comprobaciones de integridad y claves foráneas antes de usar bases existentes y alrededor de sus migraciones.
 - Copias consistentes mediante `node:sqlite`, verificadas y acompañadas de manifiesto antes de publicarse en `data/backups/`.
 - Protección obligatoria previa a migraciones, sin restauración automática, y bloqueo de instancia única antes de abrir SQLite.
+- Copias automáticas tras dos minutos sin cambios, intervalo mínimo de treinta minutos, estado pendiente persistente y operaciones SQLite serializadas en main.
+- Retención verificada de seis copias automáticas y dos protegidas, sin eliminar copias manuales, inválidas, desconocidas ni la última copia válida.
 - Pruebas SQLite aisladas para creación, persistencia, integridad, copias, migraciones, reapertura, errores y cierre.
 - Recursos de marca y las imágenes de clanes de Ronin presentes en el repositorio, sin mover ni renombrar.
 - Target portable x64 de Windows con identidad de Fatebound y recursos públicos incluidos mediante una lista explícita.
@@ -138,7 +146,7 @@ El formato deberá permitir importar, validar, editar y exportar un mundo sin p�
 
 ### Planificado
 
-- Automatización y retención de copias, exportación manual, recuperación explícita y repositorios del dominio sobre SQLite.
+- Exportación manual de copias a otra unidad, recuperación explícita y repositorios del dominio sobre SQLite.
 - Validación del portable desde un pendrive físico y desde otro ordenador.
 - Instalaciones válidas sin mundos, importación personal y protección frente al borrado accidental.
 - Separación de compilaciones públicas sin contenido protegido y compilaciones privadas autorizadas.

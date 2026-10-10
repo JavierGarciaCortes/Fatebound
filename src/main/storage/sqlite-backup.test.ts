@@ -85,7 +85,8 @@ test('writes a relative manifest with size and matching SHA-256', async () => {
     const databaseStats = await stat(result.databaseFile)
 
     assert.deepEqual(manifest, result.manifest)
-    assert.equal(manifest.formatVersion, 1)
+    assert.equal(manifest.formatVersion, 2)
+    assert.equal(manifest.application, 'fatebound')
     assert.equal(manifest.id, FIXED_ID)
     assert.equal(manifest.createdAt, FIXED_DATE.toISOString())
     assert.equal(manifest.reason, 'pre-migration')
@@ -161,6 +162,7 @@ test('cleans stale temporary backup directories without deleting published backu
   await withBackupFixture(async (database, _databaseFile, backupsDirectory) => {
     const staleDirectory = join(backupsDirectory, '.partial-stale')
     await mkdir(staleDirectory, { recursive: true })
+    await writeFile(join(staleDirectory, '.fatebound-backup-staging'), 'fatebound\n')
     await writeFile(join(staleDirectory, 'incomplete.sqlite'), 'incomplete')
     const existingBackupDirectory = join(backupsDirectory, 'backup-existing')
     await mkdir(existingBackupDirectory)
@@ -175,5 +177,80 @@ test('cleans stale temporary backup directories without deleting published backu
     assert.equal(entries.includes('.partial-stale'), false)
     assert.equal(entries.includes('backup-existing'), true)
     assert.equal(entries.filter((entry) => entry.startsWith('backup-')).length, 2)
+  })
+})
+
+test('does not remove an unknown directory that only resembles backup staging', async () => {
+  await withBackupFixture(async (database, _databaseFile, backupsDirectory) => {
+    const unknownDirectory = join(backupsDirectory, '.partial-unknown')
+    await mkdir(unknownDirectory, { recursive: true })
+    await writeFile(join(unknownDirectory, 'keep.txt'), 'unknown data')
+
+    await createSqliteBackup(database, backupsDirectory, {
+      reason: 'manual',
+      schemaVersion: 1
+    })
+
+    assert.deepEqual(await readFile(join(unknownDirectory, 'keep.txt'), 'utf8'), 'unknown data')
+  })
+})
+
+test('reports ENOSPC before publication and preserves earlier backups', async () => {
+  await withBackupFixture(async (database, _databaseFile, backupsDirectory) => {
+    const existing = await createSqliteBackup(database, backupsDirectory, {
+      reason: 'manual',
+      schemaVersion: 1
+    })
+
+    await assert.rejects(
+      createSqliteBackup(database, backupsDirectory, {
+        reason: 'automatic',
+        schemaVersion: 1,
+        async getAvailableBytes() {
+          return 0n
+        }
+      }),
+      (error: unknown) => {
+        assert.ok(error instanceof Error)
+        assert.match(error.message, /Could not create a verified Fatebound SQLite backup/)
+        assert.equal((error.cause as NodeJS.ErrnoException).code, 'ENOSPC')
+        return true
+      }
+    )
+
+    assert.equal((await stat(existing.databaseFile)).isFile(), true)
+    assert.equal(
+      (await readdir(backupsDirectory)).filter((name) => name.startsWith('backup-')).length,
+      1
+    )
+  })
+})
+
+test('cleans an ENOSPC write failure without touching earlier backups', async () => {
+  await withBackupFixture(async (database, _databaseFile, backupsDirectory) => {
+    const existing = await createSqliteBackup(database, backupsDirectory, {
+      reason: 'manual',
+      schemaVersion: 1
+    })
+
+    await assert.rejects(
+      createSqliteBackup(database, backupsDirectory, {
+        reason: 'automatic',
+        schemaVersion: 1,
+        async backupDatabase(_sourceDatabase, destinationFile) {
+          await writeFile(destinationFile, 'partial')
+          const error = new Error('disk full') as NodeJS.ErrnoException
+          error.code = 'ENOSPC'
+          throw error
+        }
+      }),
+      /Could not create a verified Fatebound SQLite backup/
+    )
+
+    assert.equal((await stat(existing.databaseFile)).isFile(), true)
+    assert.equal(
+      (await readdir(backupsDirectory)).filter((name) => name.startsWith('backup-')).length,
+      1
+    )
   })
 })

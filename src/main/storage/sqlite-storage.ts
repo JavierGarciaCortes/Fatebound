@@ -2,7 +2,13 @@ import { stat } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { DatabaseSync, type DatabaseSyncOptions } from 'node:sqlite'
 import { getActiveStoragePaths } from './portable-storage.ts'
+import {
+  AutomaticSqliteBackupCoordinator,
+  loadAutomaticBackupState,
+  saveAutomaticBackupState
+} from './sqlite-automatic-backup.ts'
 import { createSqliteBackup, type CreateSqliteBackupOptions } from './sqlite-backup.ts'
+import { enforceSqliteBackupRetention } from './sqlite-backup-retention.ts'
 import { validateSqliteDatabase } from './sqlite-integrity.ts'
 import {
   applySqliteMigrations,
@@ -10,10 +16,17 @@ import {
   SQLITE_MIGRATIONS,
   type SqliteMigration
 } from './sqlite-migrations.ts'
+import { SqliteOperationQueue } from './sqlite-operation-queue.ts'
 
 const SQLITE_BUSY_TIMEOUT_MS = 5_000
 
-let activeDatabase: DatabaseSync | undefined
+interface ActiveSqliteRuntime {
+  readonly database: DatabaseSync
+  readonly operations: SqliteOperationQueue
+  readonly automaticBackups: AutomaticSqliteBackupCoordinator
+}
+
+let activeRuntime: ActiveSqliteRuntime | undefined
 let activeDatabaseOpening = false
 
 const DATABASE_OPTIONS: DatabaseSyncOptions = {
@@ -28,6 +41,12 @@ const DATABASE_OPTIONS: DatabaseSyncOptions = {
 export interface SqliteDatabaseStartupOptions {
   readonly migrations?: readonly SqliteMigration[]
   readonly createMigrationBackup?: typeof createSqliteBackup
+  readonly enforceBackupRetention?: typeof enforceSqliteBackupRetention
+  readonly onBackupMaintenanceError?: (error: unknown) => void
+}
+
+export interface ActiveSqliteDatabaseOptions {
+  readonly onAutomaticBackupError?: (error: unknown) => void
 }
 
 interface JournalModeRow {
@@ -79,6 +98,7 @@ export async function openSqliteDatabase(
   const resolvedBackupsDirectory = resolve(backupsDirectory)
   const migrations = options.migrations ?? SQLITE_MIGRATIONS
   const createMigrationBackup = options.createMigrationBackup ?? createSqliteBackup
+  const enforceBackupRetention = options.enforceBackupRetention ?? enforceSqliteBackupRetention
   const existedBeforeStartup = await databaseFileExists(resolvedDatabaseFile)
   let database: DatabaseSync | undefined
 
@@ -99,6 +119,12 @@ export async function openSqliteDatabase(
         resolvedBackupsDirectory,
         migrationBackupOptions(migrationPlan.currentVersion)
       )
+
+      try {
+        await enforceBackupRetention(resolvedBackupsDirectory)
+      } catch (error) {
+        options.onBackupMaintenanceError?.(error)
+      }
     }
 
     if (migrationPlan.pendingMigrations.length > 0) {
@@ -117,30 +143,131 @@ export async function openSqliteDatabase(
   }
 }
 
-export async function openActiveSqliteDatabase(): Promise<DatabaseSync> {
-  if (activeDatabase?.isOpen || activeDatabaseOpening) {
+export async function openActiveSqliteDatabase(
+  options: ActiveSqliteDatabaseOptions = {}
+): Promise<void> {
+  if (activeRuntime?.database.isOpen || activeDatabaseOpening) {
     throw new Error('The Fatebound SQLite database is already open')
   }
 
   activeDatabaseOpening = true
+  let openedDatabase: DatabaseSync | undefined
 
   try {
     const paths = getActiveStoragePaths()
-    const database = await openSqliteDatabase(paths.databaseFile, paths.backupsDirectory)
-    activeDatabase = database
-    return database
+    const reportAutomaticBackupError = options.onAutomaticBackupError ?? (() => undefined)
+    const database = await openSqliteDatabase(paths.databaseFile, paths.backupsDirectory, {
+      onBackupMaintenanceError: reportAutomaticBackupError
+    })
+    openedDatabase = database
+    const operations = new SqliteOperationQueue()
+    const initialBackupState = await loadAutomaticBackupState(
+      paths.backupsDirectory,
+      reportAutomaticBackupError
+    )
+    const automaticBackups = new AutomaticSqliteBackupCoordinator({
+      initialState: initialBackupState,
+      onError: reportAutomaticBackupError,
+      persistState: (state) => saveAutomaticBackupState(paths.backupsDirectory, state),
+      createBackup: () =>
+        operations.run(async () => {
+          if (!database.isOpen) {
+            throw new Error('SQLite is not available for an automatic backup')
+          }
+
+          const schemaVersion = getSqliteMigrationPlan(database).currentVersion
+          const result = await createSqliteBackup(database, paths.backupsDirectory, {
+            reason: 'automatic',
+            schemaVersion
+          })
+
+          try {
+            await enforceSqliteBackupRetention(paths.backupsDirectory)
+          } catch (error) {
+            reportAutomaticBackupError(error)
+          }
+
+          return result
+        })
+    })
+
+    activeRuntime = { database, operations, automaticBackups }
+    automaticBackups.start()
+  } catch (error) {
+    if (activeRuntime?.database.isOpen) activeRuntime.database.close()
+    if (openedDatabase?.isOpen) openedDatabase.close()
+    activeRuntime = undefined
+    throw error
   } finally {
     activeDatabaseOpening = false
   }
 }
 
 export function hasOpenActiveSqliteDatabase(): boolean {
-  return activeDatabase?.isOpen === true
+  return activeRuntime?.database.isOpen === true
 }
 
-export function closeActiveSqliteDatabase(): void {
-  const database = activeDatabase
-  activeDatabase = undefined
+interface TotalChangesRow {
+  readonly count: number
+}
 
-  if (database?.isOpen) database.close()
+function readTotalChanges(database: DatabaseSync): number {
+  return (database.prepare('SELECT total_changes() AS count').get() as unknown as TotalChangesRow)
+    .count
+}
+
+export async function runSqliteWriteTransaction<T>(
+  database: DatabaseSync,
+  operation: (database: DatabaseSync) => T,
+  onCommittedChange: () => void | Promise<void>
+): Promise<T> {
+  const totalChangesBefore = readTotalChanges(database)
+  database.exec('BEGIN IMMEDIATE')
+
+  try {
+    const result = operation(database)
+    if (result instanceof Promise) {
+      throw new Error('SQLite write transactions must not contain asynchronous work')
+    }
+    if (!database.isTransaction) {
+      throw new Error('SQLite write operations must not commit or roll back their own transaction')
+    }
+
+    const changed = readTotalChanges(database) > totalChangesBefore
+    database.exec('COMMIT')
+    if (changed) await onCommittedChange()
+    return result
+  } catch (error) {
+    if (database.isTransaction) database.exec('ROLLBACK')
+    throw error
+  }
+}
+
+export async function runActiveSqliteWriteTransaction<T>(
+  operation: (database: DatabaseSync) => T
+): Promise<T> {
+  const runtime = activeRuntime
+  if (!runtime?.database.isOpen) {
+    throw new Error('The Fatebound SQLite database is not available')
+  }
+
+  return runtime.operations.run(() =>
+    runSqliteWriteTransaction(runtime.database, operation, () =>
+      runtime.automaticBackups.recordCommittedChange()
+    )
+  )
+}
+
+export async function closeActiveSqliteDatabase(): Promise<void> {
+  const runtime = activeRuntime
+  activeRuntime = undefined
+
+  if (!runtime) return
+
+  const backupShutdown = runtime.automaticBackups.stop()
+  runtime.operations.stopAccepting()
+  await backupShutdown
+  await runtime.operations.waitForIdle()
+
+  if (runtime.database.isOpen) runtime.database.close()
 }
