@@ -27,6 +27,11 @@ interface AppliedMigrationRow {
   readonly name: string
 }
 
+export interface SqliteMigrationPlan {
+  readonly currentVersion: number
+  readonly pendingMigrations: readonly SqliteMigration[]
+}
+
 function validateMigrationManifest(migrations: readonly SqliteMigration[]): void {
   migrations.forEach((migration, index) => {
     const expectedVersion = index + 1
@@ -105,12 +110,24 @@ export function applySqliteMigrations(
   database: DatabaseSync,
   migrations: readonly SqliteMigration[] = SQLITE_MIGRATIONS
 ): void {
+  const plan = getSqliteMigrationPlan(database, migrations)
+
+  for (const migration of plan.pendingMigrations) {
+    applyMigration(database, migration)
+  }
+}
+
+export function getSqliteMigrationPlan(
+  database: DatabaseSync,
+  migrations: readonly SqliteMigration[] = SQLITE_MIGRATIONS
+): SqliteMigrationPlan {
   validateMigrationManifest(migrations)
 
   const appliedMigrations = readAppliedMigrations(database)
   validateAppliedMigrations(appliedMigrations, migrations)
 
-  for (const migration of migrations.slice(appliedMigrations.length)) {
-    applyMigration(database, migration)
-  }
+  return Object.freeze({
+    currentVersion: appliedMigrations.at(-1)?.version ?? 0,
+    pendingMigrations: Object.freeze(migrations.slice(appliedMigrations.length))
+  })
 }

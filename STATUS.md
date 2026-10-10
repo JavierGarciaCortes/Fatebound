@@ -6,7 +6,7 @@ Rama de trabajo: `feature/sqlite-storage`
 
 ## Estado general
 
-Fatebound 2.0 está en fase de fundamentos. El scaffold de Electron, Vue 3 y TypeScript existe, y el proceso main ya resuelve y valida una ubicación de almacenamiento, abre SQLite y aplica sus migraciones antes de abrir la interfaz. Todavía no hay esquema del juego, mundos instalados, motor de reglas, gestión de partidas ni interfaz final. La futura aplicación podrá iniciarse legítimamente sin mundos y permitirá que el usuario importe los suyos.
+Fatebound 2.0 está en fase de fundamentos. El scaffold de Electron, Vue 3 y TypeScript existe, y el proceso main ya resuelve y valida una ubicación de almacenamiento, comprueba SQLite, crea copias protegidas antes de migrar bases existentes y aplica sus migraciones antes de abrir la interfaz. Todavía no hay esquema del juego, mundos instalados, motor de reglas, gestión de partidas ni interfaz final. La futura aplicación podrá iniciarse legítimamente sin mundos y permitirá que el usuario importe los suyos.
 
 Una decisión documentada no equivale a funcionalidad implementada. Todo lo descrito como **propuesto** en `docs/ARCHITECTURE.md` continúa pendiente de desarrollo y verificación.
 
@@ -31,8 +31,15 @@ Una decisión documentada no equivale a funcionalidad implementada. Todo lo desc
 - [x] Configuración portable `journal_mode=DELETE`, `synchronous=EXTRA`, claves foráneas, extensiones deshabilitadas, `trusted_schema=OFF`, temporales en memoria y espera de bloqueos.
 - [x] Migraciones SQL ordenadas, versionadas y transaccionales, con rechazo de historiales incompatibles.
 - [x] Migración inicial limitada a la tabla técnica `fatebound_schema_migrations`; no se ha creado el esquema del juego.
+- [x] Apertura, configuración, comprobación, protección y migración de SQLite separadas en fases explícitas.
+- [x] `quick_check` y `foreign_key_check` sobre bases existentes; `integrity_check` antes y después de sus migraciones.
+- [x] Copias consistentes mediante `backup()` de `node:sqlite`, verificadas antes de publicarse bajo `data/backups/`.
+- [x] Manifiesto sin rutas absolutas con identificador, fecha UTC, motivo, versión de esquema, tamaño y SHA-256.
+- [x] Copia obligatoria antes de migrar una base existente, sin copia inicial vacía ni restauración automática.
+- [x] Publicación con nombres únicos, conservación de copias anteriores y limpieza acotada de staging `.partial-*`.
+- [x] Bloqueo de instancia única adquirido antes de abrir SQLite; una segunda instancia sale sin acceder a la base.
 - [x] Cierre idempotente de la conexión durante `will-quit` y antes de terminar la verificación del portable.
-- [x] Dieciséis pruebas automatizadas para rutas, permisos, apertura, persistencia, migraciones, reapertura, errores y cierre, siempre sobre directorios temporales aislados.
+- [x] Treinta y cuatro pruebas automatizadas para rutas, permisos, instancia única, integridad, copias, apertura, persistencia, migraciones, reapertura, errores y cierre, siempre sobre directorios temporales aislados.
 - [x] Target `portable` x64 de electron-builder configurado para generar `dist/Fatebound.exe` sin instalador obligatorio.
 - [x] Identidad de plantilla sustituida por `com.fatebound.app`, autor/producto `Fatebound` y `Fatebound.exe`; eliminadas la publicación de ejemplo y la configuración de actualizaciones.
 - [x] Lista pública de recursos limitada a `resources/icon.png` y `resources/branding/`, conservando nombres, rutas relativas y contenido.
@@ -45,11 +52,11 @@ La documentación y el scaffold existente se han revisado con las comprobaciones
 
 ## Trabajo actualmente en curso
 
-La infraestructura inicial de SQLite portable está implementada. La base se crea o abre en la ruta activa, las migraciones se ejecutan antes de la interfaz y un fallo impide continuar. La implementación automatizada usa almacenamiento temporal aislado; la verificación del artefacto portable y sus resultados se detallan al final de este archivo. La ejecución desde un pendrive físico y desde otro ordenador sigue pendiente.
+La primera fase de seguridad de SQLite portable está implementada. La base se valida antes de usarse, las bases existentes reciben una copia verificada antes de cualquier migración pendiente y un fallo de integridad, copia o migración impide abrir la interfaz sin restaurar datos automáticamente. Las copias periódicas, la retención, la exportación externa y la recuperación manual siguen pendientes. La ejecución desde un pendrive físico y desde otro ordenador tampoco se ha realizado todavía.
 
 ## Siguiente tarea prioritaria
 
-**Diseñar e implementar la primera estrategia de copia de seguridad y recuperación de SQLite**, antes de ampliar el esquema con datos del juego, incluyendo el caso de una extracción insegura de la unidad.
+**Implementar la automatización y retención de copias SQLite**, partiendo de seis copias automáticas y dos protegidas, preservando siempre la última copia válida y sin añadir todavía restauración silenciosa.
 
 ## Pendientes por fases
 
@@ -62,7 +69,8 @@ La infraestructura inicial de SQLite portable está implementada. La base se cre
 ### Fase 2 — Persistencia y versiones
 
 - Implementar repositorios de aplicación y transacciones sobre la conexión SQLite existente.
-- Implementar copias de seguridad y recuperación ante corrupción o extracción insegura.
+- Implementar copias automáticas después de cambios, retención de seis automáticas y dos protegidas, límites de espacio y protección de la última copia válida.
+- Implementar exportación manual a otra unidad y recuperación explícita sin sobrescritura silenciosa.
 - Implementar mundos y versiones publicadas inmutables.
 - Vincular personajes y campañas a una versión concreta del mundo.
 - Permitir una instalación válida sin mundos y registrar de forma idempotente los mundos importados.
@@ -99,12 +107,15 @@ La infraestructura inicial de SQLite portable está implementada. La base se cre
 - La portabilidad todavía no se ha validado desde un pendrive físico ni desde otro ordenador.
 - `Fatebound.exe` no tiene firma Authenticode; el certificado y el proceso de firma para distribución están pendientes.
 - `node:sqlite` continúa clasificado como API en desarrollo activo en Node 22; la compatibilidad queda ligada y verificada contra la versión de Node incluida en Electron 39.
-- `journal_mode=DELETE` con `synchronous=EXTRA` reduce el riesgo, pero no garantiza integridad si se retira físicamente una unidad durante una escritura ni sustituye las futuras copias de seguridad.
-- No existen todavía copias de seguridad, recuperación ante corrupción ni comprobación de integridad al arrancar.
+- `journal_mode=DELETE` con `synchronous=EXTRA` y las copias previas reducen el riesgo, pero no hacen segura la retirada física durante una escritura.
+- Las copias locales comparten dispositivo con la base y no protegen frente a pérdida o avería física del pendrive.
+- Solo existen copias previas a migraciones: faltan automatización tras cambios, retención, límites de espacio, exportación externa y recuperación manual.
+- El bloqueo de instancia tiene cobertura unitaria mediante un doble de Electron; lanzar dos ejecutables simultáneos sigue pendiente de comprobación manual.
 
 ## Decisiones pendientes
 
-- Política de copias de seguridad y recuperación ante extracción insegura de una unidad.
+- Interfaz y flujo exactos de recuperación manual y cuarentena de una base dañada.
+- Política de espacio disponible para aplicar la retención aprobada de seis copias automáticas y dos protegidas.
 - Esquema y versionado del contrato de importación Markdown.
 - Organización concreta de las plantillas originales y estrategia de compatibilidad para importar, validar, editar y exportar sin pérdida.
 - Identificadores, numeración y ciclo de publicación de versiones de mundos.
@@ -117,18 +128,19 @@ La infraestructura inicial de SQLite portable está implementada. La base se cre
 
 ## Validación de esta actualización
 
-- `npm test`: superado, 16 pruebas; las siete nuevas pruebas SQLite cubren creación, configuración, persistencia, migración pendiente, rollback, versión futura, error de apertura y cierre activo.
-- `npm run lint`: superado con código 0; ESLint conserva 507 avisos históricos de Prettier por finales de línea CRLF en archivos anteriores.
+- `npm test`: superado, 34 pruebas. Cubren integridad correcta y base truncada, claves foráneas, copia y reapertura, manifiesto y SHA-256, no sobrescritura, interrupción y candidato inválido, limpieza de staging, copia previa obligatoria, bloqueo ante fallos, migración parcialmente confirmada sin restauración automática, base nueva sin copia e instancia única mediante doble de Electron.
+- `npm run lint`: superado con código 0 y sin avisos mostrados.
 - `npm run typecheck`: superado para main/preload y renderer.
-- `npm run build`: superado fuera del sandbox; el primer intento dentro del entorno restringido fue bloqueado al iniciar `esbuild` con `spawn EPERM`.
-- `npm run build:win`: superado fuera del sandbox. Generó `D:\Proyectos\Fatebound\dist\Fatebound.exe` (87.099.876 bytes; SHA-256 `3730C6E695FD252AF6B46F525C84B37378CAC293D242C70E7819F34349C207E4`).
-- Inspección de `app.asar`: el bundle main contiene `require("node:sqlite")`, la configuración `DELETE`/`EXTRA` y el modo de verificación; no contiene `better-sqlite3` ni un binario `sqlite3.node`, porque SQLite forma parte del runtime Electron.
-- Ejecución automatizada del `Fatebound.exe` portable real desde una carpeta temporal: código 0, base de 12.288 bytes creada en `data/fatebound.sqlite` junto al ejecutable, migración 1 presente y `PRAGMA integrity_check = ok`. La carpeta temporal se eliminó al terminar.
-- La misma verificación sobre `win-unpacked` también terminó con código 0. Los intentos iniciales con código 9/1 no llegaron a Fatebound porque el entorno del agente imponía `ELECTRON_RUN_AS_NODE=1`; al retirarla del proceso hijo, ambos artefactos funcionaron.
-- `node:sqlite` se comprobó además en el runtime instalado Electron 39.8.10 / Node 22.22.1 / SQLite 3.51.2 y en Node de desarrollo 22.23.2 / SQLite 3.51.3.
+- `npm run build`: superado fuera del sandbox; el intento inicial dentro del entorno restringido fue bloqueado al iniciar `esbuild` con `spawn EPERM`.
+- `npm run build:win`: superado fuera del sandbox. Generó `D:\Proyectos\Fatebound\dist\Fatebound.exe` (87.100.356 bytes; SHA-256 `A7E8E8FC1BDED7EB33AED290ED12D3BDC78C46DF2469A339E8D87EE4ED732A3D`).
+- Inspección de `app.asar`: el bundle main contiene `node:sqlite`, la llamada de backup, staging `.partial-*`, motivo `pre-migration`, bloqueo de instancia y configuración `DELETE`/`EXTRA`. `win-unpacked` no contiene `sqlite3.node`, DLL ni ejecutable SQLite externo.
+- Ejecución del portable real sobre una carpeta temporal nueva: código 0, migración 1 e `integrity_check = ok`; no creó `data/backups/`, como corresponde a una base completamente nueva.
+- Ejecución del portable real sobre una base existente de esquema 0: código 0, creó una única copia `pre-migration`, el manifiesto declaró esquema 0 y su SHA-256 coincidió. La copia conservó los datos anteriores, obtuvo `integrity_check = ok`, cero infracciones foráneas y no contenía la tabla creada por la migración posterior.
+- `node:sqlite` se comprobó con Node de desarrollo 22.23.2 / SQLite 3.51.3 y mediante el runtime integrado en el portable Electron 39.8.10.
 - `Get-AuthenticodeSignature dist\Fatebound.exe`: `NotSigned`; no se configuró firma en esta tarea.
-- `git diff --check` y revisión final de `git diff` / `git status`: superadas; no hay cambios ajenos al alcance ni archivos temporales residuales.
-- Ejecución desde un pendrive físico y desde otro ordenador: no realizada todavía.
+- `git diff --check` y revisión de `git diff` / `git status`: superados; los cambios se limitan a almacenamiento SQLite, arranque, pruebas y los tres documentos obligatorios. Git mostró únicamente sus avisos informativos de conversión LF/CRLF.
+- Prueba real de dos instancias simultáneas: pendiente de comprobación manual; la decisión de salir antes de iniciar almacenamiento está cubierta con dobles automatizados.
+- Ejecución desde un pendrive físico y desde otro ordenador: no realizada.
 
 ## Registro de cambios
 
@@ -151,3 +163,8 @@ La infraestructura inicial de SQLite portable está implementada. La base se cre
 - Añadidas migraciones SQL transaccionales y una primera migración limitada al control de versiones.
 - Adoptados `journal_mode=DELETE` y `synchronous=EXTRA` para priorizar recuperación y durabilidad en almacenamiento extraíble.
 - Añadidas pruebas aisladas de apertura, persistencia, migraciones, reapertura, errores y cierre.
+- Separadas la apertura, configuración, validación, protección y migración de SQLite.
+- Añadidas comprobaciones `quick_check`, `integrity_check` y `foreign_key_check` que bloquean el arranque ante datos inválidos.
+- Implementadas copias consistentes con la API de backup de `node:sqlite`, staging único, verificación, SHA-256 y manifiesto portable.
+- Protegidas las migraciones de bases existentes mediante una copia obligatoria, sin restauración automática ni copia inicial vacía.
+- Añadido el bloqueo de instancia única antes de acceder al almacenamiento.

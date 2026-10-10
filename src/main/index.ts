@@ -9,6 +9,7 @@ import {
   hasOpenActiveSqliteDatabase,
   openActiveSqliteDatabase
 } from './storage/sqlite-storage.ts'
+import { acquireSingleInstanceLock } from './single-instance.ts'
 
 let mainWindow: BrowserWindow | null = null
 const PORTABLE_SQLITE_VERIFICATION_ARGUMENT = '--verify-portable-sqlite'
@@ -63,7 +64,7 @@ async function startApplication(): Promise<void> {
   }
 
   activateStoragePaths(storageResult.paths)
-  openActiveSqliteDatabase()
+  await openActiveSqliteDatabase()
 
   if (process.argv.includes(PORTABLE_SQLITE_VERIFICATION_ARGUMENT)) {
     closeActiveSqliteDatabase()
@@ -74,59 +75,71 @@ async function startApplication(): Promise<void> {
   createWindow()
 }
 
-// This method will be called when Electron has finished
-// initialization and is ready to create browser windows.
-// Some APIs can only be used after this event occurs.
-app.whenReady().then(() => {
-  // Set app user model id for windows
-  electronApp.setAppUserModelId('com.fatebound.app')
+function registerApplicationLifecycle(): void {
+  // This method will be called when Electron has finished
+  // initialization and is ready to create browser windows.
+  // Some APIs can only be used after this event occurs.
+  app.whenReady().then(() => {
+    // Set app user model id for windows
+    electronApp.setAppUserModelId('com.fatebound.app')
 
-  // Default open or close DevTools by F12 in development
-  // and ignore CommandOrControl + R in production.
-  // see https://github.com/alex8088/electron-toolkit/tree/master/packages/utils
-  app.on('browser-window-created', (_, window) => {
-    optimizer.watchWindowShortcuts(window)
+    // Default open or close DevTools by F12 in development
+    // and ignore CommandOrControl + R in production.
+    // see https://github.com/alex8088/electron-toolkit/tree/master/packages/utils
+    app.on('browser-window-created', (_, window) => {
+      optimizer.watchWindowShortcuts(window)
+    })
+
+    // IPC test
+    ipcMain.on('ping', () => console.log('pong'))
+
+    app.on('activate', function () {
+      if (!hasActiveStoragePaths() || !hasOpenActiveSqliteDatabase()) return
+
+      // On macOS it's common to re-create a window in the app when the
+      // dock icon is clicked and there are no other windows open.
+      if (BrowserWindow.getAllWindows().length === 0) createWindow()
+    })
+
+    void startApplication().catch((error: unknown) => {
+      console.error('Unable to initialize the Fatebound SQLite database', error)
+
+      if (process.argv.includes(PORTABLE_SQLITE_VERIFICATION_ARGUMENT)) {
+        app.exit(1)
+        return
+      }
+
+      dialog.showErrorBox(
+        'Fatebound no puede abrir sus datos',
+        'La comprobación de integridad, la copia de seguridad o la migración de SQLite no se pudo completar. Fatebound se cerrará sin abrir la interfaz y no restaurará ni sustituirá automáticamente la base de datos.'
+      )
+      app.quit()
+    })
   })
 
-  // IPC test
-  ipcMain.on('ping', () => console.log('pong'))
-
-  app.on('activate', function () {
-    if (!hasActiveStoragePaths() || !hasOpenActiveSqliteDatabase()) return
-
-    // On macOS it's common to re-create a window in the app when the
-    // dock icon is clicked and there are no other windows open.
-    if (BrowserWindow.getAllWindows().length === 0) createWindow()
+  app.on('will-quit', () => {
+    closeActiveSqliteDatabase()
   })
 
-  void startApplication().catch((error: unknown) => {
-    console.error('Unable to initialize the Fatebound SQLite database', error)
-
-    if (process.argv.includes(PORTABLE_SQLITE_VERIFICATION_ARGUMENT)) {
-      app.exit(1)
-      return
+  // Quit when all windows are closed, except on macOS. There, it's common
+  // for applications and their menu bar to stay active until the user quits
+  // explicitly with Cmd + Q.
+  app.on('window-all-closed', () => {
+    if (process.platform !== 'darwin') {
+      app.quit()
     }
-
-    dialog.showErrorBox(
-      'Fatebound no puede abrir sus datos',
-      'No se pudo crear, abrir o actualizar la base de datos SQLite. Fatebound se cerrará sin mostrar la ventana principal para evitar trabajar sin persistencia.'
-    )
-    app.quit()
   })
-})
+}
 
-app.on('will-quit', () => {
-  closeActiveSqliteDatabase()
-})
+if (acquireSingleInstanceLock(app)) {
+  app.on('second-instance', () => {
+    if (!mainWindow || mainWindow.isDestroyed()) return
+    if (mainWindow.isMinimized()) mainWindow.restore()
+    mainWindow.focus()
+  })
 
-// Quit when all windows are closed, except on macOS. There, it's common
-// for applications and their menu bar to stay active until the user quits
-// explicitly with Cmd + Q.
-app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') {
-    app.quit()
-  }
-})
+  registerApplicationLifecycle()
+}
 
 // In this file you can include the rest of your app's specific main process
 // code. You can also put them in separate files and require them here.

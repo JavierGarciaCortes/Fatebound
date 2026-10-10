@@ -96,10 +96,10 @@ Las rutas centrales actuales son:
     fatebound.sqlite   base creada o abierta durante el arranque
     worlds/            recursos importados futuros
     exports/           exportaciones futuras
-    backups/           copias de seguridad futuras
+    backups/           copias SQLite verificadas
 ```
 
-La comprobación de permisos crea el directorio de datos si falta. Después, y solo si la ubicación es válida, SQLite crea o abre `fatebound.sqlite`. Los subdirectorios siguen siendo rutas reservadas para consumidores futuros y no se crean en esta fase.
+La comprobación de permisos crea el directorio de datos si falta. Después, y solo si la ubicación es válida, SQLite crea o abre `fatebound.sqlite`. `backups/` se crea bajo demanda al preparar la primera copia; `worlds/` y `exports/` siguen siendo rutas reservadas para consumidores futuros.
 
 ### 4.2 Comprobación de escritura y recuperación
 
@@ -113,7 +113,7 @@ Si la prueba falla, un diálogo nativo ofrece exactamente:
 
 Cancelar el selector vuelve al diálogo de decisión. No existe fallback automático. La ventana principal se crea una sola vez y únicamente después de activar una ubicación válida, abrir SQLite y aplicar sus migraciones; los eventos de activación de Electron se ignoran mientras no haya una conexión abierta.
 
-La orquestación está separada de Electron para poder probar reintentos, alternativas y salida con dobles controlados. La prueba de escritura real usa un directorio temporal del sistema y lo elimina al finalizar; ninguna prueba toca carpetas reales del usuario.
+Antes de iniciar esta secuencia, main adquiere `app.requestSingleInstanceLock()`. Si otra instancia ya posee el bloqueo, la segunda sale sin validar carpetas ni abrir SQLite. La orquestación de almacenamiento está separada de Electron para poder probar reintentos, alternativas y salida con dobles controlados. La prueba de escritura real usa un directorio temporal del sistema y lo elimina al finalizar; ninguna prueba toca carpetas reales del usuario.
 
 ### 4.3 Distribución portable de Windows
 
@@ -136,7 +136,7 @@ La prueba automatizada usa directorios temporales controlados y confirma que `PO
 
 **Implementado en su nivel inicial:** Fatebound usa `DatabaseSync` de `node:sqlite`, integrado en el Node 22 que distribuye Electron 39. Se ha preferido frente a un addon externo como `better-sqlite3` porque evita binarios `.node`, reconstrucciones ABI y configuración especial de `asar`, lo que reduce los puntos de fallo del portable. La contrapartida conocida es que Node 22 clasifica todavía esta API como desarrollo activo; por eso `package.json` exige Node 22.18 o posterior y la compatibilidad se valida también ejecutando el portable, no solo bajo Node de desarrollo.
 
-`src/main/storage/sqlite-storage.ts` es el único propietario de la conexión activa. Recibe la ruta de `getActiveStoragePaths().databaseFile`, la resuelve sin sustituirla por una ubicación fija, configura SQLite y llama al migrador. Ni preload ni renderer exponen SQLite. Si la apertura, la configuración o una migración fallan, la conexión parcial se cierra, se muestra un error nativo y la ventana principal no se crea. La conexión normal se cierra de forma idempotente en `will-quit`.
+`src/main/storage/sqlite-storage.ts` es el único propietario de la conexión activa. Recibe `getActiveStoragePaths().databaseFile` y `getActiveStoragePaths().backupsDirectory`, resuelve ambas rutas sin sustituirlas por ubicaciones fijas y orquesta fases separadas de apertura, configuración, validación, protección y migración. Ni preload ni renderer exponen SQLite. Si alguna fase falla, la conexión parcial se cierra, se muestra un error nativo y la ventana principal no se crea. La conexión normal se cierra de forma idempotente en `will-quit`.
 
 La configuración inicial es deliberadamente conservadora para almacenamiento extraíble:
 
@@ -145,13 +145,31 @@ La configuración inicial es deliberadamente conservadora para almacenamiento ex
 - claves foráneas activas, extensiones cargables deshabilitadas, literales de cadena con comillas dobles deshabilitados y `trusted_schema=OFF`.
 - `temp_store=MEMORY`, para que los temporales no transaccionales no dependan de la carpeta temporal del sistema, y un timeout de bloqueos de cinco segundos.
 
-Esta configuración no puede garantizar durabilidad si el sistema operativo, el controlador o la propia unidad informan de una sincronización antes de persistir los datos, ni puede hacer segura la retirada física durante una escritura. Sigue pendiente probar una unidad extraíble real e implementar copias de seguridad, comprobaciones de integridad y recuperación explícita.
+Esta configuración no puede garantizar durabilidad si el sistema operativo, el controlador o la propia unidad informan de una sincronización antes de persistir los datos, ni puede hacer segura la retirada física durante una escritura. Sigue pendiente probar una unidad extraíble real y completar la automatización, retención, exportación y recuperación explícita.
 
-`src/main/storage/sqlite-migrations.ts` contiene un manifiesto ordenado de migraciones con versión, nombre y SQL. Al abrir se compara toda la historia aplicada con el manifiesto integrado; una versión futura, un hueco o un nombre distinto bloquean el arranque. Cada migración pendiente se ejecuta de forma independiente con `BEGIN IMMEDIATE`, registra su versión dentro de la misma transacción y termina con `COMMIT`; cualquier error ejecuta `ROLLBACK`.
+`src/main/storage/sqlite-migrations.ts` contiene un manifiesto ordenado de migraciones con versión, nombre y SQL. El planificador compara toda la historia aplicada con el manifiesto integrado antes de modificar la base; una versión futura, un hueco o un nombre distinto bloquean el arranque. Cada migración pendiente se ejecuta de forma independiente con `BEGIN IMMEDIATE`, registra su versión dentro de la misma transacción y termina con `COMMIT`; cualquier error ejecuta `ROLLBACK` para esa migración.
 
-La migración 1, `initialize_migration_tracking`, crea únicamente `fatebound_schema_migrations`, con versión, nombre y fecha de aplicación. No existen tablas de mundos, personajes, clanes, campañas, eventos ni contenido de Ronin. Las migraciones futuras deberán conservar el mismo orden, y antes de que alguna sea destructiva habrá que implementar la política de copias de seguridad.
+La migración 1, `initialize_migration_tracking`, crea únicamente `fatebound_schema_migrations`, con versión, nombre y fecha de aplicación. No existen tablas de mundos, personajes, clanes, campañas, eventos ni contenido de Ronin. Las migraciones futuras deberán conservar el mismo orden y quedan protegidas por la copia previa descrita a continuación.
 
-Referencias técnicas de la decisión: [API `node:sqlite` de Node 22.20](https://nodejs.org/download/release/v22.20.0/docs/api/sqlite.html), [PRAGMA de SQLite](https://www.sqlite.org/pragma.html) y [archivos temporales y journals](https://www.sqlite.org/tempfiles.html).
+### 4.5 Integridad y copias de seguridad SQLite
+
+**Implementado en su primera fase:** una base que ya existía antes del arranque debe superar `PRAGMA quick_check` y `PRAGMA foreign_key_check` antes de planificar cualquier migración. Si existen migraciones pendientes, debe superar además `PRAGMA integrity_check` antes de crear la copia protegida y después de terminar las migraciones. La base nueva también se comprueba tras su migración inicial, pero no genera una copia vacía. Un error de lectura, corrupción o infracción de claves foráneas cierra la conexión y bloquea el arranque normal; Fatebound no borra, regenera, restaura ni sustituye automáticamente el archivo.
+
+`src/main/storage/sqlite-backup.ts` usa exclusivamente `backup()` de `node:sqlite` sobre la conexión abierta en main. No copia directamente `fatebound.sqlite`. El procedimiento actual es:
+
+1. crear `data/backups/` si hace falta y limpiar únicamente directorios de staging `.partial-*` abandonados dentro de esa ruta;
+2. crear un directorio temporal único y ejecutar allí la copia en línea;
+3. abrir la candidata en solo lectura y ejecutar `integrity_check` y `foreign_key_check`;
+4. calcular tamaño y SHA-256 y escribir `manifest.json` con identificador, fecha UTC, motivo y versión del esquema, sin rutas absolutas;
+5. publicar el directorio completo mediante renombrado a un nombre único que nunca reutiliza ni sobrescribe otra copia.
+
+Cada directorio publicado contiene `fatebound.sqlite` y `manifest.json`. Si la copia, la validación, el manifiesto o la publicación fallan, se elimina el staging de esa operación cuando es seguro y no se inicia la migración. Si una migración posterior falla, su transacción se revierte, la copia previa permanece intacta y la aplicación se cierra; no se restaura ni se reintenta automáticamente. Como las migraciones se confirman individualmente, una migración anterior del mismo lote puede haber quedado aplicada y el historial conserva ese estado real.
+
+La API admite los motivos `pre-migration`, `automatic` y `manual` para evitar rediseñarla en las siguientes fases, pero solo `pre-migration` se usa actualmente. No hay temporizadores, copias tras cambios ordinarios, retención, borrado automático, selección de destinos externos ni interfaz de recuperación. La política aprobada para la fase siguiente parte de seis copias automáticas y dos protegidas, preservando siempre la última copia válida. Restaurar será una operación manual y explícita.
+
+Las copias locales permanecen en el mismo dispositivo que `data/fatebound.sqlite`: protegen frente a una migración o modificación lógica, pero no frente a pérdida o avería física de la unidad. La futura exportación manual deberá usar de nuevo `backup()` hacia un destino elegido en main y no expondrá SQLite ni el sistema de archivos al renderer.
+
+Referencias técnicas de la decisión: [API `node:sqlite` de Node 22.20](https://nodejs.org/download/release/v22.20.0/docs/api/sqlite.html), [Online Backup API de SQLite](https://www.sqlite.org/backup.html), [PRAGMA de SQLite](https://www.sqlite.org/pragma.html) y [archivos temporales y journals](https://www.sqlite.org/tempfiles.html).
 
 ## 5. Mundos, versiones y recursos
 

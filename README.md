@@ -2,7 +2,7 @@
 
 Fatebound es una aplicación de escritorio para Windows destinada a jugar RPG narrativos en solitario. El objetivo es ofrecer una experiencia local y portable: las reglas, los mundos, las partidas y sus crónicas podrán viajar junto a la aplicación y el juego no dependerá de un servidor ni de conexión a Internet.
 
-El repositorio se encuentra en una fase inicial de fundamentos. Actualmente contiene el scaffold funcional de Electron y Vue y la infraestructura inicial de persistencia SQLite portable; el esquema del juego, el motor, la importación de mundos y las interfaces definitivas todavía no están implementados.
+El repositorio se encuentra en una fase inicial de fundamentos. Actualmente contiene el scaffold funcional de Electron y Vue, la persistencia SQLite portable y su primera capa de integridad y copias previas a migraciones; el esquema del juego, el motor, la importación de mundos y las interfaces definitivas todavía no están implementados.
 
 ## Tecnologías
 
@@ -31,17 +31,17 @@ npm ci
 
 Los comandos siguientes proceden de `package.json`:
 
-| Comando                | Uso                                                            |
-| ---------------------- | -------------------------------------------------------------- |
-| `npm run dev`          | Inicia Electron con recarga durante el desarrollo.             |
-| `npm run start`        | Abre en modo preview una compilación ya generada.              |
-| `npm run lint`         | Ejecuta ESLint.                                                |
-| `npm test`             | Ejecuta las pruebas del almacenamiento portable y SQLite.      |
-| `npm run typecheck`    | Comprueba los tipos de main, preload y renderer.               |
-| `npm run build`        | Comprueba tipos y genera la aplicación con electron-vite.      |
-| `npm run build:unpack` | Genera una distribución sin empaquetar.                        |
-| `npm run build:win`    | Genera `dist/Fatebound.exe`, el portable de Windows x64.       |
-| `npm run format`       | Formatea el repositorio con Prettier y modifica archivos.      |
+| Comando                | Uso                                                       |
+| ---------------------- | --------------------------------------------------------- |
+| `npm run dev`          | Inicia Electron con recarga durante el desarrollo.        |
+| `npm run start`        | Abre en modo preview una compilación ya generada.         |
+| `npm run lint`         | Ejecuta ESLint.                                           |
+| `npm test`             | Ejecuta las pruebas del almacenamiento portable y SQLite. |
+| `npm run typecheck`    | Comprueba los tipos de main, preload y renderer.          |
+| `npm run build`        | Comprueba tipos y genera la aplicación con electron-vite. |
+| `npm run build:unpack` | Genera una distribución sin empaquetar.                   |
+| `npm run build:win`    | Genera `dist/Fatebound.exe`, el portable de Windows x64.  |
+| `npm run format`       | Formatea el repositorio con Prettier y modifica archivos. |
 
 Fatebound 2.0 tiene Windows como plataforma objetivo. `npm run build:win` comprueba los tipos, compila la aplicación y genera un único ejecutable portable x64 en `dist/Fatebound.exe`; no genera ni exige un instalador. El artefacto se identifica como Fatebound mediante `com.fatebound.app`, `Fatebound` y `Fatebound.exe`.
 
@@ -68,11 +68,18 @@ El almacenamiento se prepara íntegramente en el proceso main:
 - en desarrollo se utiliza `.fatebound-dev/data/` dentro del proyecto, aislado de cualquier instalación real y excluido de Git;
 - en una distribución se utiliza `data/` junto al ejecutable portable; el launcher de electron-builder comunica su directorio original mediante `PORTABLE_EXECUTABLE_DIR`, evitando la carpeta temporal en la que se extrae la aplicación;
 - la conexión SQLite se crea o abre exclusivamente en main mediante `getActiveStoragePaths().databaseFile`, después de validar la carpeta y antes de mostrar la ventana;
+- Fatebound adquiere el bloqueo de instancia única antes de abrir SQLite; una segunda instancia sale sin acceder a la base;
 - antes de abrir la interfaz se crea un archivo temporal exclusivo, se escribe en él y se elimina para comprobar permisos reales.
 
 La base se guarda como `data/fatebound.sqlite`. En desarrollo queda bajo `.fatebound-dev/data/`; en el portable queda junto a `Fatebound.exe`, nunca en el directorio temporal donde el launcher extrae la aplicación. La migración inicial crea únicamente `fatebound_schema_migrations`: todavía no existen tablas de mundos, personajes, clanes, campañas o eventos.
 
-Cada migración tiene versión, nombre y SQL integrados en la aplicación. Las pendientes se aplican en orden y cada una usa su propia transacción `BEGIN IMMEDIATE`/`COMMIT`; un fallo ejecuta `ROLLBACK` y bloquea el arranque. También se rechaza una base cuya historia sea más nueva o no coincida con la aplicación.
+La apertura, la configuración, las comprobaciones y las migraciones son fases separadas. Una base existente debe superar `PRAGMA quick_check` y `PRAGMA foreign_key_check` antes de usarse. Si tiene migraciones pendientes, también debe superar `PRAGMA integrity_check`, crear una copia verificada y volver a superar la comprobación completa después de migrar. Cualquier fallo bloquea la ventana principal sin borrar, regenerar, restaurar ni sustituir automáticamente la base.
+
+Cada migración tiene versión, nombre y SQL integrados en la aplicación. Las pendientes se aplican en orden y cada una usa su propia transacción `BEGIN IMMEDIATE`/`COMMIT`; un fallo ejecuta `ROLLBACK` para esa migración, conserva la copia previa y bloquea el arranque. También se rechaza una base cuya historia sea más nueva o no coincida con la aplicación. Una base completamente nueva aplica su migración inicial sin generar una copia vacía innecesaria.
+
+Las copias se crean mediante `backup()` de `node:sqlite`, nunca copiando el archivo abierto. Cada copia se prepara en un directorio temporal único dentro de `data/backups/`, se valida con las comprobaciones completa y de claves foráneas y solo entonces se publica como un directorio inmutable con `fatebound.sqlite` y `manifest.json`. El manifiesto contiene identificador, fecha UTC, motivo, versión del esquema, tamaño y SHA-256, sin rutas absolutas. Los restos temporales se limpian al intentar una nueva copia y una copia publicada nunca se sobrescribe.
+
+Esta primera fase solo crea copias protegidas antes de migrar una base existente. Todavía no hay copias periódicas, retención automática, exportación a otra unidad ni interfaz de restauración. La futura retención partirá de seis copias automáticas y dos protegidas, conservará la última copia válida y nunca restaurará datos sin confirmación explícita. Como `data/backups/` comparte dispositivo con la base, estas copias no protegen frente a la pérdida o avería física del pendrive.
 
 Para favorecer la recuperación en unidades extraíbles se usa el journal clásico `DELETE` con `synchronous=EXTRA`, además de claves foráneas activas, extensiones deshabilitadas, `trusted_schema=OFF`, temporales en memoria y una espera de bloqueos de cinco segundos. Esta elección reduce los archivos persistentes auxiliares y conserva el rollback journal junto a la base si una escritura se interrumpe, a costa de más operaciones de sincronización y menor rendimiento que WAL. No hace segura la extracción física durante una escritura: deben cerrarse Fatebound y las escrituras pendientes antes de retirar la unidad.
 
@@ -119,7 +126,10 @@ El formato deberá permitir importar, validar, editar y exportar un mundo sin p�
 - Pruebas automatizadas del resolvedor y del arranque sin usar carpetas reales del usuario.
 - Apertura y cierre de SQLite exclusivamente en main, con configuración conservadora para almacenamiento extraíble.
 - Migraciones SQL versionadas y transaccionales con una única migración técnica inicial.
-- Pruebas SQLite aisladas para creación, persistencia, migraciones, reapertura, errores y cierre.
+- Comprobaciones de integridad y claves foráneas antes de usar bases existentes y alrededor de sus migraciones.
+- Copias consistentes mediante `node:sqlite`, verificadas y acompañadas de manifiesto antes de publicarse en `data/backups/`.
+- Protección obligatoria previa a migraciones, sin restauración automática, y bloqueo de instancia única antes de abrir SQLite.
+- Pruebas SQLite aisladas para creación, persistencia, integridad, copias, migraciones, reapertura, errores y cierre.
 - Recursos de marca y las imágenes de clanes de Ronin presentes en el repositorio, sin mover ni renombrar.
 - Target portable x64 de Windows con identidad de Fatebound y recursos públicos incluidos mediante una lista explícita.
 - Artefacto `dist/Fatebound.exe` generado e inspeccionado sin contenido de Ronin ni configuración de actualización automática.
@@ -128,7 +138,7 @@ El formato deberá permitir importar, validar, editar y exportar un mundo sin p�
 
 ### Planificado
 
-- Copias de seguridad, recuperación y repositorios del dominio sobre SQLite.
+- Automatización y retención de copias, exportación manual, recuperación explícita y repositorios del dominio sobre SQLite.
 - Validación del portable desde un pendrive físico y desde otro ordenador.
 - Instalaciones válidas sin mundos, importación personal y protección frente al borrado accidental.
 - Separación de compilaciones públicas sin contenido protegido y compilaciones privadas autorizadas.
