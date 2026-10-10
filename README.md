@@ -56,18 +56,30 @@ La arquitectura propuesta añade servicios de dominio, repositorios y un resolve
 
 Consulta [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) para ver el diseño propuesto y sus límites.
 
-## Mundos
+## Mundos y distribución
 
-Ronin, de Tiago Junges, será el mundo base integrado:
+Fatebound debe poder distribuirse públicamente sin mundos instalados y sin incorporar contenido protegido de terceros. Una instalación vacía será un estado válido: el usuario podrá importar sus propios mundos desde Markdown, incluido Ronin para uso personal cuando disponga legítimamente de ese contenido.
 
-- estará disponible sin importación adicional y no podrá eliminarse;
-- su versión original permanecerá intacta;
-- cualquier modificación producirá una versión nueva;
-- sus reglas, contenido y recursos se mantendrán separados de las partidas.
+Ronin, de Tiago Junges, no forma parte obligatoria de la distribución pública. Cuando el usuario lo instale, Fatebound conservará intacta su versión importada, creará versiones nuevas para las modificaciones y la protegerá frente al borrado accidental en el gestor de mundos. Sus reglas, contenido y recursos permanecerán separados de las partidas.
 
-El repositorio ya conserva recursos gráficos en `resources/worlds/ronin/`, incluidas las 36 combinaciones `1_1.png` a `6_6.png` de clanes. El contenido estructurado de Ronin todavía no ha sido importado ni instalado en una base de datos.
+Se contempla una compilación privada distinta, con Ronin preinstalado. Esa variante deberá mantenerse separada de cualquier artefacto público y solo podrá generarse o distribuirse en el marco de los permisos aplicables. No se usarán contraseñas ni mecanismos de ocultación como sustituto de las condiciones de licencia.
 
-Los mundos adicionales, como Paladín o Ninja, serán independientes. Está previsto importarlos desde Markdown con metadatos estructurados y copiar sus recursos al almacenamiento portable administrado por Fatebound. El contenido importado se tratará siempre como datos, no como código ejecutable.
+El repositorio conserva actualmente recursos gráficos en `resources/worlds/ronin/`, incluidas las 36 combinaciones `1_1.png` a `6_6.png` de clanes. Su presencia en el repositorio no implica que deban incorporarse a una distribución pública; el empaquetado público y privado todavía no está separado. El contenido estructurado de Ronin no se ha importado ni instalado en una base de datos.
+
+Los demás mundos serán independientes y seguirán el mismo modelo de importación, validación, edición, versionado y exportación. El contenido importado se tratará siempre como datos, no como código ejecutable.
+
+## Plantillas de mundos
+
+Está previsto incluir plantillas y ejemplos Markdown originales de Fatebound para ayudar a crear mundos sin reutilizar contenido del reglamento de Ronin ni de otros terceros. Deberán explicar cómo representar:
+
+- identificadores estables y metadatos básicos;
+- tablas y resultados de dados;
+- textos y traducciones;
+- efectos mecánicos y sus parámetros;
+- condiciones y referencias entre elementos;
+- referencias relativas a imágenes y otros recursos.
+
+El formato deberá permitir importar, validar, editar y exportar un mundo sin pérdida de información. Estos son requisitos de diseño, no una especificación definitiva: la sintaxis, el esquema, la organización de archivos y su versionado se definirán en una tarea posterior.
 
 ## Estado actual
 
@@ -76,15 +88,16 @@ Los mundos adicionales, como Paladín o Ninja, serán independientes. Está prev
 - Scaffold de Electron, Vue 3 y TypeScript.
 - Separación física inicial entre main, preload y renderer.
 - Flujo de desarrollo, lint, comprobación de tipos y build.
-- Recursos de marca y las imágenes de clanes de Ronin, sin mover ni renombrar.
+- Recursos de marca y las imágenes de clanes de Ronin presentes en el repositorio, sin mover ni renombrar.
 - Documentación de producto, estado y arquitectura propuesta.
 
 ### Planificado
 
 - Resolución de rutas y empaquetado portable para Windows.
 - SQLite, migraciones, copias de seguridad y versionado inmutable de mundos.
-- Instalación del Ronin incluido y gestión de mundos adicionales.
-- Importador y editor de Markdown.
+- Instalaciones válidas sin mundos, importación personal y protección frente al borrado accidental.
+- Separación de compilaciones públicas sin contenido protegido y compilaciones privadas autorizadas.
+- Plantillas originales e importador, validador, editor y exportador de Markdown.
 - Catálogo de efectos mecánicos y motor de reglas.
 - Personajes, clanes, campañas, registro de eventos y exportación de crónicas a Markdown.
 - Integración opcional de IA bajo confirmación del jugador; jugar seguirá siendo posible sin conexión.

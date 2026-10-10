@@ -15,7 +15,8 @@ El repositorio contiene actualmente:
 - un renderer Vue con la pantalla de demostración de electron-vite;
 - TypeScript estricto, ESLint, Prettier, electron-vite y electron-builder;
 - recursos de marca y 36 imágenes de combinaciones de dados para los clanes de Ronin;
-- una configuración de Windows basada en NSIS, no una distribución portable.
+- una configuración de Windows basada en NSIS, no una distribución portable;
+- un único perfil de empaquetado que todavía no separa artefactos públicos y privados.
 
 No están implementados SQLite, el resolvedor de rutas portables, el dominio, el importador, el editor, el motor de reglas, las campañas, las crónicas ni la integración de IA.
 
@@ -25,6 +26,7 @@ No están implementados SQLite, el resolvedor de rutas portables, el dominio, el
 - **Portable:** los datos mutables se resuelven junto a la distribución portable y pueden viajar con ella.
 - **Fronteras explícitas:** renderer, preload, main, dominio e infraestructura tienen responsabilidades separadas.
 - **Contenido no confiable:** Markdown, metadatos e imágenes importados son datos que deben validarse; nunca se ejecutan.
+- **Distribución responsable:** la compilación pública puede funcionar sin mundos y no incorpora contenido protegido de terceros sin autorización.
 - **Versiones inmutables:** una versión publicada no se edita; una modificación genera una versión derivada.
 - **Trazabilidad:** las acciones relevantes de una partida producen eventos utilizables en una crónica.
 - **Control del jugador:** una IA opcional puede proponer, pero no modificar reglas ni estado de juego sin confirmación.
@@ -40,7 +42,7 @@ flowchart LR
     DOM --> PORTS[Puertos de repositorio]
     INF --> PORTS
     INF --> DATA[(Datos portables)]
-    INF --> BUILTIN[Recursos integrados\nde solo lectura]
+    INF --> BUILTIN[Plantillas y recursos autorizados\nde solo lectura]
 ```
 
 ### 3.1 Renderer — presentación
@@ -111,7 +113,7 @@ Se requieren:
 - copias de seguridad antes de migraciones destructivas;
 - recuperación explícita ante corrupción o extracción insegura de la unidad;
 - restricciones que impidan modificar contenido publicado;
-- operaciones idempotentes para instalar contenido integrado.
+- operaciones idempotentes para registrar mundos importados e instalar contenido autorizado por el perfil de compilación.
 
 La modalidad de journal de SQLite se decidirá después de probar su comportamiento en unidades extraíbles; no se presupone WAL.
 
@@ -127,11 +129,13 @@ Las reglas, el contenido del mundo y el estado de las partidas se almacenan como
 
 Personajes y campañas conservan el identificador exacto de la versión del mundo con la que fueron creados. Una actualización del mundo no migra una partida de forma implícita.
 
-### 5.1 Recursos integrados
+### 5.1 Recursos incluidos y perfiles de distribución
 
-Los recursos distribuidos con la aplicación permanecen en el paquete como fuente de solo lectura. `resources/branding/` contiene la marca y `resources/worlds/ronin/clans/` contiene las imágenes existentes `1_1.png` a `6_6.png`. Esos nombres y archivos no se alteran.
+Los recursos distribuidos con la aplicación permanecen en el paquete como fuente de solo lectura. `resources/branding/` contiene la marca. `resources/worlds/ronin/clans/` contiene actualmente las imágenes existentes `1_1.png` a `6_6.png`; esos nombres y archivos no se alteran en esta fase, pero su presencia en el repositorio no autoriza su inclusión automática en un artefacto público.
 
-**Propuesta no implementada:** un manifiesto versionado describirá el contenido integrado, sus recursos y sumas de comprobación. El empaquetado incluirá ese manifiesto y los archivos requeridos. Nunca se escribirá sobre la copia incluida.
+**Propuesta no implementada:** cada perfil de compilación utilizará una lista explícita de contenido autorizado y un manifiesto versionado con sus recursos y sumas de comprobación. La compilación pública incluirá únicamente recursos propios o autorizados y podrá no contener ningún mundo. Una compilación privada podrá añadir contenido preinstalado permitido sin cambiar las garantías del producto. Nunca se escribirá sobre una copia incluida.
+
+Los artefactos públicos y privados tendrán nombres y procesos de salida inequívocos, y se verificará su contenido antes de distribuirlos. No se utilizarán contraseñas, cifrado superficial u ocultación como mecanismo para resolver permisos de licencia.
 
 ### 5.2 Recursos de mundos adicionales
 
@@ -139,23 +143,34 @@ Los recursos distribuidos con la aplicación permanecen en el paquete como fuent
 
 El importador impedirá escapes de directorio, enlaces inseguros, extensiones no admitidas y archivos que excedan los límites configurados. La publicación congelará las referencias de esa versión; una sustitución de recursos creará otra versión.
 
-## 6. Ronin integrado
+## 6. Ronin como mundo instalable
 
-Ronin, de Tiago Junges, es el mundo base protegido:
+Ronin, de Tiago Junges, no es un requisito para ejecutar Fatebound. Se contemplan tres escenarios separados:
 
-- se distribuye con Fatebound y estará disponible sin importación manual;
-- no puede eliminarse desde el gestor de mundos;
-- la versión original incluida es inmutable;
-- una personalización crea una versión derivada, sin sobrescribir el original;
-- puede coexistir con mundos independientes como Paladín o Ninja.
+1. **Distribución pública:** no incorpora Ronin ni necesita ningún mundo preinstalado.
+2. **Importación personal:** el usuario importa su propia copia de Ronin mediante el flujo normal de mundos.
+3. **Compilación privada:** una variante separada puede llevar Ronin preinstalado cuando existan los permisos aplicables; no se publica ni se confunde con el artefacto público.
 
-**Propuesta no implementada:** al iniciar con persistencia disponible, un instalador de contenido comparará el manifiesto integrado con lo registrado en SQLite. Si falta una versión incluida, la instalará en una transacción idempotente. No reemplazará partidas ni versiones modificadas por el usuario.
+**Propuesta no implementada:** una vez instalado, Ronin se marcará como mundo protegido. El gestor ordinario no permitirá borrarlo accidentalmente; cualquier futura operación administrativa deberá ser explícita, advertida y recuperable. La versión instalada se conservará inmutable y una personalización creará una versión derivada sin sobrescribirla.
 
-Actualmente solo existen los recursos gráficos indicados; no se ha importado el reglamento ni se ha instalado contenido de Ronin en SQLite. Antes de distribuirlo deberá confirmarse la licencia y la atribución aplicables.
+El registro de un Ronin importado y la instalación desde una compilación privada reutilizarán las mismas validaciones, el mismo modelo de versiones y transacciones idempotentes. Ninguno reemplazará partidas ni versiones modificadas por el usuario.
+
+Actualmente solo existen los recursos gráficos indicados; no se ha importado el reglamento ni se ha instalado contenido de Ronin en SQLite. Las condiciones de licencia y atribución deberán resolverse para cualquier compilación que lo preinstale. Una contraseña no modifica esas condiciones y no forma parte del diseño.
 
 ## 7. Importador Markdown y editor
 
-**Propuesta no implementada:** el formato de intercambio combinará Markdown legible con metadatos estructurados y versionados. El contrato exacto —por ejemplo, front matter y manifiesto de recursos— sigue pendiente de aprobación.
+**Propuesta no implementada:** el formato de intercambio combinará Markdown legible con metadatos estructurados y versionados. Fatebound incluirá plantillas y ejemplos originales, sin textos, tablas ni reglas copiadas de Ronin o de otros terceros.
+
+Las futuras plantillas deberán documentar, como requisitos mínimos:
+
+- identificadores estables y relaciones entre elementos;
+- metadatos del mundo y de sus versiones;
+- tablas y resultados de dados;
+- textos traducibles y asociación de traducciones;
+- efectos mecánicos, parámetros y condiciones;
+- referencias relativas a imágenes y otros recursos.
+
+El mismo modelo deberá poder importarse, validarse, editarse y exportarse sin pérdida de información. El contrato exacto —sintaxis, esquema, organización de archivos, manifiestos y estrategia de versiones— se diseñará en una tarea posterior; este documento no lo fija todavía.
 
 El flujo previsto es:
 
@@ -220,9 +235,10 @@ El preload genérico y `sandbox: false` del scaffold actual son brechas conocida
 1. Resolver y probar la raíz portable en desarrollo y distribución Windows.
 2. Definir contratos IPC mínimos y endurecer la ventana.
 3. Introducir SQLite, migraciones y repositorios sin contenido de juego.
-4. Definir el manifiesto e instalar idempotentemente Ronin.
-5. Incorporar importación, borradores y publicación inmutable.
+4. Diseñar el formato de mundos y sus plantillas originales.
+5. Incorporar importación, validación, edición, exportación y publicación inmutable.
 6. Implementar motor, campañas, eventos y exportación.
-7. Añadir interfaces finales e integración opcional de IA.
+7. Separar y verificar los perfiles de compilación pública y privada.
+8. Añadir interfaces finales e integración opcional de IA.
 
 `STATUS.md` es la fuente para la prioridad inmediata y el resultado real de cada fase.

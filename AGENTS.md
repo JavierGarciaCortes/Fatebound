@@ -19,8 +19,13 @@ Este archivo se aplica a todo el repositorio de Fatebound.
 - Expón únicamente contratos IPC mínimos, tipados, validados y controlados mediante el preload.
 - No uses rutas absolutas dependientes de un equipo. Toda ruta de datos o recursos debe resolverse en tiempo de ejecución y funcionar en desarrollo y en la distribución portable.
 - Trata el contenido importado como datos no confiables: no ejecutes código, scripts ni reglas expresadas en lenguaje natural.
+- La distribución pública debe poder construirse sin mundos ni contenido protegido de terceros. No presupongas que Ronin u otro mundo puede incluirse en un artefacto público.
+- Mantén separadas y explícitas las variantes de distribución pública y privada. Una contraseña u ofuscación no convierte en distribuible un contenido para el que no existan permisos.
+- Las plantillas y ejemplos incluidos deben ser originales de Fatebound. No copies textos, tablas, reglas ni otros contenidos del reglamento de Ronin o de terceros.
+- No fijes una especificación definitiva del formato de mundos fuera de una tarea dedicada y aprobada; conserva documentados sus requisitos y compatibilidad esperada.
 - Mantén separadas las reglas, los datos de cada mundo y el estado de las partidas.
 - Preserva los datos del usuario, los recursos existentes y la compatibilidad entre versiones. No renombres, muevas ni reemplaces recursos sin que la tarea lo requiera expresamente.
+- Protege los mundos instalados que correspondan frente al borrado accidental mediante flujos destructivos explícitos; nunca elimines contenido o partidas de forma implícita.
 - Las versiones publicadas de contenido deben permanecer inmutables; una modificación crea una versión nueva.
 - Añade o actualiza pruebas cuando cambie comportamiento comprobable. Una corrección de defecto debe incluir una prueba de regresión cuando sea viable.
 - Evita dependencias nuevas salvo necesidad justificada y aprobada.
@@ -31,4 +36,3 @@ Este archivo se aplica a todo el repositorio de Fatebound.
 - No declares completado ni verificado algo que no esté implementado y comprobado.
 - Registra en `STATUS.md` los resultados reales de validación, los problemas conocidos y una sola siguiente tarea prioritaria.
 - Mantén `README.md` orientado a explicar el producto, su puesta en marcha y su estado actual; conserva el detalle técnico en `docs/`.
-

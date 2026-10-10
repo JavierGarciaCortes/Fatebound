@@ -6,7 +6,7 @@ Rama de trabajo: `feature/project-foundation`
 
 ## Estado general
 
-Fatebound 2.0 está en fase de fundamentos. El scaffold de Electron, Vue 3 y TypeScript existe, y se han documentado las decisiones arquitectónicas del producto. Todavía no hay SQLite, datos estructurados de Ronin, motor de reglas, gestión de partidas ni interfaz final.
+Fatebound 2.0 está en fase de fundamentos. El scaffold de Electron, Vue 3 y TypeScript existe, y se han documentado las decisiones arquitectónicas del producto. Todavía no hay SQLite, mundos instalados, motor de reglas, gestión de partidas ni interfaz final. La futura aplicación podrá iniciarse legítimamente sin mundos y permitirá que el usuario importe los suyos.
 
 Una decisión documentada no equivale a funcionalidad implementada. Todo lo descrito como **propuesto** en `docs/ARCHITECTURE.md` continúa pendiente de desarrollo y verificación.
 
@@ -19,6 +19,8 @@ Una decisión documentada no equivale a funcionalidad implementada. Todo lo desc
 - [x] Fundamentos y límites permanentes documentados en `AGENTS.md`.
 - [x] Producto, comandos y estado real documentados en `README.md`.
 - [x] Arquitectura propuesta documentada en `docs/ARCHITECTURE.md`.
+- [x] Separación documental entre distribución pública sin contenido protegido, importación personal y compilación privada autorizada.
+- [x] Requisitos de las futuras plantillas originales de mundos, sin cerrar todavía el formato Markdown.
 
 La documentación y el scaffold existente se han revisado con las comprobaciones indicadas al final de este archivo.
 
@@ -47,13 +49,15 @@ No hay una implementación funcional en curso. La arquitectura propuesta queda p
 - Implementar repositorios, transacciones, copias de seguridad y recuperación.
 - Implementar mundos y versiones publicadas inmutables.
 - Vincular personajes y campañas a una versión concreta del mundo.
-- Instalar de forma idempotente la versión incluida de Ronin, preservando el original.
+- Permitir una instalación válida sin mundos y registrar de forma idempotente los mundos importados.
+- Proteger los mundos instalados que correspondan, incluido Ronin, frente al borrado accidental.
 
 ### Fase 3 — Contenido de mundos
 
-- Definir y versionar el contrato de Markdown y sus metadatos.
-- Implementar importación segura, validación, vista previa y gestión de recursos.
-- Implementar el editor de borradores y el flujo de publicación de una versión nueva.
+- Diseñar y versionar el contrato de Markdown y sus metadatos en una tarea específica.
+- Crear plantillas y ejemplos originales para identificadores, tablas, dados, traducciones, efectos, condiciones e imágenes, sin contenido de Ronin.
+- Implementar importación segura, validación, vista previa, edición, exportación y gestión de recursos.
+- Implementar el flujo de borradores y publicación de una versión nueva.
 - Implementar mundos adicionales independientes.
 
 ### Fase 4 — Juego y crónicas
@@ -66,12 +70,15 @@ No hay una implementación funcional en curso. La arquitectura propuesta queda p
 ### Fase 5 — Integraciones y distribución
 
 - Diseñar la integración opcional de IA con confirmación humana y sin autoridad sobre las reglas.
+- Separar y verificar los perfiles de compilación pública y privada; el público no debe incluir contenido protegido de terceros.
 - Completar la experiencia de usuario y las interfaces definitivas.
 - Validar portabilidad, actualizaciones, recuperación y uso desde unidades extraíbles.
 
 ## Problemas conocidos
 
 - `electron-builder.yml` conserva valores de plantilla (`appId`, metadatos, publicación de ejemplo) y configura NSIS, no un target portable.
+- El empaquetado no distingue todavía una compilación pública sin contenido protegido de una posible compilación privada con Ronin preinstalado.
+- La configuración actual incluye `resources/**`; antes de una distribución pública debe existir una lista explícita de recursos autorizados y verificarse el artefacto resultante.
 - `sandbox` está desactivado en la ventana principal.
 - El preload expone todavía la API genérica de `@electron-toolkit/preload`; el contrato específico `window.api` está vacío.
 - La interfaz visible es la pantalla de demostración de electron-vite.
@@ -84,18 +91,21 @@ No hay una implementación funcional en curso. La arquitectura propuesta queda p
 - Convención exacta del directorio portable, copias de seguridad y comportamiento ante una unidad extraíble no escribible.
 - Estrategia de journal y recuperación de SQLite adecuada para almacenamiento extraíble.
 - Esquema y versionado del contrato de importación Markdown.
+- Organización concreta de las plantillas originales y estrategia de compatibilidad para importar, validar, editar y exportar sin pérdida.
 - Identificadores, numeración y ciclo de publicación de versiones de mundos.
 - Límites de tamaño, formatos permitidos y deduplicación de recursos importados.
-- Licencia, atribución y condiciones de distribución aplicables al contenido original integrado de Ronin.
+- Mecanismo exacto para proteger mundos instalados frente al borrado accidental y permitir operaciones administrativas seguras.
+- Procedimiento de compilación y verificación que impida mezclar artefactos públicos y privados.
+- Licencia, atribución y condiciones aplicables a cualquier compilación privada que incluya Ronin u otro contenido de terceros.
 - Alcance y proveedores posibles para la IA opcional, manteniendo el juego base completamente offline.
 
 ## Validación de esta actualización
 
 - `npm run lint`: superado.
 - `npm run typecheck`: superado.
-- `npm run build`: superado. El primer intento quedó bloqueado por el sandbox al iniciar `esbuild` (`spawn EPERM`); la repetición autorizada fuera del sandbox finalizó correctamente.
+- `npm run build`: superado. El intento dentro del sandbox quedó bloqueado al iniciar `esbuild` (`spawn EPERM`); la repetición autorizada fuera del sandbox finalizó correctamente.
 - Pruebas automatizadas: no existe un script `test` en `package.json`.
-- Revisión de `git diff` y `git status`: superada; el alcance final contiene únicamente `AGENTS.md`, `README.md`, `STATUS.md` y `docs/ARCHITECTURE.md`.
+- Revisión de `git diff` y `git status`: superada; el alcance contiene únicamente `AGENTS.md`, `README.md`, `STATUS.md` y `docs/ARCHITECTURE.md`.
 
 ## Registro de cambios
 
@@ -105,4 +115,6 @@ No hay una implementación funcional en curso. La arquitectura propuesta queda p
 - Añadidas instrucciones permanentes para agentes.
 - Añadido este registro de desarrollo con una única siguiente prioridad.
 - Documentada la arquitectura propuesta sin implementar SQLite, el motor ni interfaces finales.
+- Revisada la estrategia de mundos: distribución pública vacía, importación personal y compilación privada separada.
+- Documentados los requisitos de plantillas Markdown originales sin fijar todavía su especificación.
 - Conservados sin cambios los recursos y nombres existentes.
