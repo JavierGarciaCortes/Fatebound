@@ -1,4 +1,4 @@
-import { app, shell, BrowserWindow, dialog, ipcMain } from 'electron'
+import { app, shell, BrowserWindow, dialog, ipcMain, type OpenDialogOptions } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/branding/fatebound/fatebound-app-icon.png?asset'
@@ -11,6 +11,8 @@ import {
 } from './storage/sqlite-storage.ts'
 import { readStorageDiagnostics } from './storage/storage-diagnostics.ts'
 import { registerStorageDiagnosticsIpc } from './storage/storage-diagnostics-ipc.ts'
+import { registerManualSqliteExportIpc } from './storage/sqlite-manual-export-ipc.ts'
+import { exportManualSqliteBackup } from './storage/sqlite-manual-export.ts'
 import { acquireSingleInstanceLock } from './single-instance.ts'
 import { registerApplicationPreferencesIpc } from './preferences/application-preferences-ipc.ts'
 import { readActiveApplicationLanguage } from './preferences/application-preferences.ts'
@@ -26,6 +28,20 @@ const PORTABLE_SQLITE_VERIFICATION_ARGUMENT = '--verify-portable-sqlite'
 
 function mainT(key: MessageKey): string {
   return translate(mainApplicationLanguage, key)
+}
+
+async function selectManualSqliteExportDestination(): Promise<string | undefined> {
+  const options: OpenDialogOptions = {
+    title: mainT('native.export.chooseTitle'),
+    buttonLabel: mainT('native.export.chooseButton'),
+    properties: ['openDirectory', 'createDirectory', 'promptToCreate', 'dontAddToRecent']
+  }
+  const result =
+    mainWindow && !mainWindow.isDestroyed()
+      ? await dialog.showOpenDialog(mainWindow, options)
+      : await dialog.showOpenDialog(options)
+
+  return result.canceled || result.filePaths.length !== 1 ? undefined : result.filePaths[0]
 }
 
 function createWindow(): void {
@@ -139,6 +155,13 @@ function registerApplicationLifecycle(): void {
     (channel, handler) => ipcMain.handle(channel, handler),
     readStorageDiagnostics,
     (error) => console.error('Unable to read Fatebound storage diagnostics', error)
+  )
+
+  registerManualSqliteExportIpc(
+    (channel, handler) => ipcMain.handle(channel, () => handler()),
+    selectManualSqliteExportDestination,
+    exportManualSqliteBackup,
+    (error) => console.error('Unable to export a manual Fatebound SQLite backup', error)
   )
 
   // This method will be called when Electron has finished

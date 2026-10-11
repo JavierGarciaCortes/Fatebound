@@ -2,7 +2,7 @@
 
 Estado del documento: dirección de producto y requisitos aprobados; especificación técnica pendiente.
 
-Última actualización: 2026-10-10.
+Última actualización: 2026-10-11.
 
 Este documento registra qué debe permitir un paquete de mundo de Fatebound sin convertir todavía las ideas de estructura, nombres de archivos o esquemas en un estándar cerrado. El importador, el editor, el esquema del juego y el motor de reglas aún no están implementados.
 
@@ -13,10 +13,10 @@ Un mundo debe poder instalarse, validarse, versionarse, utilizarse y exportarse 
 La dirección aprobada es:
 
 - distribuir mundos mediante paquetes ZIP instalables;
-- proponer la extensión `.fateworld`, pendiente de confirmar al definir el contrato técnico;
+- usar la extensión `.fateworld`, aprobada como identidad del paquete aunque su detección, manifiesto y contrato técnico sigan pendientes;
 - combinar contenido Markdown, datos estructurados YAML, imágenes, recursos visuales y temas declarativos;
 - permitir que varios mundos y varias versiones de un mismo mundo coexistan;
-- conservar la vinculación de personajes y campañas con la versión exacta usada al crearlos;
+- conservar la vinculación de personajes y Crónicas con la versión exacta usada al crearlos;
 - permitir en el futuro editar datos desde Fatebound y exportar de nuevo un paquete completo;
 - preparar inicialmente los paquetes mediante herramientas y procesos propios, sin exigir un editor visual avanzado en la primera versión.
 
@@ -28,12 +28,14 @@ Un paquete podrá incluir las siguientes clases de contenido:
 
 - **manifiesto y metadatos:** identidad estable, versión del mundo, versión del formato, compatibilidad mecánica y referencias internas;
 - **Markdown:** ambientación, instrucciones, descripciones y otros textos destinados a personas;
-- **YAML estructurado:** tablas, técnicas, efectos conocidos, parámetros, condiciones, relaciones y datos traducibles;
+- **YAML estructurado:** tablas con identificadores estables, técnicas, efectos conocidos, parámetros, condiciones, relaciones y datos traducibles;
 - **recursos visuales:** ilustraciones, fondos, símbolos, texturas e imágenes referenciadas mediante rutas relativas;
 - **tema declarativo:** valores visuales y selección de recursos dentro de las capacidades que Fatebound admita explícitamente;
 - **traducciones:** textos o catálogos localizados cuando el contrato definitivo los contemple.
 
 Markdown y YAML son datos. No podrán declarar scripts, consultas SQL, módulos, plugins, expresiones evaluables ni instrucciones en lenguaje natural que Fatebound ejecute como reglas.
+
+El paquete contendrá definiciones versionadas de reglas y contenido. Los personajes, el progreso y estado por Crónica, secundarios, clanes elegidos o generados durante el juego, relaciones, tiradas, combates, decisiones, efectos pendientes y eventos pertenecerán a SQLite. Esta separación está aprobada pero no define todavía campos, tablas SQL, nombres de archivos ni un manifiesto normativo.
 
 ### 2.1 Ejemplo conceptual, no normativo
 
@@ -61,10 +63,12 @@ La instalación deberá:
 - evitar colisiones entre mundos distintos y entre versiones;
 - instalar recursos bajo rutas administradas por Fatebound, sin depender de la ruta del equipo de origen;
 - registrar de forma idempotente una versión ya instalada;
-- permitir que una campaña antigua siga resolviendo exactamente su mundo y versión aunque existan publicaciones posteriores;
+- permitir que una Crónica antigua siga resolviendo exactamente su mundo y versión aunque existan publicaciones posteriores;
 - rechazar o poner en espera paquetes cuya compatibilidad no pueda determinarse con seguridad.
 
 Los nombres definitivos de campos, la sintaxis de versiones y la política ante dependencias entre paquetes quedan pendientes.
+
+Las tablas y demás elementos referenciables tendrán identificadores estables independientes de su posición visible. Un mundo podrá reorganizar, sustituir u omitir tablas o reglas que no necesite; la instalación deberá rechazar cualquier paquete que deje referencias ausentes, ambiguas o incompatibles.
 
 ## 4. Compatibilidad mecánica
 
@@ -72,7 +76,7 @@ La versión del formato de paquete y el nivel de capacidades del motor son conce
 
 ### Fase 1 — Mundos compatibles con Ronin
 
-Los mundos comparten las mecánicas fundamentales de Ronin y pueden cambiar mediante datos la ambientación, los nombres, las tablas, las técnicas, las imágenes y la presentación. Ronin, Templario y Shaolin son ejemplos de los perfiles previstos.
+El primer motor será fiel a las mecánicas originales de Ronin: dados Yin/Yang, tablas enlazadas, atributos, interacciones, técnicas, combate, bloqueos, efectos y consecuencias. Los primeros mundos compartirán ese motor y cambiarán principalmente mediante datos la ambientación, el contenido y la organización de tablas y técnicas. Ronin, Templario y Shaolin son ejemplos de los perfiles previstos.
 
 ### Fase 2 — Mundos Ronin ampliados
 
@@ -80,7 +84,7 @@ El motor añade capacidades mecánicas compatibles con las existentes. Robot y S
 
 ### Fase 3 — Mundos avanzados
 
-El motor admite subsistemas más especializados, en especial de combate. Naves espaciales es el ejemplo de referencia, con sistemas, escudos y armamento. La ampliación debe conservar la ejecución de los mundos y partidas anteriores.
+El motor admite subsistemas más especializados, en especial de combate. Naves espaciales es el ejemplo de referencia, con sistemas, escudos y armamento. La ampliación debe conservar la ejecución de los mundos y partidas anteriores. La evolución aprobada es Ronin-compatible, después ampliada y finalmente especializada.
 
 Las tres fases son hoja de ruta, no funcionalidad disponible. Antes de ampliar el motor deberán definirse capacidades versionadas, valores por defecto compatibles, pruebas con mundos anteriores y, cuando sea imprescindible transformar datos persistidos, una migración explícita y protegida mediante las garantías SQLite existentes.
 
@@ -88,7 +92,7 @@ Las tres fases son hoja de ruta, no funcionalidad disponible. Antes de ampliar e
 
 El flujo previsto, todavía no implementado, es:
 
-1. seleccionar el paquete sin ejecutarlo;
+1. seleccionar el paquete `.fateworld` sin ejecutarlo;
 2. copiarlo o abrirlo en un área temporal controlada;
 3. inspeccionar el ZIP y aplicar límites antes de extraer;
 4. validar manifiesto, versión, estructura, rutas, tamaños y tipos admitidos;
@@ -107,7 +111,8 @@ La validación deberá impedir, como mínimo:
 - YAML con tipos, etiquetas o construcciones ejecutables;
 - HTML activo, JavaScript, CSS arbitrario y recursos remotos no autorizados;
 - referencias a archivos ausentes o fuera del paquete;
-- identificadores duplicados, versiones incoherentes y capacidades no soportadas.
+- identificadores duplicados, versiones incoherentes y capacidades no soportadas;
+- referencias rotas después de reorganizar, sustituir u omitir tablas o reglas.
 
 Los límites concretos de tamaño, compresión, cantidad de archivos, formatos y dimensiones de imagen se fijarán junto al importador y deberán ser configurables o justificarse técnicamente.
 
@@ -149,7 +154,7 @@ Las plantillas, ejemplos y temas incluidos públicamente serán originales de Fa
 
 La especificación técnica deberá resolver antes de implementar el importador:
 
-- confirmación de la extensión `.fateworld` y detección independiente de la extensión;
+- detección por contenido independiente de la extensión `.fateworld` aprobada;
 - nombre, campos obligatorios y versionado del manifiesto;
 - relación entre versión de paquete, versión de mundo y capacidades del motor;
 - esquema YAML, identificadores, referencias, traducciones y espacios de nombres;
@@ -161,3 +166,5 @@ La especificación técnica deberá resolver antes de implementar el importador:
 - necesidad futura de firmas, procedencia o sumas de comprobación del paquete.
 
 Ninguna estructura ilustrativa de este documento debe considerarse estable hasta que una tarea específica defina, implemente y pruebe el importador.
+
+La futura recuperación completa deberá considerar conjuntamente SQLite y las versiones instaladas de los paquetes `.fateworld`; todavía no se ha definido ni implementado su contenedor, manifiesto o flujo de restauración.

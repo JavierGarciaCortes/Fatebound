@@ -1,6 +1,6 @@
 # Arquitectura de Fatebound 2.0
 
-Estado del documento: arquitectura propuesta con el resolvedor, la seguridad SQLite, la primera shell visual y el empaquetado portable de Windows ya implementados.
+Estado del documento: arquitectura aprobada con el resolvedor, la seguridad SQLite, la exportación manual de backups, la primera shell visual y el empaquetado portable de Windows ya implementados; el dominio y el motor continúan pendientes.
 
 Última actualización: 2026-10-11.
 
@@ -10,8 +10,8 @@ Este documento describe la dirección aprobada para Fatebound y marca expresamen
 
 El repositorio contiene actualmente:
 
-- un proceso main que crea una ventana, gestiona el ciclo de vida y atiende un diagnóstico SQLite de solo lectura;
-- un preload restringido que expone únicamente `window.api.storage.getDiagnostics()`;
+- un proceso main que crea una ventana, gestiona el ciclo de vida y atiende diagnóstico y exportación SQLite;
+- un preload restringido que expone únicamente contratos específicos de diagnóstico, exportación y preferencias;
 - un renderer Vue con shell de Fatebound, identidad base y nueve temas YAML integrados con ilustraciones empaquetadas;
 - TypeScript estricto, ESLint, Prettier, electron-vite y electron-builder;
 - recursos de marca y 36 imágenes de combinaciones de dados para los clanes de Ronin;
@@ -19,7 +19,7 @@ El repositorio contiene actualmente:
 - un empaquetado público con lista explícita de recursos propios; la variante privada todavía no está configurada;
 - un resolvedor central, una comprobación de escritura y una conexión SQLite ejecutados en main antes de crear la ventana principal;
 - migraciones SQL versionadas y transaccionales con una única migración técnica inicial;
-- integridad, copias previas a migraciones, copias automáticas y retención segura ejecutadas exclusivamente en main.
+- integridad, copias previas a migraciones, copias automáticas, retención segura y exportación manual ejecutadas exclusivamente en main.
 
 No están implementados el esquema de persistencia del juego, los repositorios del dominio, los mundos jugables, el importador, el editor, el motor de reglas, las campañas, las crónicas ni la integración de IA. Las tarjetas de mundos y los estados futuros de la shell son demostraciones de presentación, no datos instalados.
 
@@ -53,13 +53,13 @@ flowchart LR
 
 ### 3.1 Renderer — presentación
 
-Vue representa vistas, formularios y estados de interacción. Puede solicitar operaciones mediante la API del preload, pero no recibe consultas SQL, módulos de Node ni acceso general a rutas. El diagnóstico es la excepción deliberada y acotada: presenta al usuario las rutas activas de datos y base sin permitir elegir, recorrer, leer ni modificar otros archivos. Las respuestas son DTO tipados y sin detalles internos innecesarios.
+Vue representa vistas, formularios y estados de interacción. Puede solicitar operaciones mediante la API del preload, pero no recibe consultas SQL, módulos de Node ni acceso general a rutas. El diagnóstico presenta las rutas activas de datos y base sin permitir elegir, recorrer, leer ni modificar otros archivos. La exportación solicita que main abra el selector del sistema, sin enviar o recibir la ruta seleccionada. Las respuestas son DTO tipados y sin detalles internos innecesarios.
 
 **Implementado:** la demo de electron-vite se ha sustituido por una shell que separa navegación global y contextual. La marca completa es el acceso a Inicio, Ajustes es un botón de cabecera y el menú lateral contiene solo Mundos mientras no exista un mundo jugable instalado y activo. La estructura admite Mundos, Personajes y Crónicas cuando reciba en el futuro un contexto real con identificador y versión. El arranque usa `fatebound` como identidad visual neutral, no como mundo del catálogo. Ronin, Templario, Ninja, Shaolin, Robot, Soldado, Naves y Mundoplato pueden cambiar la ambientación durante la sesión, pero no instalan mundos ni amplían la navegación.
 
 ### 3.2 Preload — frontera nativa
 
-**Implementado:** el preload ya no expone `@electron-toolkit/preload` ni `ipcRenderer`. Ofrece únicamente `window.api.storage.getDiagnostics()` y `window.api.preferences.getLanguage()`/`setLanguage()` sobre canales fijos. Los contratos compartidos son tipados, el idioma se valida tanto en preload como en main y no se aceptan rutas ni identificadores arbitrarios. Capacidades futuras se añadirán expresamente, sin primitivas generales de archivos, SQL ni la conexión SQLite.
+**Implementado:** el preload ya no expone `@electron-toolkit/preload` ni `ipcRenderer`. Ofrece únicamente `window.api.storage.getDiagnostics()`, `window.api.storage.exportSqliteBackup()` y `window.api.preferences.getLanguage()`/`setLanguage()` sobre canales fijos. La exportación no acepta argumentos ni devuelve la ruta elegida; solo comunica éxito con el nombre generado, cancelación o un código conocido. Los contratos compartidos son tipados, el idioma se valida tanto en preload como en main y no se aceptan rutas ni identificadores arbitrarios. Capacidades futuras se añadirán expresamente, sin primitivas generales de archivos, SQL ni la conexión SQLite.
 
 ### 3.3 Main — aplicación
 
@@ -170,7 +170,7 @@ La configuración inicial es deliberadamente conservadora para almacenamiento ex
 - claves foráneas activas, extensiones cargables deshabilitadas, literales de cadena con comillas dobles deshabilitados y `trusted_schema=OFF`.
 - `temp_store=MEMORY`, para que los temporales no transaccionales no dependan de la carpeta temporal del sistema, y un timeout de bloqueos de cinco segundos.
 
-Esta configuración no puede garantizar durabilidad si el sistema operativo, el controlador o la propia unidad informan de una sincronización antes de persistir los datos, ni puede hacer segura la retirada física durante una escritura. Sigue pendiente probar una unidad extraíble real y completar la exportación y recuperación explícita.
+Esta configuración no puede garantizar durabilidad si el sistema operativo, el controlador o la propia unidad informan de una sincronización antes de persistir los datos, ni puede hacer segura la retirada física durante una escritura. Sigue pendiente probar una unidad extraíble real y completar la recuperación explícita; la exportación manual ya está implementada.
 
 `src/main/storage/sqlite-migrations.ts` contiene un manifiesto ordenado de migraciones con versión, nombre y SQL. El planificador compara toda la historia aplicada con el manifiesto integrado antes de modificar la base; una versión futura, un hueco o un nombre distinto bloquean el arranque. Cada migración pendiente se ejecuta de forma independiente con `BEGIN IMMEDIATE`, registra su versión dentro de la misma transacción y termina con `COMMIT`; cualquier error ejecuta `ROLLBACK` para esa migración.
 
@@ -198,11 +198,23 @@ La cola `SqliteOperationQueue` impide solapar escrituras gestionadas y copias. E
 
 La retención solo empieza después de que la copia nueva esté publicada y verificada. Conserva como máximo seis copias `automatic` y dos protegidas en conjunto (`pre-migration` y `protected`); ignora siempre `manual`. Antes de eliminar un directorio se comprueban de nuevo el marcador de aplicación, el nombre derivado del manifiesto, los dos archivos exactos, tamaño, SHA-256, `integrity_check` y claves foráneas. La última copia válida nunca se elimina. Manifiestos v1 anteriores, manifiestos inválidos, archivos adicionales y rutas desconocidas no se consideran administrados y permanecen intactos. Una imposibilidad de aplicar retención se informa pero no invalida una copia nueva ya publicada. No existe un umbral fijo de espacio ni se eliminan copias antiguas para hacer sitio antes de crear otra.
 
-Las copias locales permanecen en el mismo dispositivo que `data/fatebound.sqlite`: protegen frente a una migración o modificación lógica, pero no frente a pérdida o avería física de la unidad. La exportación manual y la restauración explícita todavía no están implementadas. La exportación deberá usar de nuevo `backup()` hacia un destino elegido en main y no expondrá SQLite ni el sistema de archivos al renderer; la restauración nunca sobrescribirá datos sin una decisión expresa del usuario.
+Las copias locales permanecen en el mismo dispositivo que `data/fatebound.sqlite`: protegen frente a una migración o modificación lógica, pero no frente a pérdida o avería física de la unidad. La exportación manual ya permite conservar una copia verificada en otra ubicación. La restauración explícita todavía no está implementada y nunca sobrescribirá datos sin una decisión expresa del usuario.
+
+**Dirección aprobada, todavía no implementada:** la recuperación completa no podrá limitarse a SQLite. También deberá identificar y recuperar las versiones exactas de los paquetes `.fateworld` instalados que necesiten personajes y Crónicas. Esta decisión no define todavía un formato de archivo de recuperación, un manifiesto de paquete ni un procedimiento de restauración.
 
 Referencias técnicas de la decisión: [API `node:sqlite` de Node 22.23](https://nodejs.org/download/release/latest-jod/docs/api/sqlite.html), [información de sistema de archivos de Node 22](https://nodejs.org/download/release/latest-jod/docs/api/fs.html), [Online Backup API de SQLite](https://www.sqlite.org/backup.html), [PRAGMA de SQLite](https://www.sqlite.org/pragma.html) y [archivos temporales y journals](https://www.sqlite.org/tempfiles.html).
 
-### 4.6 Diagnóstico de almacenamiento
+### 4.6 Exportación manual de backups
+
+**Implementada, pendiente de validación manual:** Ajustes invoca un canal IPC específico y sin argumentos. Main abre el selector nativo de carpetas con el idioma activo y conserva la ruta íntegramente dentro del proceso privilegiado. El renderer recibe únicamente uno de tres resultados: éxito con el nombre seguro del directorio creado, cancelación o un código de error sanitizado.
+
+Main resuelve la ruta real y rechaza destinos iguales o contenidos en los directorios activos de datos o backups, incluidos alias mediante enlaces que puedan resolverse. La creación se serializa en `SqliteOperationQueue` junto con escrituras, copias automáticas y cierre. Reutiliza `createSqliteBackup()` con motivo `manual`, por lo que ejecuta `backup()` sobre la conexión abierta, comprueba espacio cuando es posible, genera manifiesto v2 y publica un directorio único sin sustituir datos existentes.
+
+Antes de responder con éxito, la operación vuelve a pasar el directorio por `inspectManagedSqliteBackup()`: exige exactamente `fatebound.sqlite` y `manifest.json`, nombre coherente, tamaño, SHA-256, `integrity_check` y claves foráneas. Esta comprobación final permanece dentro de la cola, de modo que el cierre seguro espera también su finalización. Un fallo elimina los temporales marcados por el servicio; si la publicación recién creada no supera la validación final, solo se elimina esa ruta propia después de volver a comprobar su nombre, motivo, padre y archivos esperados. Cancelar el selector no crea archivos.
+
+La exportación externa no altera el estado del programador automático ni participa en la retención 6/2 de `data/backups/`. No implementa restauración, exploración general de archivos ni cambio de la raíz activa.
+
+### 4.7 Diagnóstico de almacenamiento
 
 **Implementado:** Ajustes solicita una instantánea solo cuando se abre la sección por primera vez o el usuario pulsa **Actualizar**. Main serializa `quick_check`, `foreign_key_check` y la lectura de la versión de esquema mediante la misma cola que coordina SQLite. En paralelo inspecciona las copias publicadas con el validador existente; el recuento incluye exclusivamente manifiestos v2 de Fatebound cuyo nombre, estructura, tamaño, SHA-256 e integridad son válidos.
 
@@ -212,13 +224,12 @@ La respuesta contiene las rutas activas de datos y base, disponibilidad de SQLit
 
 Un mundo es una línea de contenido independiente. Cada versión contiene datos, reglas declarativas, textos, traducciones y referencias a recursos. Los borradores pueden editarse; al publicarse se vuelven inmutables. Editar contenido publicado crea una versión nueva enlazada con su origen.
 
-Las reglas, el contenido del mundo y el estado de las partidas se almacenan como responsabilidades diferentes:
+Las reglas, el contenido del mundo y el estado de las partidas se almacenarán como responsabilidades diferentes:
 
-- **reglas y efectos:** primitivas mecánicas estructuradas que puede ejecutar el motor;
-- **datos del mundo:** clanes, técnicas, textos, tablas, traducciones y recursos de una versión;
-- **partida:** personaje, campaña, decisiones, tiradas, consecuencias, notas y eventos.
+- **paquete `.fateworld`:** definiciones versionadas de reglas y contenido del mundo, incluidos clanes, técnicas, textos, tablas, traducciones y recursos;
+- **SQLite:** fichas base de personajes, progreso y estado por Crónica, secundarios, clanes, relaciones, tiradas, combates, decisiones, efectos pendientes y eventos.
 
-Personajes y campañas conservan el identificador exacto de la versión del mundo con la que fueron creados. Una actualización del mundo no migra una partida de forma implícita.
+Personajes y Crónicas conservarán el identificador exacto de la versión del mundo con la que fueron creados. Una actualización del mundo no migrará una partida de forma implícita. Esta separación está aprobada pero todavía no existe en el esquema SQL ni fija la estructura interna del paquete.
 
 ### 5.1 Recursos incluidos y perfiles de distribución
 
@@ -238,7 +249,11 @@ El importador impedirá escapes de directorio, enlaces inseguros, extensiones no
 
 ### 5.3 Hoja de ruta mecánica y compatibilidad
 
-**Dirección aprobada, todavía no implementada:** las capacidades del motor evolucionarán en tres fases acumulativas.
+**Dirección aprobada, todavía no implementada:** el primer motor será fiel a las mecánicas originales de Ronin: dados Yin/Yang, tablas enlazadas, atributos, interacciones, técnicas, combate, bloqueos, efectos y consecuencias. Los primeros mundos compartirán ese motor y cambiarán principalmente la ambientación, el contenido y la organización declarativa de tablas y técnicas.
+
+Las tablas tendrán identificadores estables independientes de su orden o posición visible. Cada mundo podrá reorganizar, sustituir u omitir las tablas y reglas que no necesite, siempre que el paquete valide todas sus referencias y no deje enlaces internos rotos.
+
+El motor evolucionará en tres fases acumulativas:
 
 1. **Mundos compatibles con Ronin:** comparten las mecánicas fundamentales y personalizan mediante datos ambientación, nombres, tablas, técnicas, imágenes y presentación. Ronin, Templario y Shaolin son ejemplos de perfiles previstos.
 2. **Mundos Ronin ampliados:** añaden capacidades compatibles con el modelo anterior. Robot y Soldado son ejemplos de perfiles previstos. Los mundos de la fase 1 deben seguir funcionando sin modificaciones obligatorias.
@@ -262,18 +277,18 @@ Actualmente solo existen los recursos gráficos indicados; no se ha importado el
 
 ## 7. Paquetes de mundos, importador y editor
 
-**Dirección aprobada, todavía no implementada:** los mundos se distribuirán mediante paquetes ZIP instalables. La extensión propuesta es `.fateworld`, pendiente de especificación técnica definitiva. Cada paquete podrá combinar Markdown legible, YAML estructurado, imágenes, recursos visuales y un tema declarativo versionado. Fatebound incluirá plantillas y ejemplos originales, sin textos, tablas ni reglas copiadas de Ronin o de otros terceros.
+**Dirección aprobada, todavía no implementada:** los mundos se distribuirán mediante paquetes ZIP instalables con extensión `.fateworld`. Cada paquete contendrá definiciones versionadas de reglas y contenido y podrá combinar Markdown legible, YAML estructurado, imágenes, recursos visuales y un tema declarativo versionado. Fatebound incluirá plantillas y ejemplos originales, sin textos, tablas ni reglas copiadas de Ronin o de otros terceros.
 
 Las futuras plantillas deberán documentar, como requisitos mínimos:
 
 - identificadores estables y relaciones entre elementos;
 - metadatos del mundo y de sus versiones;
-- tablas y resultados de dados;
+- tablas con identificadores estables independientes de su posición visible, resultados de dados y referencias validadas;
 - textos traducibles y asociación de traducciones;
 - efectos mecánicos, parámetros y condiciones;
 - referencias relativas a imágenes y otros recursos.
 
-El mismo modelo deberá poder importarse, validarse, editarse y exportarse sin pérdida de información. Varias versiones podrán coexistir y los personajes y crónicas conservarán su vínculo exacto. El contrato exacto —sintaxis, esquema, organización de archivos, manifiestos, capacidades y estrategia de versiones— se diseñará en una tarea posterior; ni este documento ni la estructura ilustrativa de `WORLD_FORMAT.md` lo fijan todavía.
+El mismo modelo deberá poder importarse, validarse, editarse y exportarse sin pérdida de información. Varias versiones podrán coexistir y los personajes y Crónicas conservarán su vínculo exacto. Cada mundo podrá reorganizar, sustituir u omitir tablas o reglas, pero la validación deberá comprobar la totalidad de las referencias estables. El contrato exacto —sintaxis, esquema, organización de archivos, manifiestos, capacidades y estrategia de versiones— se diseñará en una tarea posterior; ni este documento ni la estructura ilustrativa de `WORLD_FORMAT.md` lo fijan todavía.
 
 El flujo previsto es:
 
@@ -288,17 +303,19 @@ El editor modifica borradores o crea una versión derivada. Al principio los paq
 
 ## 8. Motor de reglas y efectos
 
-**Propuesta no implementada:** el motor recibe acciones estructuradas y produce resultados deterministas a partir del estado, los efectos y las tiradas proporcionadas. No analiza prosa para decidir mecánicas.
+**Dirección aprobada, todavía no implementada:** el motor recibe acciones estructuradas y produce resultados deterministas a partir del estado, los efectos y las tiradas proporcionadas. Su primera capacidad será fiel a los dados Yin/Yang, tablas enlazadas, atributos, interacciones, técnicas, combate, bloqueos, efectos y consecuencias de Ronin. No analiza prosa para decidir mecánicas.
 
 Las técnicas referenciarán un catálogo versionado de efectos mecánicos reutilizables. Cada efecto tendrá un identificador conocido, parámetros validados y una implementación explícita. Componer técnicas significa combinar efectos admitidos, no evaluar expresiones arbitrarias ni cargar módulos desde un mundo importado.
 
-El generador de tiradas se abstraerá para permitir reproducción y pruebas. Las entradas y salidas relevantes producirán eventos de campaña.
+El generador de tiradas se abstraerá para permitir reproducción y pruebas. Las entradas y salidas relevantes producirán eventos de Crónica.
 
 ## 9. Personajes, clanes y crónicas
 
-**Dirección aprobada, no implementada:** un personaje pertenece a una versión concreta de mundo y puede referenciar un clan definido en esa misma versión. Una crónica conserva su mundo, versión, personaje principal, estado y secuencia de eventos. Inicialmente tendrá un único personaje principal; un personaje podrá protagonizar varias crónicas.
+**Dirección aprobada, no implementada:** cada personaje tendrá una ficha base permanente, vinculada a una versión concreta de mundo y capaz de referenciar un clan de esa versión. El progreso y el estado derivados del juego serán independientes para cada Crónica, que conservará su mundo, versión, personaje principal y secuencia de eventos.
 
-Los casos de uso validarán que las referencias pertenezcan a la misma versión. La actualización o publicación de un mundo no alterará automáticamente personajes o crónicas existentes; una migración futura deberá ser explícita, reversible y confirmada. Sigue pendiente decidir si el progreso de un personaje se comparte entre sus crónicas y, en su caso, qué cambios son comunes o específicos de cada historia.
+Una ficha solo podrá participar en una Crónica en curso. Cerrar Fatebound no liberará al personaje: la ocupación pertenece al estado persistente de la Crónica, no a la sesión de la aplicación. Finalizarla o abandonarla definitivamente liberará la ficha para una nueva Crónica. El abandono será irreversible y conservará el historial consultable. La muerte dentro de una Crónica cerrará o resolverá ese estado narrativo, pero no impedirá reutilizar la ficha base en otra Crónica nueva.
+
+Los casos de uso validarán que las referencias pertenezcan a la misma versión y que una ficha no esté ocupada por dos Crónicas en curso. La actualización o publicación de un mundo no alterará automáticamente personajes o Crónicas existentes; una migración futura deberá ser explícita, protegida y confirmada. Estas invariantes están aprobadas, pero todavía no existe su esquema SQLite ni sus flujos de interfaz.
 
 ## 10. Eventos y crónicas
 
@@ -331,20 +348,21 @@ La implementación mantiene y deberá seguir manteniendo:
 - conservar copias recuperables antes de migraciones y operaciones destructivas;
 - registrar errores técnicos sin exponer datos privados en la interfaz.
 
-La API genérica del scaffold y el canal de demostración `ping` se han retirado. La superficie nativa actual queda limitada al diagnóstico tipado sin argumentos y a lectura/escritura validada del idioma; incorporar otra capacidad exigirá un contrato IPC específico y pruebas equivalentes.
+La API genérica del scaffold y el canal de demostración `ping` se han retirado. La superficie nativa actual queda limitada al diagnóstico tipado sin argumentos, la exportación manual sin rutas y la lectura/escritura validada del idioma; incorporar otra capacidad exigirá un contrato IPC específico y pruebas equivalentes.
 
 ## 13. Orden de implementación recomendado
 
 1. **Implementado:** resolver y probar la raíz de datos portable y el flujo ante falta de escritura.
 2. **Implementado y validado:** generar el portable de Windows y validar su comportamiento en ejecución.
 3. **Implementado:** primera interfaz funcional, navegación, temas integrados, ocho mundos futuros con estado honesto, nueva marca y diagnóstico SQLite de solo lectura.
-4. **Implementado:** retirada de las API genéricas del preload, canal IPC único y activación de aislamiento, ausencia de Node en renderer y sandbox.
+4. **Implementado:** retirada de las API genéricas del preload, canales IPC específicos y activación de aislamiento, ausencia de Node en renderer y sandbox.
 5. **Implementado, pendiente de verificación manual:** internacionalización de la interfaz en español, inglés y coreano con preferencia portable, manteniendo separados los futuros idiomas de contenido.
-6. **Siguiente prioridad:** implementar la exportación manual y restauración explícita de copias SQLite, sin sobrescritura silenciosa; después, repositorios del dominio sobre la transacción existente.
-7. Cerrar en una tarea específica el contrato versionado de paquetes de mundos y crear plantillas originales.
-8. Incorporar importación, validación, edición, exportación y publicación inmutable.
-9. Implementar progresivamente el motor compatible, las campañas, los eventos y la exportación.
-10. Configurar y verificar el perfil privado separado cuando exista autorización para su contenido.
-11. Añadir las fases mecánicas extendida y avanzada y, solo después, la integración opcional de IA.
+6. **Implementado, pendiente de validación manual:** exportación manual de copias SQLite a una carpeta elegida en main, sin rutas en el renderer ni sobrescritura silenciosa.
+7. **Siguiente prioridad:** diseñar la restauración explícita y la recuperación conjunta de SQLite y paquetes instalados; después, repositorios del dominio sobre la transacción existente.
+8. Cerrar en una tarea específica el contrato versionado de paquetes de mundos y crear plantillas originales.
+9. Incorporar importación, validación, edición, exportación y publicación inmutable.
+10. Implementar progresivamente el motor compatible, las Crónicas, los eventos y la exportación.
+11. Configurar y verificar el perfil privado separado cuando exista autorización para su contenido.
+12. Añadir las fases mecánicas extendida y avanzada y, solo después, la integración opcional de IA.
 
 `STATUS.md` es la fuente para la prioridad inmediata y el resultado real de cada fase.

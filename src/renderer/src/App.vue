@@ -5,6 +5,7 @@ import type {
   StorageDiagnosticsResult
 } from '../../shared/storage-diagnostics'
 import type { ApplicationLanguage } from '../../shared/application-language'
+import type { SqliteManualExportResult } from '../../shared/sqlite-manual-export'
 import type { MessageKey } from '../../shared/i18n'
 import brandLogoHorizontal from '../../../resources/branding/fatebound/fatebound-logo-horizontal.png'
 import brandSymbol from '../../../resources/branding/fatebound/fatebound-symbol.png'
@@ -33,6 +34,8 @@ const activeInstalledWorld = ref<InstalledWorldNavigationContext | null>(null)
 const mainContent = ref<HTMLElement | null>(null)
 const diagnostics = ref<StorageDiagnosticsResult | null>(null)
 const diagnosticsLoading = ref(false)
+const backupExportResult = ref<SqliteManualExportResult | null>(null)
+const backupExporting = ref(false)
 const failedArtwork = ref<readonly string[]>([])
 
 const activeTheme = computed(() => resolveBuiltinTheme(activeThemeId.value))
@@ -67,6 +70,27 @@ const languageStatusKey = computed<MessageKey | null>(() => {
   }
   return keys[preferenceState.value] ?? null
 })
+const backupExportMessage = computed(() => {
+  if (backupExporting.value) return t('settings.export.working')
+
+  const result = backupExportResult.value
+  if (result === null) return null
+  if (result.status === 'success') {
+    return t('settings.export.success', { backupName: result.backupDirectoryName })
+  }
+  if (result.status === 'cancelled') return t('settings.export.cancelled')
+  if (result.code === 'destination-not-allowed') {
+    return t('settings.export.destinationError')
+  }
+  if (result.code === 'destination-unavailable') {
+    return t('settings.export.destinationUnavailableError')
+  }
+  if (result.code === 'export-in-progress') return t('settings.export.inProgressError')
+  return t('settings.export.genericError')
+})
+const backupExportFailed = computed(
+  () => backupExportResult.value?.status === 'error'
+)
 
 function navigationLabel(sectionId: AppSectionId): string {
   return t(`navigation.${sectionId}.label` as MessageKey)
@@ -164,6 +188,21 @@ function formatCheckedAt(value: string): string {
 function changeLanguage(value: ApplicationLanguage): void {
   if (value === language.value || preferenceState.value === 'saving') return
   void selectLanguage(value)
+}
+
+async function exportSqliteBackup(): Promise<void> {
+  if (backupExporting.value) return
+
+  backupExporting.value = true
+  backupExportResult.value = null
+
+  try {
+    backupExportResult.value = await window.api.storage.exportSqliteBackup()
+  } catch {
+    backupExportResult.value = { status: 'error', code: 'export-failed' }
+  } finally {
+    backupExporting.value = false
+  }
 }
 </script>
 
@@ -519,6 +558,31 @@ function changeLanguage(value: ApplicationLanguage): void {
               aria-live="polite"
             >
               {{ t(languageStatusKey) }}
+            </p>
+          </article>
+
+          <article class="backup-export-panel panel" aria-labelledby="backup-export-title">
+            <div class="backup-export-panel__copy">
+              <span class="eyebrow">{{ t('settings.export.eyebrow') }}</span>
+              <h3 id="backup-export-title">{{ t('settings.export.title') }}</h3>
+              <p>{{ t('settings.export.body') }}</p>
+            </div>
+            <button
+              class="button button--primary"
+              type="button"
+              :disabled="backupExporting"
+              @click="exportSqliteBackup"
+            >
+              <AppIcon name="database" />
+              {{ backupExporting ? t('settings.export.working') : t('settings.export.action') }}
+            </button>
+            <p
+              v-if="backupExportMessage"
+              class="backup-export-status"
+              :class="{ 'backup-export-status--error': backupExportFailed }"
+              aria-live="polite"
+            >
+              {{ backupExportMessage }}
             </p>
           </article>
 

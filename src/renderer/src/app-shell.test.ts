@@ -161,6 +161,12 @@ test('future-world cards select atmosphere without offering playable actions', (
   )
 })
 
+test('Settings exposes manual backup export without collecting a renderer path', () => {
+  assert.match(appSource, /window\.api\.storage\.exportSqliteBackup\(\)/)
+  assert.match(appSource, /settings\.export\.action/)
+  assert.doesNotMatch(appSource, /type="file"/)
+})
+
 test('the initial theme and invalid selections resolve to neutral Fatebound', () => {
   assert.equal(DEFAULT_BUILTIN_THEME_ID, 'fatebound')
   assert.equal(resolveBuiltinThemeId(undefined), 'fatebound')

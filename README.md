@@ -2,7 +2,7 @@
 
 Fatebound es una aplicación de escritorio para Windows destinada a jugar RPG narrativos en solitario. El objetivo es ofrecer una experiencia local y portable: las reglas, los mundos, las partidas y sus crónicas podrán viajar junto a la aplicación y el juego no dependerá de un servidor ni de conexión a Internet.
 
-El repositorio se encuentra en una fase inicial de fundamentos. Actualmente contiene una primera shell funcional de Electron y Vue, interfaz en español, inglés y coreano, preferencias portables y persistencia SQLite con comprobaciones de integridad y copias seguras. El esquema del juego, el motor, la importación de mundos y las pantallas jugables todavía no están implementados.
+El repositorio se encuentra en una fase inicial de fundamentos. Actualmente contiene una primera shell funcional de Electron y Vue, interfaz en español, inglés y coreano, preferencias portables y persistencia SQLite con comprobaciones de integridad, copias seguras y exportación manual. El esquema del juego, el motor, la importación de mundos y las pantallas jugables todavía no están implementados.
 
 ## Visión de producto
 
@@ -59,11 +59,11 @@ El ejecutable generado actualmente no tiene firma Authenticode. Windows puede mo
 
 La aplicación conserva los tres contextos de Electron:
 
-- `src/main/`: ciclo de vida, ventanas, conexión SQLite y, en el futuro, servicios de aplicación y acceso controlado a archivos.
+- `src/main/`: ciclo de vida, ventanas, conexión SQLite, backups y selección controlada del destino de exportación; los servicios de dominio continúan pendientes.
 - `src/preload/`: frontera segura y tipada entre Electron y la interfaz.
 - `src/renderer/`: interfaz Vue sin acceso directo a SQLite o al sistema de archivos.
 
-El proceso main contiene un resolvedor central de rutas portables, valida la escritura y abre SQLite antes de mostrar la ventana principal. La arquitectura futura añadirá servicios de dominio y repositorios detrás de contratos IPC mínimos. Los recursos incluidos serán de solo lectura; los datos mutables se guardan en una ubicación resuelta en tiempo de ejecución, nunca en rutas absolutas específicas de un equipo ni dentro de `app.asar`.
+El proceso main contiene un resolvedor central de rutas portables, valida la escritura, abre SQLite antes de mostrar la ventana principal y coordina sus copias y exportaciones. La arquitectura futura añadirá servicios de dominio y repositorios detrás de contratos IPC mínimos. Los recursos incluidos serán de solo lectura; los datos mutables se guardan en una ubicación resuelta en tiempo de ejecución, nunca en rutas absolutas específicas de un equipo ni dentro de `app.asar`.
 
 Consulta [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) para ver la arquitectura y sus límites, [docs/WORLD_FORMAT.md](docs/WORLD_FORMAT.md) para la dirección del formato instalable y [docs/DESIGN_SYSTEM.md](docs/DESIGN_SYSTEM.md) para la dirección visual.
 
@@ -91,7 +91,9 @@ Una cola del proceso main serializa escrituras, copias y cierre. Nunca se inicia
 
 Después de publicar y verificar una copia nueva se aplica la retención: se conservan como máximo seis automáticas gestionadas y dos protegidas (`pre-migration` o futuras operaciones importantes). Las copias `manual` nunca se eliminan y tampoco se elimina la última copia válida. Antes de borrar se vuelven a comprobar propiedad, estructura exacta, manifiesto, tamaño, SHA-256 e integridad SQLite. Manifiestos v1 anteriores, manifiestos inválidos, directorios con archivos extra y rutas desconocidas quedan fuera de la retención. No hay un límite fijo arbitrario de espacio ni se borran copias para intentar hacer sitio antes de publicar otra.
 
-Todavía no hay exportación a otra unidad ni interfaz de restauración. La restauración seguirá siendo manual y explícita: Fatebound no sustituye datos silenciosamente. Como `data/backups/` comparte dispositivo con la base, estas copias no protegen frente a la pérdida o avería física del pendrive.
+Ajustes permite exportar manualmente una copia a una carpeta elegida mediante el selector nativo de main. El renderer no envía ni recibe esa ruta: solo invoca un canal sin argumentos y obtiene éxito, cancelación o un código de error conocido. La operación crea directamente en el destino un directorio único con `fatebound.sqlite` y `manifest.json`, reutiliza la cola y el backup online, y vuelve a comprobar estructura, tamaño, SHA-256, integridad y claves foráneas antes de informar del éxito. Se rechazan destinos dentro de los datos o backups activos, no se sobrescriben directorios existentes y solo se limpian temporales marcados o la candidata propia que no supere la validación final.
+
+Todavía no hay interfaz de restauración. La restauración seguirá siendo manual y explícita: Fatebound no sustituye datos silenciosamente. Como `data/backups/` comparte dispositivo con la base, solo una exportación conservada en otra unidad protege frente a la pérdida o avería física del pendrive. La recuperación completa futura deberá considerar también las versiones instaladas de los paquetes `.fateworld` que necesiten los datos SQLite.
 
 Para favorecer la recuperación en unidades extraíbles se usa el journal clásico `DELETE` con `synchronous=EXTRA`, además de claves foráneas activas, extensiones deshabilitadas, `trusted_schema=OFF`, temporales en memoria y una espera de bloqueos de cinco segundos. Esta elección reduce los archivos persistentes auxiliares y conserva el rollback journal junto a la base si una escritura se interrumpe, a costa de más operaciones de sincronización y menor rendimiento que WAL. No hace segura la extracción física durante una escritura: deben cerrarse Fatebound y las escrituras pendientes antes de retirar la unidad.
 
@@ -105,9 +107,9 @@ La validación manual básica en Windows está completada: el ejecutable se abre
 
 Fatebound debe poder distribuirse públicamente sin mundos instalados y sin incorporar contenido protegido de terceros. Una instalación vacía será un estado válido: el usuario podrá instalar sus propios paquetes de mundos, incluido Ronin para uso personal cuando disponga legítimamente de ese contenido.
 
-La dirección aprobada es distribuir cada mundo como un paquete ZIP instalable. La extensión propuesta es `.fateworld`, pendiente de especificación técnica definitiva. El paquete combinará Markdown, YAML, imágenes, recursos visuales y un tema declarativo; se validará como contenido no confiable y nunca podrá ejecutar código. Varias versiones de un mundo podrán coexistir, y personajes y crónicas conservarán su vínculo con la versión exacta con la que fueron creados. Inicialmente los paquetes se prepararán fuera de Fatebound: no es necesario construir primero un editor visual avanzado.
+La dirección aprobada es distribuir cada mundo como un paquete ZIP instalable con extensión `.fateworld`, cuyo contrato técnico sigue pendiente. El paquete contendrá definiciones versionadas de reglas y contenido y combinará Markdown, YAML, imágenes, recursos visuales y un tema declarativo; se validará como contenido no confiable y nunca podrá ejecutar código. SQLite conservará las fichas base, el progreso y estado por Crónica, secundarios, clanes, relaciones, tiradas, combates, decisiones, efectos pendientes y eventos. Varias versiones de un mundo podrán coexistir, y personajes y Crónicas conservarán su vínculo con la versión exacta con la que fueron creados. Inicialmente los paquetes se prepararán fuera de Fatebound: no es necesario construir primero un editor visual avanzado.
 
-En el modelo futuro, cada crónica tendrá inicialmente un personaje principal y un personaje podrá protagonizar varias crónicas. La política para compartir o aislar el progreso de ese personaje entre crónicas sigue pendiente de diseño; la shell actual no crea ninguno de estos registros.
+En el modelo aprobado todavía no implementado, cada personaje tendrá una ficha base permanente y progreso independiente por Crónica. Solo podrá participar en una Crónica en curso, aunque se cierre la aplicación. Finalizarla o abandonarla definitivamente liberará la ficha; el abandono será irreversible y conservará el historial consultable. La muerte en una Crónica no impedirá reutilizar la ficha base en otra nueva. La shell actual no crea ninguno de estos registros y todavía no existe su esquema SQL.
 
 Ronin, de Tiago Junges, no forma parte obligatoria de la distribución pública. Cuando el usuario lo instale, Fatebound conservará intacta su versión importada, creará versiones nuevas para las modificaciones y la protegerá frente al borrado accidental en el gestor de mundos. Sus reglas, contenido y recursos permanecerán separados de las partidas.
 
@@ -121,11 +123,13 @@ Los demás mundos serán independientes y seguirán el mismo modelo de importaci
 
 La evolución del motor se plantea en tres fases compatibles, todas todavía pendientes de implementación:
 
-1. **Mundos compatibles con Ronin:** comparten sus mecánicas fundamentales y cambian ambientación, nombres, tablas, técnicas, imágenes y presentación mediante datos. Ronin, Templario y Shaolin son los perfiles de referencia.
+1. **Mundos compatibles con Ronin:** el primer motor será fiel a sus dados Yin/Yang, tablas enlazadas, atributos, interacciones, técnicas, combate, bloqueos, efectos y consecuencias. Los primeros mundos compartirán ese motor y cambiarán sobre todo ambientación, contenido y organización de tablas y técnicas. Ronin, Templario y Shaolin son los perfiles de referencia.
 2. **Mundos Ronin ampliados:** añaden capacidades mecánicas compatibles sin obligar a modificar los mundos de la fase 1. Robot y Soldado son los perfiles de referencia.
 3. **Mundos avanzados:** incorporan subsistemas especializados, especialmente de combate. Naves espaciales es el perfil de referencia, con sistemas, escudos y armamento.
 
 Una ampliación nunca deberá romper mundos o partidas existentes sin una estrategia explícita de compatibilidad, pruebas y migración.
+
+Las tablas tendrán identificadores estables independientes de sus posiciones visibles. Cada mundo podrá reorganizar, sustituir u omitir tablas o reglas que no necesite, siempre que valide sus referencias. La recuperación completa futura deberá reunir tanto SQLite como las versiones instaladas de los paquetes; todavía no se ha definido un manifiesto `.fateworld`, un esquema SQL del juego ni un formato de restauración.
 
 ## Primera interfaz funcional
 
@@ -141,9 +145,9 @@ Los ocho mundos se etiquetan **Próximamente** porque todavía no existe un paqu
 
 Ajustes permite cambiar inmediatamente la interfaz entre **Español**, **English** y **한국어** sin perder la sección ni el tema activo. La preferencia se valida en preload y main y se publica atómicamente en `data/preferences.json`; una ausencia o valor inválido usa español. Un fallo de guardado mantiene el cambio solo durante la sesión y se comunica expresamente. Las traducciones viven en archivos independientes bajo `src/shared/i18n/locales/`, tienen claves coherentes y fallback explícito al español; las fechas visibles usan `Intl` con el idioma activo.
 
-Ajustes también consulta mediante `window.api.storage.getDiagnostics()` una instantánea real de las rutas activas, disponibilidad de SQLite, versión de esquema, integridad, claves foráneas y número de copias administradas válidas. El preload solo expone los contratos específicos de diagnóstico y preferencia; no expone `ipcRenderer`, SQL, la conexión ni acceso general a archivos. La ventana conserva aislamiento de contexto, ausencia de Node y sandbox.
+Ajustes también consulta mediante `window.api.storage.getDiagnostics()` una instantánea real de las rutas activas, disponibilidad de SQLite, versión de esquema, integridad, claves foráneas y número de copias administradas válidas. Desde la misma sección puede solicitar `window.api.storage.exportSqliteBackup()` sin proporcionar rutas. El preload solo expone los contratos específicos de diagnóstico, exportación y preferencia; no expone `ipcRenderer`, SQL, la conexión ni acceso general a archivos. La ventana conserva aislamiento de contexto, ausencia de Node y sandbox.
 
-Personajes y Crónicas conservan vistas estructurales futuras, pero permanecen fuera de la navegación mientras no haya un mundo jugable activo y no ofrecen creación ni juego. Esta interfaz no incluye todavía editor de mundos, crónicas, reglas avanzadas, restauración ni exportación de copias.
+Personajes y Crónicas conservan vistas estructurales futuras, pero permanecen fuera de la navegación mientras no haya un mundo jugable activo y no ofrecen creación ni juego. Esta interfaz no incluye todavía editor de mundos, crónicas, reglas avanzadas ni restauración.
 
 ## Plantillas de mundos
 
@@ -175,6 +179,7 @@ El formato deberá permitir importar, validar, editar y exportar un mundo sin p�
 - Protección obligatoria previa a migraciones, sin restauración automática, y bloqueo de instancia única antes de abrir SQLite.
 - Copias automáticas tras dos minutos sin cambios, intervalo mínimo de treinta minutos, estado pendiente persistente y operaciones SQLite serializadas en main.
 - Retención verificada de seis copias automáticas y dos protegidas, sin eliminar copias manuales, inválidas, desconocidas ni la última copia válida.
+- Exportación manual desde Ajustes a una carpeta elegida en main, con copia SQLite autocontenida, validación completa, publicación única y resultados localizados.
 - Pruebas aisladas para creación, persistencia, integridad, copias, migraciones, reapertura, errores, cierre, diagnóstico, preload, navegación, YAML, rutas y catálogo de temas.
 - Shell visual con Inicio en la marca, Ajustes en la cabecera y navegación contextual accesible y adaptativa.
 - Interfaz completa en español, inglés y coreano con selector inmediato, fallback español y preferencia portable atómica en `data/preferences.json`.
@@ -192,7 +197,7 @@ El formato deberá permitir importar, validar, editar y exportar un mundo sin p�
 ### Planificado
 
 - Idiomas de contenido independientes por paquete: cada futuro mundo declarará los realmente disponibles y su idioma predeterminado; Fatebound no inventará traducciones ausentes.
-- Exportación manual de copias a otra unidad, recuperación explícita y repositorios del dominio sobre SQLite.
+- Recuperación explícita y repositorios del dominio sobre SQLite.
 - Validación del portable desde un pendrive físico y desde otro ordenador.
 - Instalaciones válidas sin mundos, importación personal y protección frente al borrado accidental.
 - Separación de compilaciones públicas sin contenido protegido y compilaciones privadas autorizadas.

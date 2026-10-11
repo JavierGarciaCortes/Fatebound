@@ -80,6 +80,21 @@ export const es = {
     'No se pudo leer la preferencia portable. Se está utilizando español para esta sesión.',
   'settings.language.saveError':
     'El idioma ha cambiado para esta sesión, pero no se pudo guardar. Al volver a abrir Fatebound se usará la última preferencia válida.',
+  'settings.export.eyebrow': 'Copia externa',
+  'settings.export.title': 'Exportar copia de seguridad',
+  'settings.export.body':
+    'Elige una carpeta fuera de los datos activos. Fatebound creará dentro una copia SQLite autocontenida, verificada y con un nombre único.',
+  'settings.export.action': 'Elegir carpeta y exportar',
+  'settings.export.working': 'Creando y verificando la copia…',
+  'settings.export.success': 'Copia exportada correctamente como {backupName}.',
+  'settings.export.cancelled': 'Exportación cancelada. No se ha creado ninguna copia.',
+  'settings.export.destinationError':
+    'Esa carpeta interfiere con los datos o backups activos. Elige otra ubicación.',
+  'settings.export.destinationUnavailableError':
+    'No se pudo validar o utilizar esa carpeta. Comprueba que siga disponible y elige otra ubicación.',
+  'settings.export.inProgressError': 'Ya hay una exportación en curso.',
+  'settings.export.genericError':
+    'No se pudo completar la exportación. La base activa y las copias anteriores no se han modificado.',
   'settings.diagnostics.readOnly': 'Solo lectura',
   'settings.diagnostics.title': 'Almacenamiento SQLite',
   'settings.diagnostics.checking': 'Comprobando…',
@@ -169,6 +184,8 @@ export const es = {
     'Fatebound no ha podido crear o mantener la copia automática de SQLite.',
   'native.backup.detail':
     'La base de datos principal y las copias anteriores no se han sustituido. Puedes seguir usando Fatebound, pero conviene revisar el espacio disponible y la unidad antes de continuar.',
+  'native.export.chooseTitle': 'Elegir destino para la copia de Fatebound',
+  'native.export.chooseButton': 'Exportar aquí',
   'native.common.accept': 'Entendido',
   'native.database.title': 'Fatebound no puede abrir sus datos',
   'native.database.detail':

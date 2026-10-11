@@ -11,6 +11,10 @@ import {
   type ApplicationLanguageWriteResult
 } from '../shared/application-language.ts'
 import type { FateboundApi } from '../shared/fatebound-api.ts'
+import {
+  SQLITE_MANUAL_EXPORT_CHANNEL,
+  type SqliteManualExportResult
+} from '../shared/sqlite-manual-export.ts'
 
 export type IpcInvoke = (channel: string, ...args: readonly unknown[]) => Promise<unknown>
 
@@ -19,6 +23,9 @@ export function createFateboundApi(invoke: IpcInvoke): FateboundApi {
     storage: Object.freeze({
       async getDiagnostics(): Promise<StorageDiagnosticsResult> {
         return (await invoke(STORAGE_DIAGNOSTICS_CHANNEL)) as StorageDiagnosticsResult
+      },
+      async exportSqliteBackup(): Promise<SqliteManualExportResult> {
+        return (await invoke(SQLITE_MANUAL_EXPORT_CHANNEL)) as SqliteManualExportResult
       }
     }),
     preferences: Object.freeze({

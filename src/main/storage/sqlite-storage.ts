@@ -7,7 +7,11 @@ import {
   loadAutomaticBackupState,
   saveAutomaticBackupState
 } from './sqlite-automatic-backup.ts'
-import { createSqliteBackup, type CreateSqliteBackupOptions } from './sqlite-backup.ts'
+import {
+  createSqliteBackup,
+  type CreateSqliteBackupOptions,
+  type SqliteBackupResult
+} from './sqlite-backup.ts'
 import { enforceSqliteBackupRetention } from './sqlite-backup-retention.ts'
 import { validateSqliteDatabase } from './sqlite-integrity.ts'
 import {
@@ -279,6 +283,30 @@ export async function runActiveSqliteWriteTransaction<T>(
       runtime.automaticBackups.recordCommittedChange()
     )
   )
+}
+
+export async function createActiveManualSqliteBackup(
+  destinationDirectory: string,
+  verifyPublishedBackup: (result: SqliteBackupResult) => Promise<void> = async () => undefined
+): Promise<SqliteBackupResult> {
+  const runtime = activeRuntime
+  if (!runtime?.database.isOpen) {
+    throw new Error('The Fatebound SQLite database is not available for manual export')
+  }
+
+  return runtime.operations.run(async () => {
+    if (!runtime.database.isOpen) {
+      throw new Error('SQLite closed before the manual export could start')
+    }
+
+    const schemaVersion = getSqliteMigrationPlan(runtime.database).currentVersion
+    const result = await createSqliteBackup(runtime.database, resolve(destinationDirectory), {
+      reason: 'manual',
+      schemaVersion
+    })
+    await verifyPublishedBackup(result)
+    return result
+  })
 }
 
 export async function closeActiveSqliteDatabase(): Promise<void> {

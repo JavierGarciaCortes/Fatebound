@@ -48,6 +48,7 @@ La primera interfaz funcional deberá establecer una shell reutilizable con:
 - acceso futuro a Personajes y Crónicas únicamente bajo un contexto real de mundo instalado y versión;
 - Ajustes y diagnóstico como acción global de cabecera;
 - selector de idioma de aplicación integrado en Ajustes, con nombres nativos y estado activo inequívoco;
+- exportación manual de backups integrada en Ajustes como operación explícita, sin convertir la pantalla en un explorador de archivos;
 - mensajes de error y estados de carga comprensibles;
 - comportamiento adecuado en la ventana de escritorio y en el portable de Windows.
 
@@ -140,10 +141,10 @@ Fatebound es la identidad neutral de la aplicación, no un mundo de la bibliotec
 3. cambio perceptible y coherente de tema en la shell y el contenido;
 4. identificación explícita de demostraciones no jugables;
 5. estructura futura de Personajes y Crónicas, oculta de la navegación mientras no haya un mundo jugable activo;
-6. ajustes con selector de idioma y diagnóstico real de almacenamiento SQLite;
+6. ajustes con selector de idioma, exportación manual y diagnóstico real de almacenamiento SQLite;
 7. verificación visual y funcional en el portable de Windows.
 
-El diagnóstico consulta únicamente los datos necesarios mediante un contrato IPC mínimo, tipado y de solo lectura. Main conserva la autoridad sobre rutas y SQLite; el renderer no recibe la conexión, consultas SQL, acceso general a archivos ni detalles internos innecesarios.
+El diagnóstico consulta únicamente los datos necesarios mediante un contrato IPC mínimo, tipado y de solo lectura. La exportación abre el selector nativo desde main y muestra estados localizados de trabajo, éxito, cancelación o error, sin entregar la ruta al renderer. Main conserva la autoridad sobre rutas y SQLite; el renderer no recibe la conexión, consultas SQL, acceso general a archivos ni detalles internos innecesarios.
 
 El tema inicial es Fatebound neutral. No aparece como tarjeta de mundo: es la identidad base sin mundo activo. Ronin, Templario, Ninja, Shaolin, Robot, Soldado, Naves y Mundoplato forman las ocho tarjetas seleccionables, todas con estado **Próximamente**. **Volver a Fatebound** restablece explícitamente la base y la selección dura solo durante la sesión.
 
@@ -201,7 +202,8 @@ La implementación inicial fija las siguientes decisiones revisables:
 - foco visible, enlace para saltar al contenido, semántica de botones, mensajes `aria-live` y respeto de `prefers-reduced-motion`;
 - diagnóstico solicitado al abrir Ajustes y actualizable por acción expresa, sin sondeo.
 - selector de idioma en Ajustes con Español, English y 한국어, cambio inmediato y estado de persistencia anunciado mediante `aria-live`.
+- exportación manual como acción independiente, deshabilitada mientras trabaja y con resultado anunciado mediante `aria-live`.
 
 La interfaz está localizada en español, inglés y coreano. El idioma de la aplicación permanece independiente de los idiomas de contenido: cada futuro mundo declarará los disponibles y su predeterminado, y la interfaz no mostrará opciones ni traducciones que el paquete no aporte.
 
-Antes de estabilizar el sistema visual es obligatorio revisar manualmente los nueve temas, el contraste sobre cada hero, el encuadre completo de las ocho tarjetas 3:4 —incluido Mundoplato—, la cuadrícula 4×2, el panel de emblema, los tamaños 760×620 y 1180×780, la lectura prolongada, la navegación completa por teclado, los fallbacks, la reducción de movimiento, la claridad del nuevo logo y del engranaje como controles y el equilibrio entre inmersión y ruido decorativo. Las pruebas técnicas no sustituyen esta revisión. El catálogo actual demuestra el enfoque, pero no define todavía el contrato futuro de temas `.fateworld`.
+Antes de estabilizar el sistema visual es obligatorio revisar manualmente los nueve temas, el contraste sobre cada hero, el encuadre completo de las ocho tarjetas 3:4 —incluido Mundoplato—, la cuadrícula 4×2, el panel de emblema, los tamaños 760×620 y 1180×780, la lectura prolongada, la navegación completa por teclado, los fallbacks, la reducción de movimiento, la claridad del nuevo logo y del engranaje como controles, los estados y textos de exportación en los tres idiomas y el equilibrio entre inmersión y ruido decorativo. Las pruebas técnicas no sustituyen esta revisión. El catálogo actual demuestra el enfoque, pero no define todavía el contrato futuro de temas `.fateworld`.

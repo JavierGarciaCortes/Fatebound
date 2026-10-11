@@ -81,6 +81,21 @@ export const ko = {
     '포터블 환경 설정을 읽을 수 없어 이번 세션에서는 스페인어를 사용합니다.',
   'settings.language.saveError':
     '이번 세션의 언어는 변경되었지만 저장하지 못했습니다. Fatebound를 다시 열면 마지막으로 저장된 올바른 설정을 사용합니다.',
+  'settings.export.eyebrow': '외부 백업',
+  'settings.export.title': '백업 내보내기',
+  'settings.export.body':
+    '활성 데이터 폴더 밖의 위치를 선택하세요. Fatebound가 그 안에 고유한 이름으로 자체 완결형 SQLite 백업을 만들고 검증합니다.',
+  'settings.export.action': '폴더 선택 후 내보내기',
+  'settings.export.working': '백업 생성 및 검증 중…',
+  'settings.export.success': '백업을 {backupName}(으)로 내보냈습니다.',
+  'settings.export.cancelled': '내보내기를 취소했습니다. 백업이 생성되지 않았습니다.',
+  'settings.export.destinationError':
+    '선택한 폴더가 활성 데이터 또는 백업 폴더와 겹칩니다. 다른 위치를 선택하세요.',
+  'settings.export.destinationUnavailableError':
+    '선택한 폴더를 검증하거나 사용할 수 없습니다. 폴더가 계속 사용 가능한지 확인하고 다른 위치를 선택하세요.',
+  'settings.export.inProgressError': '백업 내보내기가 이미 진행 중입니다.',
+  'settings.export.genericError':
+    '내보내기를 완료하지 못했습니다. 활성 데이터베이스와 기존 백업은 변경되지 않았습니다.',
   'settings.diagnostics.readOnly': '읽기 전용',
   'settings.diagnostics.title': 'SQLite 저장소',
   'settings.diagnostics.checking': '확인 중…',
@@ -166,6 +181,8 @@ export const ko = {
   'native.backup.message': 'Fatebound가 SQLite 자동 백업을 만들거나 유지하지 못했습니다.',
   'native.backup.detail':
     '기본 데이터베이스와 이전 백업은 교체되지 않았습니다. Fatebound를 계속 사용할 수 있지만, 진행하기 전에 여유 공간과 드라이브를 확인하세요.',
+  'native.export.chooseTitle': 'Fatebound 백업을 저장할 폴더 선택',
+  'native.export.chooseButton': '여기에 내보내기',
   'native.common.accept': '확인',
   'native.database.title': 'Fatebound가 데이터를 열 수 없습니다',
   'native.database.detail':

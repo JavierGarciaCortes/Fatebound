@@ -81,6 +81,21 @@ export const en = {
     'The portable preference could not be read. Spanish is being used for this session.',
   'settings.language.saveError':
     'The language changed for this session, but it could not be saved. Fatebound will use the last valid preference when reopened.',
+  'settings.export.eyebrow': 'External copy',
+  'settings.export.title': 'Export backup',
+  'settings.export.body':
+    'Choose a folder outside active storage. Fatebound will create a self-contained, verified SQLite backup with a unique name inside it.',
+  'settings.export.action': 'Choose folder and export',
+  'settings.export.working': 'Creating and verifying the backup…',
+  'settings.export.success': 'Backup exported successfully as {backupName}.',
+  'settings.export.cancelled': 'Export cancelled. No backup was created.',
+  'settings.export.destinationError':
+    'That folder interferes with active data or backups. Choose a different location.',
+  'settings.export.destinationUnavailableError':
+    'That folder could not be validated or used. Check that it is still available and choose another location.',
+  'settings.export.inProgressError': 'A backup export is already in progress.',
+  'settings.export.genericError':
+    'The export could not be completed. The active database and earlier backups were not modified.',
   'settings.diagnostics.readOnly': 'Read only',
   'settings.diagnostics.title': 'SQLite storage',
   'settings.diagnostics.checking': 'Checking…',
@@ -168,6 +183,8 @@ export const en = {
   'native.backup.message': 'Fatebound could not create or maintain the automatic SQLite backup.',
   'native.backup.detail':
     'The main database and previous backups were not replaced. You can keep using Fatebound, but check the available space and the drive before continuing.',
+  'native.export.chooseTitle': 'Choose destination for the Fatebound backup',
+  'native.export.chooseButton': 'Export here',
   'native.common.accept': 'Understood',
   'native.database.title': 'Fatebound cannot open your data',
   'native.database.detail':
