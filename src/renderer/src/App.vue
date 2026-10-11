@@ -4,11 +4,12 @@ import type {
   StorageDiagnosticsFailure,
   StorageDiagnosticsResult
 } from '../../shared/storage-diagnostics'
+import type { ApplicationLanguage } from '../../shared/application-language'
+import type { MessageKey } from '../../shared/i18n'
 import brandLogoHorizontal from '../../../resources/branding/fatebound/fatebound-logo-horizontal.png'
 import brandSymbol from '../../../resources/branding/fatebound/fatebound-symbol.png'
 import AppIcon from './components/AppIcon.vue'
 import {
-  APP_SECTIONS,
   DEFAULT_BUILTIN_THEME_ID,
   getContextualNavigationSections,
   resolveBuiltinThemeId,
@@ -22,6 +23,9 @@ import {
   type BuiltinTheme
 } from './builtin-theme-catalog'
 import type { BuiltinThemeId, ThemeArtworkRole } from './builtin-theme-schema'
+import { useI18n, type LanguagePreferenceState } from './i18n'
+
+const { language, preferenceState, availableLanguages, t, selectLanguage } = useI18n()
 
 const activeSection = ref<AppSectionId>('home')
 const activeThemeId = ref<BuiltinThemeId>(DEFAULT_BUILTIN_THEME_ID)
@@ -35,7 +39,6 @@ const activeTheme = computed(() => resolveBuiltinTheme(activeThemeId.value))
 const activeWorldTheme = computed(() =>
   activeTheme.value.role === 'future-world' ? activeTheme.value : null
 )
-const activeSectionDetails = computed(() => APP_SECTIONS[activeSection.value])
 const visibleNavigationSections = computed(() =>
   getContextualNavigationSections(activeInstalledWorld.value)
 )
@@ -54,6 +57,38 @@ const themeStyle = computed<Record<string, string>>(() => ({
   '--success': activeTheme.value.visual.colors.success,
   '--danger': activeTheme.value.visual.colors.danger
 }))
+const languageStatusKey = computed<MessageKey | null>(() => {
+  const keys: Partial<Record<LanguagePreferenceState, MessageKey>> = {
+    invalid: 'settings.language.invalid',
+    'load-error': 'settings.language.loadError',
+    saving: 'settings.language.saving',
+    saved: 'settings.language.saved',
+    'save-error': 'settings.language.saveError'
+  }
+  return keys[preferenceState.value] ?? null
+})
+
+function navigationLabel(sectionId: AppSectionId): string {
+  return t(`navigation.${sectionId}.label` as MessageKey)
+}
+
+function navigationDescription(sectionId: AppSectionId): string {
+  return t(`navigation.${sectionId}.description` as MessageKey)
+}
+
+const languageNameKeys: Readonly<Record<ApplicationLanguage, MessageKey>> = {
+  es: 'settings.language.es',
+  en: 'settings.language.en',
+  ko: 'settings.language.ko'
+}
+
+function languageName(value: ApplicationLanguage): string {
+  return t(languageNameKeys[value])
+}
+
+function themeText(themeId: BuiltinThemeId, field: 'name' | 'tagline' | 'category' | 'description' | 'atmosphere'): string {
+  return t(`theme.${themeId}.${field}` as MessageKey)
+}
 
 function hexToRgb(value: string): string {
   const color = Number.parseInt(value.slice(1), 16)
@@ -102,9 +137,7 @@ async function loadDiagnostics(): Promise<void> {
   } catch {
     const failure: StorageDiagnosticsFailure = {
       status: 'error',
-      code: 'diagnostics-unavailable',
-      message:
-        'No se pudo solicitar el diagnóstico al proceso principal. Fatebound no mostrará datos estimados.'
+      code: 'diagnostics-unavailable'
     }
     diagnostics.value = failure
   } finally {
@@ -116,10 +149,21 @@ function formatCheckedAt(value: string): string {
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return value
 
-  return new Intl.DateTimeFormat('es-ES', {
+  const dateLocales: Readonly<Record<ApplicationLanguage, string>> = {
+    es: 'es-ES',
+    en: 'en-GB',
+    ko: 'ko-KR'
+  }
+
+  return new Intl.DateTimeFormat(dateLocales[language.value], {
     dateStyle: 'medium',
     timeStyle: 'short'
   }).format(date)
+}
+
+function changeLanguage(value: ApplicationLanguage): void {
+  if (value === language.value || preferenceState.value === 'saving') return
+  void selectLanguage(value)
 }
 </script>
 
@@ -130,16 +174,16 @@ function formatCheckedAt(value: string): string {
     :data-motif="activeTheme.visual.motif"
     :style="themeStyle"
   >
-    <a class="skip-link" href="#main-content">Saltar al contenido</a>
+    <a class="skip-link" href="#main-content">{{ t('a11y.skipToContent') }}</a>
 
-    <aside class="sidebar" aria-label="Navegación principal">
+    <aside class="sidebar" :aria-label="t('a11y.primaryNavigation')">
       <button
         class="brand-lockup"
         :class="{ 'brand-lockup--active': activeSection === 'home' }"
         type="button"
         :aria-current="activeSection === 'home' ? 'page' : undefined"
-        aria-label="Fatebound: ir a Inicio"
-        title="Ir a Inicio"
+        :aria-label="t('a11y.goHome')"
+        :title="navigationLabel('home')"
         @click="navigateTo('home')"
       >
         <img :src="brandLogoHorizontal" alt="" class="brand-logo brand-logo--horizontal" />
@@ -154,16 +198,16 @@ function formatCheckedAt(value: string): string {
           :class="{ 'nav-item--active': activeSection === section.id }"
           type="button"
           :aria-current="activeSection === section.id ? 'page' : undefined"
-          :title="section.description"
+          :title="navigationDescription(section.id)"
           @click="navigateTo(section.id)"
         >
           <AppIcon :name="section.id" />
-          <span>{{ section.label }}</span>
+          <span>{{ navigationLabel(section.id) }}</span>
         </button>
       </nav>
 
       <div class="sidebar-context">
-        <span class="context-label">Atmósfera activa</span>
+        <span class="context-label">{{ t('sidebar.activeAtmosphere') }}</span>
         <div class="context-world">
           <span class="context-sigil" aria-hidden="true">
             <img v-if="activeTheme.isNeutral" :src="brandSymbol" alt="" />
@@ -176,37 +220,37 @@ function formatCheckedAt(value: string): string {
             <AppIcon v-else name="sparkles" />
           </span>
           <div>
-            <strong>{{ activeTheme.displayName }}</strong>
-            <small>{{ activeTheme.isNeutral ? 'Sin mundo activo' : 'Próximamente' }}</small>
+            <strong>{{ themeText(activeTheme.id, 'name') }}</strong>
+            <small>{{ activeTheme.isNeutral ? t('common.noActiveWorld') : t('common.upcoming') }}</small>
           </div>
         </div>
       </div>
 
       <div class="sidebar-footer">
         <span class="status-dot" aria-hidden="true"></span>
-        Local · Portable · Sin conexión
+        {{ t('sidebar.localPortableOffline') }}
       </div>
     </aside>
 
     <div class="workspace">
       <header class="topbar">
         <div>
-          <span class="topbar-kicker">{{ activeSectionDetails.description }}</span>
-          <h1>{{ activeSectionDetails.label }}</h1>
+          <span class="topbar-kicker">{{ navigationDescription(activeSection) }}</span>
+          <h1>{{ navigationLabel(activeSection) }}</h1>
         </div>
         <div class="topbar-actions">
-          <div class="topbar-world" aria-label="Tema visual activo">
-            <span>{{ activeTheme.displayName }}</span>
-            <strong>{{ activeTheme.isNeutral ? 'Identidad base' : 'Próximamente' }}</strong>
+          <div class="topbar-world" :aria-label="t('a11y.activeVisualTheme')">
+            <span>{{ themeText(activeTheme.id, 'name') }}</span>
+            <strong>{{ activeTheme.isNeutral ? t('common.baseIdentity') : t('common.upcoming') }}</strong>
           </div>
           <button
             class="settings-button"
             :class="{ 'settings-button--active': activeSection === 'settings' }"
             type="button"
-            :aria-label="activeSection === 'settings' ? 'Ajustes abiertos' : 'Abrir Ajustes'"
+            :aria-label="activeSection === 'settings' ? t('navigation.settings.opened') : t('navigation.settings.open')"
             :aria-current="activeSection === 'settings' ? 'page' : undefined"
             :aria-pressed="activeSection === 'settings'"
-            :title="activeSection === 'settings' ? 'Ajustes abiertos' : 'Abrir Ajustes'"
+            :title="activeSection === 'settings' ? t('navigation.settings.opened') : t('navigation.settings.open')"
             @click="navigateTo('settings')"
           >
             <AppIcon name="settings" />
@@ -238,18 +282,16 @@ function formatCheckedAt(value: string): string {
               <div class="preview-badge">
                 <span aria-hidden="true"></span>
                 {{
-                  activeTheme.isNeutral
-                    ? 'Fatebound · Sin mundo activo'
-                    : 'Mundo futuro · Próximamente'
+                  activeTheme.isNeutral ? t('home.neutralBadge') : t('home.futureBadge')
                 }}
               </div>
-              <p class="hero-overline">{{ activeTheme.presentation.category }}</p>
-              <h2 id="home-title">{{ activeTheme.tagline }}</h2>
-              <p class="hero-description">{{ activeTheme.presentation.description }}</p>
+              <p class="hero-overline">{{ themeText(activeTheme.id, 'category') }}</p>
+              <h2 id="home-title">{{ themeText(activeTheme.id, 'tagline') }}</h2>
+              <p class="hero-description">{{ themeText(activeTheme.id, 'description') }}</p>
               <div class="hero-actions">
                 <button class="button button--primary" type="button" @click="navigateTo('worlds')">
                   <AppIcon name="compass" />
-                  Explorar atmósferas
+                  {{ t('home.explore') }}
                 </button>
                 <button
                   v-if="!activeTheme.isNeutral"
@@ -258,7 +300,7 @@ function formatCheckedAt(value: string): string {
                   @click="returnToNeutralTheme"
                 >
                   <AppIcon name="home" />
-                  Volver a Fatebound
+                  {{ t('home.returnToFatebound') }}
                 </button>
               </div>
             </div>
@@ -274,17 +316,14 @@ function formatCheckedAt(value: string): string {
               <div class="panel-heading">
                 <div class="panel-icon"><AppIcon name="chronicles" /></div>
                 <div>
-                  <span class="eyebrow">Tu diario de aventuras</span>
-                  <h3>La próxima crónica empieza aquí</h3>
+                  <span class="eyebrow">{{ t('home.journal.eyebrow') }}</span>
+                  <h3>{{ t('home.journal.title') }}</h3>
                 </div>
               </div>
-              <p>
-                Cuando existan crónicas, este espacio reunirá decisiones, escenas y consecuencias.
-                Aún no hay historias jugables ni datos de ejemplo guardados.
-              </p>
+              <p>{{ t('home.journal.body') }}</p>
               <div class="honest-state">
                 <span class="honest-state__line"></span>
-                Función prevista para una fase posterior
+                {{ t('home.journal.future') }}
               </div>
             </article>
 
@@ -292,16 +331,13 @@ function formatCheckedAt(value: string): string {
               <div class="panel-heading">
                 <div class="panel-icon"><AppIcon name="worlds" /></div>
                 <div>
-                  <span class="eyebrow">Biblioteca local</span>
-                  <h3>Ningún mundo instalado</h3>
+                  <span class="eyebrow">{{ t('home.library.eyebrow') }}</span>
+                  <h3>{{ t('home.library.title') }}</h3>
                 </div>
               </div>
-              <p>
-                Ocho mundos futuros permiten explorar su atmósfera visual. Todavía no contienen
-                paquetes, reglas, personajes ni contenido jugable.
-              </p>
+              <p>{{ t('home.library.body') }}</p>
               <button class="text-action" type="button" @click="navigateTo('worlds')">
-                Ver los ocho mundos
+                {{ t('home.library.action') }}
                 <span aria-hidden="true">→</span>
               </button>
             </article>
@@ -315,16 +351,13 @@ function formatCheckedAt(value: string): string {
         >
           <div class="page-intro">
             <div>
-              <span class="eyebrow">Biblioteca visual</span>
-              <h2 id="worlds-title">Elige el tono de tu aventura</h2>
+              <span class="eyebrow">{{ t('worlds.eyebrow') }}</span>
+              <h2 id="worlds-title">{{ t('worlds.title') }}</h2>
             </div>
-            <p>
-              Ocho mundos futuros, seleccionables para explorar su ambientación. Ninguno contiene
-              todavía reglas ni contenido jugable.
-            </p>
+            <p>{{ t('worlds.intro') }}</p>
           </div>
 
-          <div class="world-card-grid" aria-label="Mundos futuros disponibles">
+          <div class="world-card-grid" :aria-label="t('a11y.futureWorlds')">
             <button
               v-for="theme in BUILTIN_WORLD_THEMES"
               :key="theme.id"
@@ -354,9 +387,9 @@ function formatCheckedAt(value: string): string {
                 />
               </span>
               <span class="world-card__body">
-                <small>Próximamente</small>
-                <strong>{{ theme.displayName }}</strong>
-                <span>{{ theme.presentation.category }}</span>
+                <small>{{ t('common.upcoming') }}</small>
+                <strong>{{ themeText(theme.id, 'name') }}</strong>
+                <span>{{ themeText(theme.id, 'category') }}</span>
               </span>
               <span class="world-card__check" aria-hidden="true">✓</span>
             </button>
@@ -376,35 +409,29 @@ function formatCheckedAt(value: string): string {
               </div>
             </div>
             <div class="world-detail__content">
-              <span class="preview-badge preview-badge--inline">Próximamente</span>
-              <h3>{{ activeWorldTheme.tagline }}</h3>
-              <p>{{ activeWorldTheme.presentation.description }}</p>
+              <span class="preview-badge preview-badge--inline">{{ t('common.upcoming') }}</span>
+              <h3>{{ themeText(activeWorldTheme.id, 'tagline') }}</h3>
+              <p>{{ themeText(activeWorldTheme.id, 'description') }}</p>
               <div class="world-detail__meta">
                 <div>
-                  <span>Atmósfera</span>
-                  <strong>{{ activeWorldTheme.presentation.atmosphere }}</strong>
+                  <span>{{ t('worlds.atmosphere') }}</span>
+                  <strong>{{ themeText(activeWorldTheme.id, 'atmosphere') }}</strong>
                 </div>
                 <div>
-                  <span>Disponibilidad</span>
-                  <strong>Próximamente</strong>
+                  <span>{{ t('worlds.availability') }}</span>
+                  <strong>{{ t('common.upcoming') }}</strong>
                 </div>
               </div>
-              <p class="world-note">
-                Este mundo aún no contiene reglas ni contenido jugable. Por ahora, seleccionarlo
-                solo activa su ambientación visual durante la sesión.
-              </p>
+              <p class="world-note">{{ t('worlds.note') }}</p>
             </div>
           </article>
 
           <article v-else class="world-detail-empty panel">
             <span class="panel-icon" aria-hidden="true"><AppIcon name="worlds" /></span>
             <div>
-              <span class="eyebrow">Sin mundo seleccionado</span>
-              <h3>Explora una atmósfera futura</h3>
-              <p>
-                Fatebound permanece como identidad base. Selecciona una tarjeta para ver el tono y
-                el emblema del mundo sin activar contenido jugable.
-              </p>
+              <span class="eyebrow">{{ t('worlds.empty.eyebrow') }}</span>
+              <h3>{{ t('worlds.empty.title') }}</h3>
+              <p>{{ t('worlds.empty.body') }}</p>
             </div>
           </article>
         </section>
@@ -418,17 +445,14 @@ function formatCheckedAt(value: string): string {
             <AppIcon name="characters" />
             <span></span>
           </div>
-          <span class="eyebrow">Archivo de protagonistas</span>
-          <h2 id="characters-title">Tus personajes aún no han llegado</h2>
-          <p>
-            La creación y gestión de personajes se implementará cuando exista el esquema del juego.
-            Esta pantalla no guarda datos ni ofrece acciones simuladas.
-          </p>
+          <span class="eyebrow">{{ t('characters.eyebrow') }}</span>
+          <h2 id="characters-title">{{ t('characters.title') }}</h2>
+          <p>{{ t('characters.body') }}</p>
           <div class="future-card">
             <AppIcon name="shield" />
             <div>
-              <strong>Preparado para el futuro</strong>
-              <span>Cada personaje quedará vinculado a una versión exacta de su mundo.</span>
+              <strong>{{ t('characters.future.title') }}</strong>
+              <span>{{ t('characters.future.body') }}</span>
             </div>
           </div>
         </section>
@@ -442,17 +466,14 @@ function formatCheckedAt(value: string): string {
             <AppIcon name="chronicles" />
             <span></span>
           </div>
-          <span class="eyebrow">Crónicas</span>
-          <h2 id="chronicles-title">No hay historias en curso</h2>
-          <p>
-            Las crónicas y sus escenas todavía no están implementadas. Cuando lo estén, este será el
-            lugar para retomarlas sin perder su mundo ni su versión.
-          </p>
+          <span class="eyebrow">{{ t('chronicles.eyebrow') }}</span>
+          <h2 id="chronicles-title">{{ t('chronicles.title') }}</h2>
+          <p>{{ t('chronicles.body') }}</p>
           <div class="future-card">
             <AppIcon name="compass" />
             <div>
-              <strong>Sin contenido ficticio</strong>
-              <span>Fatebound no creará crónicas de muestra en tu base de datos.</span>
+              <strong>{{ t('chronicles.future.title') }}</strong>
+              <span>{{ t('chronicles.future.body') }}</span>
             </div>
           </div>
         </section>
@@ -460,22 +481,54 @@ function formatCheckedAt(value: string): string {
         <section v-else class="page page--settings" aria-labelledby="settings-title">
           <div class="page-intro">
             <div>
-              <span class="eyebrow">Sistema local</span>
-              <h2 id="settings-title">Ajustes y diagnóstico</h2>
+              <span class="eyebrow">{{ t('settings.eyebrow') }}</span>
+              <h2 id="settings-title">{{ t('settings.title') }}</h2>
             </div>
-            <p>
-              La información se consulta de forma puntual en el proceso principal. Esta pantalla no
-              puede escribir en SQLite ni explorar otros archivos.
-            </p>
+            <p>{{ t('settings.intro') }}</p>
           </div>
+
+          <article class="language-panel panel" aria-labelledby="language-title">
+            <div class="language-panel__copy">
+              <span class="eyebrow">{{ t('settings.language.eyebrow') }}</span>
+              <h3 id="language-title">{{ t('settings.language.title') }}</h3>
+              <p>{{ t('settings.language.body') }}</p>
+            </div>
+            <div
+              class="language-options"
+              role="radiogroup"
+              :aria-label="t('settings.language.groupLabel')"
+            >
+              <button
+                v-for="option in availableLanguages"
+                :key="option"
+                class="language-option"
+                :class="{ 'language-option--active': language === option }"
+                type="button"
+                role="radio"
+                :aria-checked="language === option"
+                :disabled="preferenceState === 'saving'"
+                @click="changeLanguage(option)"
+              >
+                {{ languageName(option) }}
+              </button>
+            </div>
+            <p
+              v-if="languageStatusKey"
+              class="language-status"
+              :class="{ 'language-status--error': preferenceState === 'load-error' || preferenceState === 'save-error' || preferenceState === 'invalid' }"
+              aria-live="polite"
+            >
+              {{ t(languageStatusKey) }}
+            </p>
+          </article>
 
           <article class="diagnostics-panel panel" aria-labelledby="diagnostics-title">
             <div class="diagnostics-heading">
               <div>
                 <div class="panel-icon"><AppIcon name="database" /></div>
                 <div>
-                  <span class="eyebrow">Solo lectura</span>
-                  <h3 id="diagnostics-title">Almacenamiento SQLite</h3>
+                  <span class="eyebrow">{{ t('settings.diagnostics.readOnly') }}</span>
+                  <h3 id="diagnostics-title">{{ t('settings.diagnostics.title') }}</h3>
                 </div>
               </div>
               <button
@@ -485,7 +538,7 @@ function formatCheckedAt(value: string): string {
                 @click="loadDiagnostics"
               >
                 <AppIcon name="refresh" :class="{ 'icon--spinning': diagnosticsLoading }" />
-                {{ diagnosticsLoading ? 'Comprobando…' : 'Actualizar' }}
+                {{ diagnosticsLoading ? t('settings.diagnostics.checking') : t('settings.diagnostics.refresh') }}
               </button>
             </div>
 
@@ -493,16 +546,16 @@ function formatCheckedAt(value: string): string {
               <div v-if="diagnosticsLoading && diagnostics === null" class="diagnostics-loading">
                 <span></span>
                 <div>
-                  <strong>Consultando el almacenamiento</strong>
-                  <p>La comprobación se ejecuta una sola vez y no modifica la base.</p>
+                  <strong>{{ t('settings.diagnostics.loadingTitle') }}</strong>
+                  <p>{{ t('settings.diagnostics.loadingBody') }}</p>
                 </div>
               </div>
 
               <div v-else-if="diagnostics?.status === 'error'" class="diagnostics-error">
                 <AppIcon name="shield" />
                 <div>
-                  <strong>Diagnóstico no disponible</strong>
-                  <p>{{ diagnostics.message }}</p>
+                  <strong>{{ t('settings.diagnostics.errorTitle') }}</strong>
+                  <p>{{ t('settings.diagnostics.errorBody') }}</p>
                 </div>
               </div>
 
@@ -510,37 +563,34 @@ function formatCheckedAt(value: string): string {
                 <div class="health-banner">
                   <span class="health-icon"><AppIcon name="shield" /></span>
                   <div>
-                    <strong>SQLite disponible y comprobado</strong>
-                    <span>
-                      Integridad y claves foráneas correctas ·
-                      {{ formatCheckedAt(diagnostics.checkedAt) }}
-                    </span>
+                    <strong>{{ t('settings.diagnostics.readyTitle') }}</strong>
+                    <span>{{ t('settings.diagnostics.readyBody', { date: formatCheckedAt(diagnostics.checkedAt) }) }}</span>
                   </div>
                 </div>
 
                 <dl class="diagnostics-grid">
                   <div class="diagnostic-path diagnostic-path--wide">
-                    <dt>Ubicación de datos</dt>
+                    <dt>{{ t('settings.diagnostics.dataLocation') }}</dt>
                     <dd>{{ diagnostics.dataDirectory }}</dd>
                   </div>
                   <div class="diagnostic-path diagnostic-path--wide">
-                    <dt>Base de datos</dt>
+                    <dt>{{ t('settings.diagnostics.database') }}</dt>
                     <dd>{{ diagnostics.databaseFile }}</dd>
                   </div>
                   <div>
-                    <dt>Estado SQLite</dt>
-                    <dd><span class="value-ok">Disponible</span></dd>
+                    <dt>{{ t('settings.diagnostics.sqliteStatus') }}</dt>
+                    <dd><span class="value-ok">{{ t('settings.diagnostics.available') }}</span></dd>
                   </div>
                   <div>
-                    <dt>Versión de esquema</dt>
+                    <dt>{{ t('settings.diagnostics.schemaVersion') }}</dt>
                     <dd>{{ diagnostics.schemaVersion }}</dd>
                   </div>
                   <div>
-                    <dt>Integridad</dt>
-                    <dd><span class="value-ok">Correcta</span></dd>
+                    <dt>{{ t('settings.diagnostics.integrity') }}</dt>
+                    <dd><span class="value-ok">{{ t('settings.diagnostics.correct') }}</span></dd>
                   </div>
                   <div>
-                    <dt>Copias administradas válidas</dt>
+                    <dt>{{ t('settings.diagnostics.backups') }}</dt>
                     <dd>{{ diagnostics.managedBackupCount }}</dd>
                   </div>
                 </dl>
@@ -550,10 +600,7 @@ function formatCheckedAt(value: string): string {
 
           <aside class="settings-note">
             <AppIcon name="shield" />
-            <p>
-              El renderer recibe una instantánea limitada. No recibe la conexión SQLite, consultas
-              SQL ni acceso general al sistema de archivos.
-            </p>
+            <p>{{ t('settings.securityNote') }}</p>
           </aside>
         </section>
       </main>

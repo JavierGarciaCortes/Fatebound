@@ -9,6 +9,9 @@ import {
   type StorageFailureAction,
   type StorageStartupResult
 } from './storage-startup.ts'
+import type { ApplicationLanguage } from '../../shared/application-language.ts'
+import { translate } from '../../shared/i18n/index.ts'
+import { readApplicationLanguageFromDirectory } from '../preferences/application-preferences.ts'
 
 const FAILURE_ACTIONS: readonly StorageFailureAction[] = ['retry', 'choose-directory', 'exit']
 
@@ -21,13 +24,20 @@ function getDefaultStoragePaths(): StoragePaths {
   })
 }
 
-async function requestFailureAction(directory: string): Promise<StorageFailureAction> {
+async function requestFailureAction(
+  directory: string,
+  language: ApplicationLanguage
+): Promise<StorageFailureAction> {
   const result = await dialog.showMessageBox({
     type: 'error',
     title: 'Fatebound',
-    message: 'Fatebound no puede escribir en la carpeta de datos.',
-    detail: `${directory}\n\nPuedes volver a comprobarla, elegir otra carpeta para esta sesión o salir. Fatebound no cambiará de ubicación ni moverá datos automáticamente.`,
-    buttons: ['Reintentar', 'Elegir otra carpeta', 'Salir'],
+    message: translate(language, 'native.storage.writeError'),
+    detail: translate(language, 'native.storage.writeErrorDetail', { directory }),
+    buttons: [
+      translate(language, 'native.storage.retry'),
+      translate(language, 'native.storage.chooseDirectory'),
+      translate(language, 'native.storage.exit')
+    ],
     defaultId: 0,
     cancelId: 2,
     noLink: true
@@ -36,10 +46,10 @@ async function requestFailureAction(directory: string): Promise<StorageFailureAc
   return FAILURE_ACTIONS[result.response] ?? 'exit'
 }
 
-async function chooseAlternativeDirectory(): Promise<string | null> {
+async function chooseAlternativeDirectory(language: ApplicationLanguage): Promise<string | null> {
   const result = await dialog.showOpenDialog({
-    title: 'Elegir carpeta de datos de Fatebound',
-    buttonLabel: 'Usar esta carpeta',
+    title: translate(language, 'native.storage.chooseTitle'),
+    buttonLabel: translate(language, 'native.storage.chooseButton'),
     properties: ['openDirectory', 'createDirectory', 'dontAddToRecent']
   })
 
@@ -47,9 +57,12 @@ async function chooseAlternativeDirectory(): Promise<string | null> {
 }
 
 export async function initializePortableStorage(): Promise<StorageStartupResult> {
-  return prepareStorageForStartup(getDefaultStoragePaths(), {
+  const defaultPaths = getDefaultStoragePaths()
+  const language = (await readApplicationLanguageFromDirectory(defaultPaths.dataDirectory)).language
+
+  return prepareStorageForStartup(defaultPaths, {
     probeWriteAccess: probeStorageWriteAccess,
-    requestFailureAction,
-    chooseAlternativeDirectory
+    requestFailureAction: (directory) => requestFailureAction(directory, language),
+    chooseAlternativeDirectory: () => chooseAlternativeDirectory(language)
   })
 }

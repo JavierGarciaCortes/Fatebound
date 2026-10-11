@@ -53,7 +53,6 @@ test('the shell separates global destinations from contextual navigation', () =>
     ),
     ['worlds', 'characters', 'chronicles']
   )
-  assert.equal(APP_SECTIONS.chronicles.label, 'Crónicas')
   assert.equal(resolveSectionId('settings'), 'settings')
   assert.equal(resolveSectionId('unknown'), 'home')
 })
@@ -89,11 +88,13 @@ test('all nine allowlisted built-in YAML themes exist and validate', () => {
   assert.equal(new Set<string>(directoryIds).has('paladin'), false)
 
   for (const id of BUILTIN_THEME_IDS) {
-    const definition = loadThemeDefinition(id)
+    const source = readFileSync(`${themesDirectory}/${id}/theme.yaml`, 'utf8')
+    const definition = parseBuiltinThemeYaml(source, id)
     assert.equal(definition.id, id)
     assert.equal(definition.status, 'builtin-theme')
     assert.equal(definition.playable, false)
     assert.match(definition.visual.colors.primary, /^#[A-F0-9]{6}$/)
+    assert.doesNotMatch(source, /^(?:displayName|tagline|presentation):/m)
 
     const bundledAssets: Record<string, string> = {}
     for (const role of ['hero', 'card', 'emblem'] as const) {
@@ -123,8 +124,7 @@ test('the world catalog contains eight upcoming worlds and excludes neutral Fate
   }
 
   assert.match(appSource, /v-for="theme in BUILTIN_WORLD_THEMES"/)
-  assert.match(appSource, /Próximamente/)
-  assert.doesNotMatch(appSource, /No instalada/)
+  assert.match(appSource, /common\.upcoming/)
 })
 
 test('the integrated catalog loads only allowlisted resources from builtin-themes', () => {

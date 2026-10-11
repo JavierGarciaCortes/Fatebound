@@ -3,12 +3,6 @@ schemaVersion: 1
 status: builtin-theme
 playable: false
 id: robot
-displayName: Robot
-tagline: Memoria, acero e identidad
-presentation:
-  category: Ciencia ficción
-  description: Metal, memoria y señales en la oscuridad para historias sobre identidad y tecnología.
-  atmosphere: Grafito · Metal · Cian
 visual:
   mode: dark
   mood: industrial

@@ -52,13 +52,6 @@ export interface BuiltinThemeDefinition {
   readonly status: 'builtin-theme'
   readonly playable: false
   readonly id: BuiltinThemeId
-  readonly displayName: string
-  readonly tagline: string
-  readonly presentation: {
-    readonly category: string
-    readonly description: string
-    readonly atmosphere: string
-  }
   readonly visual: {
     readonly mode: 'dark'
     readonly mood: string
@@ -264,16 +257,7 @@ export function parseBuiltinThemeYaml(
   const root = parseRestrictedYaml(source)
   expectKeys(
     root,
-    [
-      'schemaVersion',
-      'status',
-      'playable',
-      'id',
-      'displayName',
-      'tagline',
-      'presentation',
-      'visual'
-    ],
+    ['schemaVersion', 'status', 'playable', 'id', 'visual'],
     'la raíz'
   )
 
@@ -283,9 +267,6 @@ export function parseBuiltinThemeYaml(
   if (expectedId !== undefined && id !== expectedId) {
     fail(`el id ${id} no coincide con el directorio ${expectedId}`)
   }
-
-  const presentation = expectMap(root.presentation, 'presentation')
-  expectKeys(presentation, ['category', 'description', 'atmosphere'], 'presentation')
 
   const visual = expectMap(root.visual, 'visual')
   expectKeys(
@@ -324,13 +305,6 @@ export function parseBuiltinThemeYaml(
     status: expectLiteral(root.status, 'builtin-theme', 'status'),
     playable: expectLiteral(root.playable, false, 'playable'),
     id,
-    displayName: expectString(root.displayName, 'displayName', 48),
-    tagline: expectString(root.tagline, 'tagline', 90),
-    presentation: {
-      category: expectString(presentation.category, 'presentation.category', 64),
-      description: expectString(presentation.description, 'presentation.description', 240),
-      atmosphere: expectString(presentation.atmosphere, 'presentation.atmosphere', 96)
-    },
     visual: {
       mode: expectLiteral(visual.mode, 'dark', 'visual.mode'),
       mood: expectString(visual.mood, 'visual.mood', 40),

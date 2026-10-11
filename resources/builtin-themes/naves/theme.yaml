@@ -3,12 +3,6 @@ schemaVersion: 1
 status: builtin-theme
 playable: false
 id: naves
-displayName: Naves
-tagline: Exploración, vacío y estrellas
-presentation:
-  category: Odisea espacial
-  description: Órbitas remotas, naves y horizontes imposibles para aventuras más allá del mapa conocido.
-  atmosphere: Vacío · Violeta · Luz estelar
 visual:
   mode: dark
   mood: cosmic

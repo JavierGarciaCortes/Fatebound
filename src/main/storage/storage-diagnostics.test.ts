@@ -67,7 +67,7 @@ test('returns a sanitized IPC failure instead of exposing internal errors', asyn
   const result = await handler()
 
   assert.equal(result.status, 'error')
-  assert.equal(result.message.includes(secret), false)
+  assert.deepEqual(result, { status: 'error', code: 'diagnostics-unavailable' })
   assert.equal(reportedErrors.length, 1)
 })
 

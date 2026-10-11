@@ -4,13 +4,19 @@ Este archivo se aplica a todo el repositorio de Fatebound.
 
 ## Flujo de trabajo obligatorio
 
-1. Inspecciona el código, la configuración, la documentación y el estado de Git antes de modificar nada.
+1. Inspecciona el código, la configuración y la documentación antes de modificar nada. No consultes el estado de Git salvo solicitud expresa de la tarea actual.
 2. Respeta el alcance solicitado. No implementes características adyacentes ni anticipes fases futuras.
 3. Explica y solicita aprobación antes de cambiar una decisión de arquitectura ya acordada.
 4. Mantén `README.md` y `STATUS.md` actualizados en cada tarea para que describan el estado real del proyecto.
-5. Ejecuta las comprobaciones disponibles y relevantes de `package.json` antes de finalizar. Si alguna no puede ejecutarse o falla, indícalo expresamente.
-6. Revisa `git diff` y `git status` antes de entregar el trabajo.
+5. Añade únicamente las pruebas automatizadas indispensables para el comportamiento nuevo, pero no ejecutes comandos de validación salvo que la tarea actual lo solicite expresamente.
+6. No ejecutes `npm test`, `npm run lint`, `npm run typecheck`, `npm run build`, `npm run build:win`, `git diff --check`, `git status -sb` ni pruebas visuales automatizadas extensas. El equipo realizará esas comprobaciones manualmente desde PowerShell después de la implementación.
 7. No hagas commits ni `push` sin autorización explícita.
+
+## Flujo reducido permanente
+
+- Implementa el alcance solicitado, revisa razonablemente el código modificado y actualiza la documentación correspondiente.
+- Evita baterías de pruebas redundantes, reconstrucciones repetidas del ejecutable e informes extensos archivo por archivo.
+- En la entrega, distingue con claridad lo implementado de las comprobaciones que siguen pendientes de ejecución manual.
 
 ## Criterios de implementación
 

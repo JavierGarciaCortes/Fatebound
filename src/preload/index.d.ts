@@ -1,4 +1,4 @@
-import type { FateboundApi } from '../shared/storage-diagnostics.ts'
+import type { FateboundApi } from '../shared/fatebound-api.ts'
 
 declare global {
   interface Window {

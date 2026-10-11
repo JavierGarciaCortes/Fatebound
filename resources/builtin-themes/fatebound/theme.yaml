@@ -3,12 +3,6 @@ schemaVersion: 1
 status: builtin-theme
 playable: false
 id: fatebound
-displayName: Fatebound
-tagline: Archivo de destinos y aventuras
-presentation:
-  category: Identidad neutral
-  description: Un umbral entre mundos para ordenar destinos, crónicas y aventuras sin imponer una ambientación.
-  atmosphere: Archivo celestial · Piedra oscura · Oro
 visual:
   mode: dark
   mood: archive

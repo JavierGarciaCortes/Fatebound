@@ -3,12 +3,6 @@ schemaVersion: 1
 status: builtin-theme
 playable: false
 id: templario
-displayName: Templario
-tagline: Juramentos, caminos y fortalezas
-presentation:
-  category: Caballero templario
-  description: Piedra antigua, caminos elevados y juramentos difíciles para aventuras de deber y resistencia.
-  atmosphere: Piedra · Carmesí · Acero
 visual:
   mode: dark
   mood: stone

@@ -4,12 +4,6 @@ schemaVersion: 1
 status: builtin-theme
 playable: false
 id: mundoplato
-displayName: Mundoplato
-tagline: Aventuras, magia y despropósitos
-presentation:
-  category: Fantasía insólita
-  description: Ciudades imposibles, mapas caprichosos y magia imprevisible para aventuras de ingenio, asombro y humor.
-  atmosphere: Pergamino · Cobre · Crepúsculo
 visual:
   mode: dark
   mood: whimsical

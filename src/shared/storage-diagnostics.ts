@@ -15,13 +15,6 @@ export interface StorageDiagnostics {
 export interface StorageDiagnosticsFailure {
   readonly status: 'error'
   readonly code: 'diagnostics-unavailable'
-  readonly message: string
 }
 
 export type StorageDiagnosticsResult = StorageDiagnostics | StorageDiagnosticsFailure
-
-export interface FateboundApi {
-  readonly storage: {
-    getDiagnostics(): Promise<StorageDiagnosticsResult>
-  }
-}

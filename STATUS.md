@@ -6,11 +6,11 @@ Rama de trabajo: `feature/app-shell`
 
 ## Estado general
 
-Fatebound 2.0 dispone ya de una primera interfaz visual funcional sobre Electron y Vue. La shell sustituye la demostración de electron-vite, separa los destinos globales de la navegación contextual y carga nueve temas YAML integrados: Fatebound como identidad base y ocho mundos futuros seleccionables. Sin un mundo activo comienza en Fatebound neutral, el menú muestra solo Mundos y Ajustes presenta un diagnóstico real y de solo lectura de la infraestructura SQLite portable.
+Fatebound 2.0 dispone ya de una primera interfaz visual funcional sobre Electron y Vue. La shell carga nueve temas visuales y está traducida al español, inglés y coreano, con cambio inmediato y preferencia portable. Sin un mundo activo comienza en Fatebound neutral, el menú muestra solo Mundos y Ajustes reúne el selector de idioma y el diagnóstico SQLite de solo lectura.
 
 El producto continúa en fase de fundamentos: no existen todavía esquema del juego, mundos instalados, personajes, campañas, reglas ni importación `.fateworld`. Ronin, Templario, Ninja, Shaolin, Robot, Soldado, Naves y Mundoplato figuran como **Próximamente** y solo permiten explorar su ambientación; ninguno representa contenido jugable disponible o instalado.
 
-## Implementado y probado
+## Implementado
 
 ### Interfaz y temas
 
@@ -29,10 +29,20 @@ El producto continúa en fase de fundamentos: no existen todavía esquema del ju
 - [x] Foco visible, enlace para saltar al contenido, controles de teclado, estados hover y `prefers-reduced-motion`.
 - [x] Seis recursos de marca organizados en `resources/branding/fatebound/`; el logo sigue siendo un botón accesible de Inicio y el PNG de aplicación alimenta el icono del portable de Windows.
 
+### Internacionalización
+
+- [x] Catálogo central de traducciones con archivos independientes para `es`, `en` y `ko`, claves tipadas, coherencia comprobable y fallback explícito a español.
+- [x] Todos los textos visibles de la shell, mundos, estados vacíos, Ajustes, diagnóstico, tooltips y etiquetas accesibles salen del catálogo.
+- [x] Textos de presentación de los nueve temas separados de `theme.yaml` y enlazados por identificador estable, sin duplicar paletas ni recursos.
+- [x] Selector accesible en Ajustes con Español, English y 한국어, cambio inmediato sin perder sección ni tema y estado de guardado anunciado.
+- [x] Fechas del diagnóstico formateadas con `Intl` según `es-ES`, `en-GB` o `ko-KR`, y fallbacks tipográficos locales para hangul.
+- [x] Preferencia validada y guardada atómicamente en `data/preferences.json`; ausencia, corrupción o valor no admitido vuelven a español.
+- [x] Idioma de aplicación separado del futuro idioma de contenido de cada mundo; las previsualizaciones actuales no declaran contenido jugable multilingüe.
+
 ### Diagnóstico y frontera de procesos
 
 - [x] Canal fijo `fatebound:storage:get-diagnostics`, sin argumentos y con respuesta compartida tipada.
-- [x] Preload reducido a `window.api.storage.getDiagnostics()`; retirados `electronAPI`, `ipcRenderer` expuesto y el canal `ping`.
+- [x] Preload reducido a diagnóstico y preferencia de idioma mediante operaciones específicas; retirados `electronAPI`, `ipcRenderer` expuesto y el canal `ping`.
 - [x] Ventana con `contextIsolation: true`, `nodeIntegration: false` y `sandbox: true`.
 - [x] Comprobación puntual de `quick_check`, claves foráneas y versión de esquema, serializada con la cola SQLite.
 - [x] Recuento de copias administradas que vuelven a superar manifiesto, estructura, tamaño, SHA-256 e integridad.
@@ -53,12 +63,12 @@ El producto continúa en fase de fundamentos: no existen todavía esquema del ju
 - **Próximamente** significa que el paquete jugable aún no existe; **No instalado** se reservará para un paquete futuro ya disponible pero ausente de la biblioteca local.
 - La selección temática dura solo durante la sesión y comienza de nuevo en Fatebound neutral al abrir la aplicación.
 - Personajes y Crónicas no aparecen en el menú sin un mundo jugable activo; sus vistas estructurales no crean, editan ni persisten datos.
-- Ajustes ofrece diagnóstico, no restauración, exportación, exploración de archivos ni cambio de ruta.
+- Ajustes ofrece idioma y diagnóstico, no restauración, exportación, exploración de archivos ni cambio de ruta.
 - No existe todavía importador, editor de mundos, motor de reglas, campañas jugables o IA.
 
 ## Siguiente tarea prioritaria
 
-**Implementar la internacionalización de la interfaz en español, inglés y coreano y mostrar de forma independiente los idiomas de contenido disponibles en cada mundo.**
+**Implementar la exportación manual de copias SQLite a otra unidad y diseñar la restauración explícita sin sobrescritura silenciosa.**
 
 ## Pendientes por fases
 
@@ -88,6 +98,7 @@ El producto continúa en fase de fundamentos: no existen todavía esquema del ju
 ## Problemas y limitaciones conocidos
 
 - La apariencia y accesibilidad necesitan evaluación visual manual prolongada en los nueve temas, las ocho tarjetas y los tamaños extremos de ventana; las pruebas técnicas no cierran esta revisión.
+- Los textos ingleses y coreanos, sus saltos de línea, el hangul y el selector de idioma necesitan revisión manual en el ejecutable y en tamaños compactos.
 - Los recursos de `builtin-themes` se identifican como ilustraciones propias integradas en Fatebound. Conviene conservar un registro formal de procedencia y derechos junto al proceso de publicación.
 - El portable de Windows convierte `fatebound-app-icon.png` durante el build; `build/icon.ico` y `build/icon.icns` no se han regenerado y deben revisarse en una tarea específica si se reutilizan para otros targets.
 - La portabilidad no se ha validado desde un pendrive físico ni desde otro ordenador.
@@ -104,25 +115,15 @@ El producto continúa en fase de fundamentos: no existen todavía esquema del ju
 - Diseñar la política de progreso compartido o aislado para un personaje que protagonice varias crónicas.
 - Definir los tokens y recursos admitidos por los temas `.fateworld` sin convertir el catálogo interno actual en una especificación prematura.
 - Definir manifiesto, esquema, límites, capacidades y traducciones del formato de mundos.
-- Implementar la localización aprobada en español, inglés y coreano con preferencia persistente, y concretar el contrato independiente de idiomas disponibles y predeterminado por mundo sin inventar traducciones.
+- Concretar en la futura especificación `.fateworld` el contrato independiente de idiomas disponibles y predeterminado por mundo sin inventar traducciones.
 - Concretar la experiencia de exportación, restauración y cuarentena SQLite.
 - Definir firma de Windows, perfil privado y condiciones de licencia antes de distribuir contenido de terceros.
 
-## Validación de esta actualización
+## Verificación pendiente de esta actualización
 
-- `npm test`: superado, 64 pruebas; además de la navegación y el aislamiento de contexto, validan el catálogo cerrado de nueve temas, las ocho tarjetas futuras, Mundoplato, la identidad base neutral, las rutas de recursos y la ausencia de acciones jugables.
-- `npm run typecheck`: superado para main/preload y renderer, también como parte del build final.
-- `npm run build`: superado fuera del sandbox; contiene nueve `hero`, nueve `card` WebP y nueve `emblem` PNG, además del logo horizontal y el símbolo usados por el renderer.
-- `npm run lint`: código 0 y ningún error; permanecen 2.655 avisos `prettier/prettier` por finales CRLF preexistentes.
-- `npm run build:win`: superado fuera del sandbox con Electron 39.8.10; generó `dist/Fatebound.exe` de 115.339.054 bytes y SHA-256 `7593DA5BE28B02F191FA2FCD56DFA98162A5DF471A46CEFF1D2C0D67BC8EC349`.
-- Inspección del paquete final: `app.asar` contiene nueve `hero`, nueve `card`, nueve `emblem`, el logo horizontal y el símbolo; `extraResources` contiene los seis PNG de marca. No hay entradas temporales ni coincidencias de contenido restringido de Ronin. electron-builder generó un `icon.ico` de 165.091 bytes desde el PNG de aplicación.
-- Ejecución automatizada del portable final, fuera del sandbox y en carpeta temporal aislada: código 0, creación de `data/fatebound.sqlite` de 12.288 bytes junto al ejecutable y ningún archivo de prueba residual.
-- Automatización visual del portable: Inicio usa Fatebound neutral; Mundos presenta exactamente ocho tarjetas en 4×2, todas **Próximamente**; Mundoplato abre un detalle con emblema y sin hero; a 760×620 la cuadrícula usa dos columnas y la marca compacta no se solapa con Ajustes. Volver a Inicio mediante la marca conserva la ambientación seleccionada y restablece el scroll.
-- Revisión de capturas reales del portable a 1440×900 y 760×620: tarjetas verticales sin recorte importante, panel de emblema legible, estados activos claros y cabecera sin solapamientos en Inicio, Mundos y el detalle de Mundoplato.
-- Firma Authenticode: `NotSigned`, limitación ya documentada.
-- Revisión manual pendiente antes de commit: recorrer los nueve temas, comprobar Enter/Espacio y el orden de tabulación con teclado real, movimiento reducido, textos largos futuros, sesiones prolongadas y el icono mostrado por el shell de Windows.
-- `git diff --check`: superado; Git solo avisa de la conversión futura LF/CRLF configurada para el repositorio, sin errores de espacios.
-- `git status -sb`: revisado en `feature/app-shell`; conserva, además de esta fase visual, los cambios sin commit ya existentes de la shell y del diagnóstico de almacenamiento.
+Por instrucción del equipo no se han ejecutado tests, lint, typecheck, builds, comprobaciones Git ni automatización visual para esta fase. Se han añadido únicamente pruebas focalizadas para coherencia de catálogos, fallback, persistencia y seguridad del IPC, pero siguen pendientes de ejecución manual.
+
+El equipo debe ejecutar desde PowerShell `npm test`, `npm run lint`, `npm run typecheck`, `npm run build`, `npm run build:win`, `git diff --check` y `git status -sb`. En el portable debe comprobar los tres idiomas, reapertura con la preferencia conservada, error de guardado, navegación por teclado, diagnóstico, fechas, textos largos, hangul y tamaños 1180×780 y 760×620.
 
 ## Registro de cambios
 
@@ -140,6 +141,10 @@ Los recursos gráficos de Ronin presentes en el repositorio no autorizan su dist
 
 ### 2026-10-11
 
+- Implementado el catálogo i18n tipado para español, inglés y coreano, con selector inmediato y fallback español.
+- Añadida la preferencia portable atómica `data/preferences.json` mediante IPC mínimo validado en preload y main.
+- Separados los textos traducibles de los nueve YAML visuales y localizados navegación, mundos, estados, diagnóstico, mensajes nativos y accesibilidad.
+- Documentada la separación permanente entre idioma de aplicación e idiomas de contenido declarados por futuros paquetes `.fateworld`.
 - Sustituido el catálogo TypeScript de tres temas por nueve YAML integrados, validados y empaquetados en compilación.
 - Establecido Fatebound neutral como inicio sin mundo activo y añadido el retorno explícito al estado neutral.
 - Separado Fatebound neutral del catálogo visible e incorporado Mundoplato como octavo mundo futuro.
@@ -151,4 +156,3 @@ Los recursos gráficos de Ronin presentes en el repositorio no autorizan su dist
 - Adaptadas las tarjetas al formato 3:4 y simplificado el detalle para usar solo el emblema sobre una superficie temática.
 - Etiquetados los ocho mundos como **Próximamente** y reservada la futura etiqueta **No instalado** para paquetes jugables disponibles.
 - Adoptado Crónicas como término de navegación y documentadas sus asociaciones futuras con personaje, mundo y versión.
-- Registrada como siguiente prioridad la internacionalización de la interfaz y los idiomas de contenido por mundo.

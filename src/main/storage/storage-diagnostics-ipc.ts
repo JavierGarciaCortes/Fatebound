@@ -9,9 +9,6 @@ export type StorageDiagnosticsReader = () => Promise<StorageDiagnostics>
 export type StorageDiagnosticsHandler = () => Promise<StorageDiagnosticsResult>
 export type IpcHandlerRegistrar = (channel: string, handler: StorageDiagnosticsHandler) => void
 
-const DIAGNOSTICS_ERROR_MESSAGE =
-  'No se pudo completar el diagnóstico de almacenamiento. SQLite puede estar cerrándose o la unidad puede no estar disponible.'
-
 export function createStorageDiagnosticsHandler(
   readDiagnostics: StorageDiagnosticsReader = readStorageDiagnostics,
   onError: (error: unknown) => void = () => undefined
@@ -23,8 +20,7 @@ export function createStorageDiagnosticsHandler(
       onError(error)
       return Object.freeze({
         status: 'error',
-        code: 'diagnostics-unavailable',
-        message: DIAGNOSTICS_ERROR_MESSAGE
+        code: 'diagnostics-unavailable'
       })
     }
   }

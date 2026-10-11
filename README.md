@@ -2,7 +2,7 @@
 
 Fatebound es una aplicación de escritorio para Windows destinada a jugar RPG narrativos en solitario. El objetivo es ofrecer una experiencia local y portable: las reglas, los mundos, las partidas y sus crónicas podrán viajar junto a la aplicación y el juego no dependerá de un servidor ni de conexión a Internet.
 
-El repositorio se encuentra en una fase inicial de fundamentos. Actualmente contiene una primera shell funcional de Electron y Vue, la persistencia SQLite portable, comprobaciones de integridad, copias previas a migraciones y copias automáticas con retención segura. El esquema del juego, el motor, la importación de mundos y las pantallas jugables todavía no están implementados.
+El repositorio se encuentra en una fase inicial de fundamentos. Actualmente contiene una primera shell funcional de Electron y Vue, interfaz en español, inglés y coreano, preferencias portables y persistencia SQLite con comprobaciones de integridad y copias seguras. El esquema del juego, el motor, la importación de mundos y las pantallas jugables todavía no están implementados.
 
 ## Visión de producto
 
@@ -133,13 +133,15 @@ La demo de electron-vite se ha sustituido por una shell Electron/Vue con destino
 
 Sin un mundo activo, cada arranque comienza en el tema neutral `fatebound`; Fatebound es la identidad base de la aplicación y no aparece como tarjeta de mundo. Elegir uno de los mundos futuros solo cambia la ambientación durante la sesión: no instala ni inicia contenido ni amplía la navegación. **Volver a Fatebound** recupera el estado neutral y pulsar la marca para volver a Inicio conserva la ambientación seleccionada.
 
-La biblioteca muestra exactamente ocho mundos: Ronin, Templario, Ninja, Shaolin, Robot, Soldado, Naves y Mundoplato. Los nueve temas integrados —esos ocho más Fatebound neutral— viven en `resources/builtin-themes/<id>/theme.yaml`. Cada definición aporta identidad, textos breves, paleta y rutas relativas; un validador estricto admite solo el esquema y la lista cerrada, y Vite integra los recursos conocidos durante la compilación. El renderer no lee el sistema de archivos, no ejecuta YAML, JavaScript o CSS de los temas y muestra una alternativa visual si falta o falla una imagen.
+La biblioteca muestra exactamente ocho mundos: Ronin, Templario, Ninja, Shaolin, Robot, Soldado, Naves y Mundoplato. Los nueve temas integrados —esos ocho más Fatebound neutral— viven en `resources/builtin-themes/<id>/theme.yaml`. Cada definición aporta únicamente identidad estable y propiedades visuales; los textos de presentación traducibles se resuelven por ese identificador desde el catálogo i18n. Un validador estricto admite solo el esquema y la lista cerrada, y Vite integra los recursos conocidos durante la compilación.
 
 Inicio utiliza el `hero` del tema activo como fondo cinematográfico legible. Mundos presenta las ocho `card` en una cuadrícula 4×2 amplia, adaptable a tres, dos o una columna, y usa el `emblem` del mundo seleccionado como protagonista del detalle sobre un fondo temático discreto, sin `hero` detrás. Los nueve temas integrados disponen de los tres recursos en formatos WebP y PNG admitidos. Este catálogo interno no fija el contrato definitivo de futuros paquetes `.fateworld`.
 
 Los ocho mundos se etiquetan **Próximamente** porque todavía no existe un paquete jugable disponible. Más adelante, **No instalado** se reservará para un mundo cuyo paquete jugable sí exista pero aún no esté instalado. Seleccionar una tarjeta futura solo muestra su tono y activa su ambientación visual; no ofrece jugar, instalar ni abrir el mundo.
 
-Ajustes consulta mediante `window.api.storage.getDiagnostics()` una instantánea real de las rutas activas, disponibilidad de SQLite, versión de esquema, integridad, claves foráneas y número de copias administradas válidas. El engranaje permanece disponible desde cualquier sección e indica cuándo Ajustes está abierto. El preload no expone `ipcRenderer`, SQL, la conexión ni acceso general a archivos; la ventana se ejecuta con aislamiento de contexto, sin Node en el renderer y con sandbox. El diagnóstico se ejecuta solo al entrar en Ajustes o al pulsar **Actualizar**.
+Ajustes permite cambiar inmediatamente la interfaz entre **Español**, **English** y **한국어** sin perder la sección ni el tema activo. La preferencia se valida en preload y main y se publica atómicamente en `data/preferences.json`; una ausencia o valor inválido usa español. Un fallo de guardado mantiene el cambio solo durante la sesión y se comunica expresamente. Las traducciones viven en archivos independientes bajo `src/shared/i18n/locales/`, tienen claves coherentes y fallback explícito al español; las fechas visibles usan `Intl` con el idioma activo.
+
+Ajustes también consulta mediante `window.api.storage.getDiagnostics()` una instantánea real de las rutas activas, disponibilidad de SQLite, versión de esquema, integridad, claves foráneas y número de copias administradas válidas. El preload solo expone los contratos específicos de diagnóstico y preferencia; no expone `ipcRenderer`, SQL, la conexión ni acceso general a archivos. La ventana conserva aislamiento de contexto, ausencia de Node y sandbox.
 
 Personajes y Crónicas conservan vistas estructurales futuras, pero permanecen fuera de la navegación mientras no haya un mundo jugable activo y no ofrecen creación ni juego. Esta interfaz no incluye todavía editor de mundos, crónicas, reglas avanzadas, restauración ni exportación de copias.
 
@@ -175,6 +177,7 @@ El formato deberá permitir importar, validar, editar y exportar un mundo sin p�
 - Retención verificada de seis copias automáticas y dos protegidas, sin eliminar copias manuales, inválidas, desconocidas ni la última copia válida.
 - Pruebas aisladas para creación, persistencia, integridad, copias, migraciones, reapertura, errores, cierre, diagnóstico, preload, navegación, YAML, rutas y catálogo de temas.
 - Shell visual con Inicio en la marca, Ajustes en la cabecera y navegación contextual accesible y adaptativa.
+- Interfaz completa en español, inglés y coreano con selector inmediato, fallback español y preferencia portable atómica en `data/preferences.json`.
 - Fatebound neutral como identidad base inicial y ocho mundos futuros declarativos —Ronin, Templario, Ninja, Shaolin, Robot, Soldado, Naves y Mundoplato— claramente separados de mundos instalados.
 - Veintisiete ilustraciones integradas desde `resources/builtin-themes/`, con degradados de legibilidad y alternativas visuales ante ausencias.
 - Diagnóstico SQLite real de solo lectura mediante un único canal IPC tipado y restringido.
@@ -188,7 +191,7 @@ El formato deberá permitir importar, validar, editar y exportar un mundo sin p�
 
 ### Planificado
 
-- Interfaz en español, inglés y coreano con preferencia persistente, independiente del idioma de contenido. Cada paquete de mundo declarará sus idiomas disponibles y predeterminado; el selector solo los mostrará cuando existan datos reales y no inventará traducciones ausentes.
+- Idiomas de contenido independientes por paquete: cada futuro mundo declarará los realmente disponibles y su idioma predeterminado; Fatebound no inventará traducciones ausentes.
 - Exportación manual de copias a otra unidad, recuperación explícita y repositorios del dominio sobre SQLite.
 - Validación del portable desde un pendrive físico y desde otro ordenador.
 - Instalaciones válidas sin mundos, importación personal y protección frente al borrado accidental.

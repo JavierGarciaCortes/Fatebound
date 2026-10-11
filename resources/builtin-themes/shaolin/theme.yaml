@@ -3,12 +3,6 @@ schemaVersion: 1
 status: builtin-theme
 playable: false
 id: shaolin
-displayName: Shaolin
-tagline: Disciplina, camino y compasión
-presentation:
-  category: Artes marciales
-  description: Montañas, templos y disciplina interior para relatos de aprendizaje, equilibrio y compasión.
-  atmosphere: Tierra · Azafrán · Amanecer
 visual:
   mode: dark
   mood: earth

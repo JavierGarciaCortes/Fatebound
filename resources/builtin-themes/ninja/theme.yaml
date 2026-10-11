@@ -3,12 +3,6 @@ schemaVersion: 1
 status: builtin-theme
 playable: false
 id: ninja
-displayName: Ninja
-tagline: Silencio, sombra y precisión
-presentation:
-  category: Sigilo
-  description: Tejados mojados, luz de luna y decisiones medidas para historias que avanzan sin hacer ruido.
-  atmosphere: Sombra · Jade · Luz lunar
 visual:
   mode: dark
   mood: shadow

@@ -3,12 +3,6 @@ schemaVersion: 1
 status: builtin-theme
 playable: false
 id: soldado
-displayName: Soldado
-tagline: Supervivencia, territorio y misión
-presentation:
-  category: Operaciones especiales
-  description: Terreno hostil, observación y recursos limitados para relatos de misión y supervivencia.
-  atmosphere: Oliva · Arena · Acero
 visual:
   mode: dark
   mood: tactical

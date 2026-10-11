@@ -4,8 +4,6 @@ export type AppSectionId = 'home' | 'worlds' | 'characters' | 'chronicles' | 'se
 
 export interface NavigationSection {
   readonly id: AppSectionId
-  readonly label: string
-  readonly description: string
 }
 
 export interface InstalledWorldNavigationContext {
@@ -14,11 +12,11 @@ export interface InstalledWorldNavigationContext {
 }
 
 export const APP_SECTIONS: Readonly<Record<AppSectionId, NavigationSection>> = Object.freeze({
-  home: { id: 'home', label: 'Inicio', description: 'Tu umbral de aventuras' },
-  worlds: { id: 'worlds', label: 'Mundos', description: 'Atmósferas y bibliotecas' },
-  characters: { id: 'characters', label: 'Personajes', description: 'Héroes de tus relatos' },
-  chronicles: { id: 'chronicles', label: 'Crónicas', description: 'Historias en curso' },
-  settings: { id: 'settings', label: 'Ajustes', description: 'Aplicación y almacenamiento' }
+  home: { id: 'home' },
+  worlds: { id: 'worlds' },
+  characters: { id: 'characters' },
+  chronicles: { id: 'chronicles' },
+  settings: { id: 'settings' }
 })
 
 const SECTION_IDS = Object.freeze(Object.keys(APP_SECTIONS) as AppSectionId[])

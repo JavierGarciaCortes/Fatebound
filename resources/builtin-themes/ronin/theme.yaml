@@ -3,12 +3,6 @@ schemaVersion: 1
 status: builtin-theme
 playable: false
 id: ronin
-displayName: Ronin
-tagline: Honor, acero y destino
-presentation:
-  category: Japón feudal
-  description: Silencio, acero y decisiones que dejan huella en una tierra de montañas, lluvia y arces rojos.
-  atmosphere: Tinta · Carmesí · Bronce
 visual:
   mode: dark
   mood: ink

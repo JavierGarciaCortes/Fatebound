@@ -12,12 +12,21 @@ import {
 import { readStorageDiagnostics } from './storage/storage-diagnostics.ts'
 import { registerStorageDiagnosticsIpc } from './storage/storage-diagnostics-ipc.ts'
 import { acquireSingleInstanceLock } from './single-instance.ts'
+import { registerApplicationPreferencesIpc } from './preferences/application-preferences-ipc.ts'
+import { readActiveApplicationLanguage } from './preferences/application-preferences.ts'
+import { DEFAULT_APPLICATION_LANGUAGE, type ApplicationLanguage } from '../shared/application-language.ts'
+import { translate, type MessageKey } from '../shared/i18n/index.ts'
 
 let mainWindow: BrowserWindow | null = null
 let shutdownStarted = false
 let shutdownComplete = false
 let automaticBackupWarningVisible = false
+let mainApplicationLanguage: ApplicationLanguage = DEFAULT_APPLICATION_LANGUAGE
 const PORTABLE_SQLITE_VERIFICATION_ARGUMENT = '--verify-portable-sqlite'
+
+function mainT(key: MessageKey): string {
+  return translate(mainApplicationLanguage, key)
+}
 
 function createWindow(): void {
   if (mainWindow && !mainWindow.isDestroyed()) {
@@ -74,6 +83,8 @@ async function startApplication(): Promise<void> {
   }
 
   activateStoragePaths(storageResult.paths)
+  const languageResult = await readActiveApplicationLanguage()
+  mainApplicationLanguage = languageResult.language
   await openActiveSqliteDatabase({
     onAutomaticBackupError(error) {
       console.error('Automatic SQLite backup maintenance failed', error)
@@ -90,11 +101,10 @@ async function startApplication(): Promise<void> {
       void dialog
         .showMessageBox({
           type: 'warning',
-          title: 'Copia de seguridad no completada',
-          message: 'Fatebound no ha podido crear o mantener la copia automática de SQLite.',
-          detail:
-            'La base de datos principal y las copias anteriores no se han sustituido. Puedes seguir usando Fatebound, pero conviene revisar el espacio disponible y la unidad antes de continuar.',
-          buttons: ['Entendido']
+          title: mainT('native.backup.title'),
+          message: mainT('native.backup.message'),
+          detail: mainT('native.backup.detail'),
+          buttons: [mainT('native.common.accept')]
         })
         .finally(() => {
           automaticBackupWarningVisible = false
@@ -112,6 +122,19 @@ async function startApplication(): Promise<void> {
 }
 
 function registerApplicationLifecycle(): void {
+  registerApplicationPreferencesIpc(
+    (channel, handler) =>
+      ipcMain.handle(channel, (_event, ...args: unknown[]) => handler(...args)),
+    {
+      onLanguageSelected(language) {
+        mainApplicationLanguage = language
+      },
+      onError(error) {
+        console.error('Unable to read or write Fatebound preferences', error)
+      }
+    }
+  )
+
   registerStorageDiagnosticsIpc(
     (channel, handler) => ipcMain.handle(channel, handler),
     readStorageDiagnostics,
@@ -149,8 +172,8 @@ function registerApplicationLifecycle(): void {
       }
 
       dialog.showErrorBox(
-        'Fatebound no puede abrir sus datos',
-        'La comprobación de integridad, la copia de seguridad o la migración de SQLite no se pudo completar. Fatebound se cerrará sin abrir la interfaz y no restaurará ni sustituirá automáticamente la base de datos.'
+        mainT('native.database.title'),
+        mainT('native.database.detail')
       )
       app.quit()
     })

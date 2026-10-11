@@ -119,6 +119,14 @@ El paquete no aportará componentes Vue, JavaScript, CSS libre, fuentes remotas 
 
 `resources/builtin-themes/` no es un ejemplo de estructura `.fateworld` ni un almacén de mundos instalados. Contiene nueve temas de solo lectura integrados en la aplicación: la identidad base Fatebound y las atmósferas de ocho mundos futuros. Estos ocho se muestran como **Próximamente** mientras no exista un paquete jugable. **No instalado** solo será aplicable cuando haya un paquete real disponible y validable; entonces podrán diseñarse su instalación y activación sin reutilizar este catálogo como contrato implícito.
 
+Los textos de presentación de este catálogo se traducen en la propia aplicación mediante el identificador estable del tema. Esas traducciones no son contenido jugable ni definen la estructura multilingüe de `.fateworld`.
+
+### 6.1 Idioma de aplicación e idiomas del mundo
+
+El idioma de aplicación controla navegación, botones, estados y mensajes comunes y actualmente admite `es`, `en` y `ko`. Un paquete de mundo será independiente: deberá declarar un idioma predeterminado y la lista exacta de idiomas de contenido realmente incluidos. No estará obligado a incluir los tres idiomas de Fatebound.
+
+Cuando exista el importador, la biblioteca solo ofrecerá los idiomas declarados por el paquete. Si el idioma de interfaz no está incluido, se usará el idioma predeterminado del mundo y se informará al jugador; nunca se generará ni simulará una traducción ausente. Los nombres de campos, la ubicación de catálogos y el fallback interno del paquete siguen pendientes de la especificación dedicada.
+
 ## 7. Edición y exportación futuras
 
 Fatebound podrá editar datos de un mundo y exportar posteriormente un paquete completo, pero la primera interfaz no necesita un editor visual avanzado. El diseño deberá conservar información que Fatebound aún no modifique, evitar pérdidas en ciclos de importación y exportación y distinguir claramente:

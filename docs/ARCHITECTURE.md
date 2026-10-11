@@ -59,7 +59,7 @@ Vue representa vistas, formularios y estados de interacción. Puede solicitar op
 
 ### 3.2 Preload — frontera nativa
 
-**Implementado:** el preload ya no expone `@electron-toolkit/preload` ni `ipcRenderer`. Su única capacidad es `window.api.storage.getDiagnostics()`, sin argumentos, sobre el canal fijo `fatebound:storage:get-diagnostics`. El contrato compartido devuelve una instantánea tipada o un error sanitizado. Capacidades futuras se añadirán expresamente, sin identificadores arbitrarios, primitivas generales de archivos, SQL ni la conexión SQLite.
+**Implementado:** el preload ya no expone `@electron-toolkit/preload` ni `ipcRenderer`. Ofrece únicamente `window.api.storage.getDiagnostics()` y `window.api.preferences.getLanguage()`/`setLanguage()` sobre canales fijos. Los contratos compartidos son tipados, el idioma se valida tanto en preload como en main y no se aceptan rutas ni identificadores arbitrarios. Capacidades futuras se añadirán expresamente, sin primitivas generales de archivos, SQL ni la conexión SQLite.
 
 ### 3.3 Main — aplicación
 
@@ -71,7 +71,7 @@ El proceso main ya es dueño de la resolución de rutas, la comprobación de esc
 - importación, exportación y copias de seguridad;
 - coordinación del motor de reglas.
 
-Los handlers IPC delegan en servicios de aplicación; no contienen reglas de negocio ni consultas dispersas. El handler de diagnóstico registra el error técnico en main y devuelve al renderer un mensaje conocido que no incluye excepciones internas.
+Los handlers IPC delegan en servicios de aplicación; no contienen reglas de negocio ni consultas dispersas. El handler de diagnóstico registra el error técnico en main y devuelve al renderer solo un código conocido; el renderer localiza el mensaje sin recibir excepciones internas.
 
 ### 3.4 Dominio
 
@@ -87,13 +87,19 @@ Las capas de dominio y repositorios continúan siendo propuestas. La frontera de
 
 La presentación se divide en una shell estable de Fatebound, un tema declarativo y contenido narrativo. **La primera capa ya está implementada:** la shell conserva navegación, estados, foco, contraste y disposición adaptativa. Los nueve temas de solo lectura se originan en `resources/builtin-themes/<id>/theme.yaml`: Fatebound aporta la identidad base y los otros ocho representan mundos futuros. No proceden de paquetes instalados, no se registran en SQLite y no son mundos jugables.
 
-`builtin-theme-schema.ts` analiza un subconjunto deliberadamente pequeño de YAML: mapas, escalares conocidos y un esquema exacto, sin etiquetas, anclas, alias, colecciones libres ni campos adicionales. Valida `schemaVersion`, estado integrado no jugable, identificador permitido, textos, colores `#RRGGBB`, opciones controladas y rutas de imagen específicas bajo `assets/`. Rechaza rutas absolutas, separadores de Windows, `..`, consultas y nombres no previstos. `builtin-theme-catalog.ts` usa `import.meta.glob` con los nueve directorios y nombres de recurso enumerados; Vite convierte YAML e imágenes en módulos y URLs de solo lectura dentro del renderer compilado. No existe lectura arbitraria del sistema de archivos, IPC nuevo, JavaScript o CSS aportado por temas.
+`builtin-theme-schema.ts` analiza un subconjunto deliberadamente pequeño de YAML: mapas, escalares conocidos y un esquema exacto, sin etiquetas, anclas, alias, colecciones libres ni campos adicionales. Valida `schemaVersion`, estado integrado no jugable, identificador permitido, colores `#RRGGBB`, opciones controladas y rutas de imagen específicas bajo `assets/`. Los YAML no contienen textos de presentación: nombres, lemas, categorías, descripciones y atmósferas se resuelven en el catálogo i18n mediante el identificador estable. Se rechazan rutas absolutas, separadores de Windows, `..`, consultas y nombres no previstos.
 
 Cada definición puede declarar `hero.webp`, `card.webp` o `card.png` y `emblem.png`. El cargador resuelve solo los archivos realmente empaquetados y registra por rol cualquier ausencia; la vista sustituye ese recurso por un fallback local sin invalidar los demás. Inicio usa la ilustración `hero` bajo superposiciones de contraste. Mundos respeta la proporción vertical 3:4 de las tarjetas y reserva el panel inferior para un emblema protagonista sobre un degradado discreto, sin reutilizar allí el `hero`. El logo oficial permanece separado. Los paneles técnicos de Ajustes conservan superficies neutrales y emplean el acento activo con contención.
 
 Legibilidad, sesiones largas, navegación clara, reducción de movimiento y adaptación al tamaño de ventana son restricciones arquitectónicas de la interfaz, no detalles ornamentales. Los ocho mundos del catálogo se etiquetan **Próximamente**: la tarjeta puede seleccionarse para cambiar la ambientación y abrir el detalle, pero no existe todavía un paquete jugable. **No instalado** se reservará para el estado futuro en el que ese paquete ya exista y aún no esté instalado. La selección permanece durante la sesión, sobrevive a la navegación entre secciones, puede volver explícitamente a Fatebound neutral y no se persiste. El acceso a Personajes y Crónicas depende exclusivamente de un futuro mundo instalado activo, nunca del tema visual. Este esquema interno prepara conceptos reutilizables, pero no constituye el contrato definitivo de `.fateworld`.
 
-**Siguiente decisión aprobada, todavía no implementada:** la interfaz de Fatebound se localizará en español, inglés y coreano y conservará una preferencia persistente. El idioma de interfaz será independiente del contenido: cada mundo declarará idiomas disponibles y predeterminado, y el selector solo los mostrará cuando existan datos reales. No se inventarán traducciones ausentes; todavía no existe infraestructura i18n ni se ha fijado su representación en `.fateworld`.
+### 3.7 Internacionalización y preferencias
+
+**Implementado, pendiente de verificación manual:** un catálogo ligero propio en `src/shared/i18n/` ofrece claves tipadas y archivos independientes para español, inglés y coreano, con español como idioma inicial y fallback explícito. El renderer conserva el idioma en estado reactivo, actualiza `document.lang`, usa `Intl.DateTimeFormat` con `es-ES`, `en-GB` o `ko-KR` y cambia los textos sin reiniciar ni alterar navegación o tema. Los diálogos nativos usan el mismo catálogo cuando el almacenamiento permite leer la preferencia.
+
+Main guarda `{ schemaVersion, applicationLanguage }` en `data/preferences.json`. La escritura usa un temporal exclusivo, sincronización y renombrado; un fallo conserva el archivo anterior. El IPC solo admite `es`, `en` o `ko`, vuelve a validarlos en main y devuelve resultados explícitos de lectura y guardado. Este archivo no forma parte de SQLite ni activa copias de la base.
+
+El idioma de aplicación es independiente del futuro idioma de contenido. Cada `.fateworld` declarará su idioma predeterminado y solo los idiomas realmente incluidos; si el idioma de interfaz no existe en un mundo, la futura biblioteca usará el predeterminado del paquete e informará al jugador. El catálogo integrado actual traduce únicamente su presentación artística y no afirma que existan contenidos jugables multilingües.
 
 ## 4. Datos portables y SQLite
 
@@ -112,6 +118,7 @@ Las rutas centrales actuales son:
 <directorio-del-ejecutable-portable>/
   data/
     fatebound.sqlite   base creada o abierta durante el arranque
+    preferences.json   idioma de aplicación portable
     worlds/            recursos importados futuros
     exports/           exportaciones futuras
     backups/           copias SQLite verificadas y estado del programador
@@ -324,7 +331,7 @@ La implementación mantiene y deberá seguir manteniendo:
 - conservar copias recuperables antes de migraciones y operaciones destructivas;
 - registrar errores técnicos sin exponer datos privados en la interfaz.
 
-La API genérica del scaffold y el canal de demostración `ping` se han retirado. La superficie nativa actual queda limitada al diagnóstico tipado y sin argumentos; incorporar otra capacidad exigirá un contrato IPC específico y pruebas equivalentes.
+La API genérica del scaffold y el canal de demostración `ping` se han retirado. La superficie nativa actual queda limitada al diagnóstico tipado sin argumentos y a lectura/escritura validada del idioma; incorporar otra capacidad exigirá un contrato IPC específico y pruebas equivalentes.
 
 ## 13. Orden de implementación recomendado
 
@@ -332,8 +339,8 @@ La API genérica del scaffold y el canal de demostración `ping` se han retirado
 2. **Implementado y validado:** generar el portable de Windows y validar su comportamiento en ejecución.
 3. **Implementado:** primera interfaz funcional, navegación, temas integrados, ocho mundos futuros con estado honesto, nueva marca y diagnóstico SQLite de solo lectura.
 4. **Implementado:** retirada de las API genéricas del preload, canal IPC único y activación de aislamiento, ausencia de Node en renderer y sandbox.
-5. **Siguiente prioridad:** internacionalización de la interfaz en español, inglés y coreano y visualización de los idiomas de contenido disponibles por mundo.
-6. Implementar después la exportación manual y restauración explícita de copias SQLite, sin sobrescritura silenciosa; después, repositorios del dominio sobre la transacción existente.
+5. **Implementado, pendiente de verificación manual:** internacionalización de la interfaz en español, inglés y coreano con preferencia portable, manteniendo separados los futuros idiomas de contenido.
+6. **Siguiente prioridad:** implementar la exportación manual y restauración explícita de copias SQLite, sin sobrescritura silenciosa; después, repositorios del dominio sobre la transacción existente.
 7. Cerrar en una tarea específica el contrato versionado de paquetes de mundos y crear plantillas originales.
 8. Incorporar importación, validación, edición, exportación y publicación inmutable.
 9. Implementar progresivamente el motor compatible, las campañas, los eventos y la exportación.

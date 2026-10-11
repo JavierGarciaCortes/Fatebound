@@ -47,6 +47,7 @@ La primera interfaz funcional deberá establecer una shell reutilizable con:
 - área de contenido adaptable al mundo activo;
 - acceso futuro a Personajes y Crónicas únicamente bajo un contexto real de mundo instalado y versión;
 - Ajustes y diagnóstico como acción global de cabecera;
+- selector de idioma de aplicación integrado en Ajustes, con nombres nativos y estado activo inequívoco;
 - mensajes de error y estados de carga comprensibles;
 - comportamiento adecuado en la ventana de escritorio y en el portable de Windows.
 
@@ -139,14 +140,14 @@ Fatebound es la identidad neutral de la aplicación, no un mundo de la bibliotec
 3. cambio perceptible y coherente de tema en la shell y el contenido;
 4. identificación explícita de demostraciones no jugables;
 5. estructura futura de Personajes y Crónicas, oculta de la navegación mientras no haya un mundo jugable activo;
-6. ajustes con un diagnóstico real de almacenamiento SQLite;
+6. ajustes con selector de idioma y diagnóstico real de almacenamiento SQLite;
 7. verificación visual y funcional en el portable de Windows.
 
 El diagnóstico consulta únicamente los datos necesarios mediante un contrato IPC mínimo, tipado y de solo lectura. Main conserva la autoridad sobre rutas y SQLite; el renderer no recibe la conexión, consultas SQL, acceso general a archivos ni detalles internos innecesarios.
 
 El tema inicial es Fatebound neutral. No aparece como tarjeta de mundo: es la identidad base sin mundo activo. Ronin, Templario, Ninja, Shaolin, Robot, Soldado, Naves y Mundoplato forman las ocho tarjetas seleccionables, todas con estado **Próximamente**. **Volver a Fatebound** restablece explícitamente la base y la selección dura solo durante la sesión.
 
-Las definiciones visuales proceden de nueve `theme.yaml` bajo `resources/builtin-themes/`, no de valores repetidos en los componentes. Cada tema dispone de `hero`, `card` y `emblem`: el hero domina Inicio bajo degradados de lectura; las ocho tarjetas de mundo conservan una composición vertical 3:4 y forman una cuadrícula 4×2 en anchuras amplias; el emblema protagoniza el panel de detalle sobre una superficie discreta sin otra ilustración detrás. Si un recurso declarado no está empaquetado o no carga, ese rol usa una alternativa gráfica controlada y el resto del tema continúa operativo.
+Las definiciones visuales proceden de nueve `theme.yaml` bajo `resources/builtin-themes/`, no de valores repetidos en los componentes. Sus textos traducibles están separados en el catálogo i18n y se enlazan por el identificador estable del tema. Cada tema dispone de `hero`, `card` y `emblem`: el hero domina Inicio bajo degradados de lectura; las ocho tarjetas de mundo conservan una composición vertical 3:4 y forman una cuadrícula 4×2 en anchuras amplias; el emblema protagoniza el panel de detalle sobre una superficie discreta sin otra ilustración detrás.
 
 Quedan fuera de esta fase el editor de mundos, la importación completa, las campañas jugables, las reglas avanzadas y la restauración de copias.
 
@@ -162,6 +163,7 @@ La primera shell implementa o representa ya estos patrones, sin considerar defin
 - estado vacío narrativo;
 - acciones primarias, secundarias y destructivas diferenciadas;
 - panel de ajustes;
+- selector de idioma mediante grupo de opciones accesible;
 - panel de diagnóstico con estados normal, advertencia y error;
 - notificaciones y diálogos accesibles;
 - contenedor de lectura para contenido narrativo.
@@ -174,7 +176,7 @@ Cada componente se evaluará por claridad, teclado, foco, contraste, texto largo
 - Esquema de tokens y límites exactos de los temas `.fateworld`.
 - Persistencia de preferencias visuales y de reducción de efectos.
 - Tamaño mínimo de ventana y estrategia de adaptación.
-- Implementación de la interfaz en español, inglés y coreano y efecto de textos más largos en la composición.
+- Verificación manual de textos ingleses y coreanos en todos los tamaños y temas.
 - Presentación independiente de los idiomas de contenido declarados por cada mundo.
 - Presupuesto de memoria, resolución y compresión de imágenes.
 - Alcance exacto del diagnóstico SQLite que resulte útil sin exponer información sensible.
@@ -191,13 +193,15 @@ La implementación inicial fija las siguientes decisiones revisables:
 - menú contextual sin Inicio ni Ajustes: solo Mundos en el estado actual, y Personajes y Crónicas cuando exista un mundo instalado activo;
 - botón de Ajustes con engranaje en la cabecera, estado activo y etiqueta accesible;
 - tipografía del sistema para lectura y una serif local del sistema para titulares, sin descargar fuentes;
+- fallbacks locales `Noto Sans KR`, `Malgun Gothic`, `Apple SD Gothic Neo`, `Noto Serif KR` y `Batang` para que el hangul conserve legibilidad sin descargar fuentes;
 - logotipo horizontal de `resources/branding/fatebound/` como identidad oficial en la barra amplia y símbolo de la misma familia en variantes compactas, independientes de los emblemas temáticos;
 - ilustraciones propias del catálogo integrado como protagonistas, con geometría abstracta secundaria y sin recursos originales restringidos del manual de Ronin;
 - catálogo YAML validado con una allowlist de nueve temas integrados, Fatebound como base y ocho mundos futuros, esquema cerrado, rutas relativas seguras y recursos empaquetados mediante Vite;
 - selección del tema limitada a la sesión, sin persistencia ni registros de mundos;
 - foco visible, enlace para saltar al contenido, semántica de botones, mensajes `aria-live` y respeto de `prefers-reduced-motion`;
 - diagnóstico solicitado al abrir Ajustes y actualizable por acción expresa, sin sondeo.
+- selector de idioma en Ajustes con Español, English y 한국어, cambio inmediato y estado de persistencia anunciado mediante `aria-live`.
 
-La siguiente fase aprobada localizará la interfaz en español, inglés y coreano con preferencia persistente. El idioma de la aplicación será independiente de los idiomas de contenido: cada mundo declarará disponibles y predeterminado, y la interfaz no mostrará opciones ni traducciones que el paquete no aporte.
+La interfaz está localizada en español, inglés y coreano. El idioma de la aplicación permanece independiente de los idiomas de contenido: cada futuro mundo declarará los disponibles y su predeterminado, y la interfaz no mostrará opciones ni traducciones que el paquete no aporte.
 
 Antes de estabilizar el sistema visual es obligatorio revisar manualmente los nueve temas, el contraste sobre cada hero, el encuadre completo de las ocho tarjetas 3:4 —incluido Mundoplato—, la cuadrícula 4×2, el panel de emblema, los tamaños 760×620 y 1180×780, la lectura prolongada, la navegación completa por teclado, los fallbacks, la reducción de movimiento, la claridad del nuevo logo y del engranaje como controles y el equilibrio entre inmersión y ruido decorativo. Las pruebas técnicas no sustituyen esta revisión. El catálogo actual demuestra el enfoque, pero no define todavía el contrato futuro de temas `.fateworld`.
