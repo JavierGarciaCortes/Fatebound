@@ -12,19 +12,17 @@ files:
   - '!{.env,.env.*,.npmrc,pnpm-lock.yaml}'
   - '!{tsconfig.json,tsconfig.node.json,tsconfig.web.json}'
 extraResources:
-  - from: resources
-    to: resources
+  - from: resources/branding/fatebound
+    to: resources/branding/fatebound
     filter:
-      - icon.png
-      - branding/*.png
-      - branding/*.ico
+      - '*.png'
 win:
   target:
     - target: portable
       arch:
         - x64
   executableName: Fatebound
-  icon: build/icon.ico
+  icon: resources/branding/fatebound/fatebound-app-icon.png
 portable:
   artifactName: Fatebound.${ext}
   requestExecutionLevel: user

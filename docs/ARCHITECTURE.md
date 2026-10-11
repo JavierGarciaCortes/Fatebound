@@ -1,8 +1,8 @@
 # Arquitectura de Fatebound 2.0
 
-Estado del documento: arquitectura propuesta con el resolvedor, la seguridad SQLite y el empaquetado portable de Windows ya implementados.
+Estado del documento: arquitectura propuesta con el resolvedor, la seguridad SQLite, la primera shell visual y el empaquetado portable de Windows ya implementados.
 
-Última actualización: 2026-10-10.
+Última actualización: 2026-10-11.
 
 Este documento describe la dirección aprobada para Fatebound y marca expresamente lo que todavía no existe. La única tabla actual controla migraciones; no se ha definido el esquema SQL del juego ni se consideran implementados los demás subsistemas propuestos. La dirección específica de paquetes se mantiene en [WORLD_FORMAT.md](WORLD_FORMAT.md) y la de interfaz en [DESIGN_SYSTEM.md](DESIGN_SYSTEM.md).
 
@@ -10,9 +10,9 @@ Este documento describe la dirección aprobada para Fatebound y marca expresamen
 
 El repositorio contiene actualmente:
 
-- un proceso main que crea una ventana, gestiona el ciclo de vida básico y responde al evento de demostración `ping`;
-- un preload que expone `@electron-toolkit/preload` y un objeto `api` vacío;
-- un renderer Vue con la pantalla de demostración de electron-vite;
+- un proceso main que crea una ventana, gestiona el ciclo de vida y atiende un diagnóstico SQLite de solo lectura;
+- un preload restringido que expone únicamente `window.api.storage.getDiagnostics()`;
+- un renderer Vue con shell de Fatebound, identidad base y nueve temas YAML integrados con ilustraciones empaquetadas;
 - TypeScript estricto, ESLint, Prettier, electron-vite y electron-builder;
 - recursos de marca y 36 imágenes de combinaciones de dados para los clanes de Ronin;
 - un target `portable` x64 de electron-builder que genera `dist/Fatebound.exe` sin instalador obligatorio;
@@ -21,7 +21,7 @@ El repositorio contiene actualmente:
 - migraciones SQL versionadas y transaccionales con una única migración técnica inicial;
 - integridad, copias previas a migraciones, copias automáticas y retención segura ejecutadas exclusivamente en main.
 
-No están implementados la nueva interfaz, el esquema de persistencia del juego, los repositorios del dominio, el importador, el editor, el motor de reglas, las campañas, las crónicas ni la integración de IA.
+No están implementados el esquema de persistencia del juego, los repositorios del dominio, los mundos jugables, el importador, el editor, el motor de reglas, las campañas, las crónicas ni la integración de IA. Las tarjetas de mundos y los estados futuros de la shell son demostraciones de presentación, no datos instalados.
 
 ## 2. Principios
 
@@ -53,13 +53,13 @@ flowchart LR
 
 ### 3.1 Renderer — presentación
 
-Vue representa vistas, formularios y estados de interacción. Puede solicitar operaciones mediante la API del preload, pero no conoce rutas físicas, consultas SQL ni módulos de Node. Las respuestas que recibe son DTO tipados y sin detalles internos innecesarios.
+Vue representa vistas, formularios y estados de interacción. Puede solicitar operaciones mediante la API del preload, pero no recibe consultas SQL, módulos de Node ni acceso general a rutas. El diagnóstico es la excepción deliberada y acotada: presenta al usuario las rutas activas de datos y base sin permitir elegir, recorrer, leer ni modificar otros archivos. Las respuestas son DTO tipados y sin detalles internos innecesarios.
 
-La siguiente fase sustituirá la demo actual por una shell con navegación, selección visual de mundos, temas demostrativos, estados vacíos honestos para personajes y partidas y un panel de ajustes. La interfaz identificará las demostraciones no jugables y podrá consultar un diagnóstico limitado del almacenamiento, pero no simulará editor, campañas o reglas que todavía no existan.
+**Implementado:** la demo de electron-vite se ha sustituido por una shell que separa navegación global y contextual. La marca completa es el acceso a Inicio, Ajustes es un botón de cabecera y el menú lateral contiene solo Mundos mientras no exista un mundo jugable instalado y activo. La estructura admite Mundos, Personajes y Crónicas cuando reciba en el futuro un contexto real con identificador y versión. El arranque usa `fatebound` como identidad visual neutral, no como mundo del catálogo. Ronin, Templario, Ninja, Shaolin, Robot, Soldado, Naves y Mundoplato pueden cambiar la ambientación durante la sesión, pero no instalan mundos ni amplían la navegación.
 
 ### 3.2 Preload — frontera nativa
 
-El preload expone una superficie pequeña agrupada por capacidades, por ejemplo diagnóstico, mundos, campañas, crónicas y exportación. Cada llamada tiene tipos compartidos y límites claros. No se expondrán `ipcRenderer`, identificadores de canal arbitrarios, primitivas generales de archivos, SQL ni la conexión SQLite. La primera ampliación será un contrato de solo lectura con los datos mínimos del diagnóstico de almacenamiento.
+**Implementado:** el preload ya no expone `@electron-toolkit/preload` ni `ipcRenderer`. Su única capacidad es `window.api.storage.getDiagnostics()`, sin argumentos, sobre el canal fijo `fatebound:storage:get-diagnostics`. El contrato compartido devuelve una instantánea tipada o un error sanitizado. Capacidades futuras se añadirán expresamente, sin identificadores arbitrarios, primitivas generales de archivos, SQL ni la conexión SQLite.
 
 ### 3.3 Main — aplicación
 
@@ -71,11 +71,11 @@ El proceso main ya es dueño de la resolución de rutas, la comprobación de esc
 - importación, exportación y copias de seguridad;
 - coordinación del motor de reglas.
 
-Los handlers IPC delegan en servicios de aplicación; no contienen reglas de negocio ni consultas dispersas.
+Los handlers IPC delegan en servicios de aplicación; no contienen reglas de negocio ni consultas dispersas. El handler de diagnóstico registra el error técnico en main y devuelve al renderer un mensaje conocido que no incluye excepciones internas.
 
 ### 3.4 Dominio
 
-El dominio modelará mundos, versiones, técnicas, efectos, personajes, clanes, campañas y eventos sin depender de Electron, Vue o SQLite. Sus invariantes incluyen la inmutabilidad de versiones publicadas y la asociación de cada personaje y campaña a una versión concreta de mundo.
+El dominio modelará mundos, versiones, técnicas, efectos, personajes, clanes, crónicas y eventos sin depender de Electron, Vue o SQLite. Sus invariantes incluyen la inmutabilidad de versiones publicadas y la asociación de cada personaje y crónica a una versión concreta de mundo.
 
 ### 3.5 Infraestructura
 
@@ -85,9 +85,15 @@ Las capas de dominio y repositorios continúan siendo propuestas. La frontera de
 
 ### 3.6 Sistema visual
 
-La presentación se divide en una shell estable de Fatebound, un tema declarativo del mundo y contenido narrativo. La shell conserva navegación, estados, foco, contraste, confirmaciones y operaciones sensibles. Los temas podrán aportar paletas, ilustraciones, fondos, símbolos, texturas y opciones tipográficas controladas, pero no componentes Vue, JavaScript, CSS arbitrario ni recursos remotos.
+La presentación se divide en una shell estable de Fatebound, un tema declarativo y contenido narrativo. **La primera capa ya está implementada:** la shell conserva navegación, estados, foco, contraste y disposición adaptativa. Los nueve temas de solo lectura se originan en `resources/builtin-themes/<id>/theme.yaml`: Fatebound aporta la identidad base y los otros ocho representan mundos futuros. No proceden de paquetes instalados, no se registran en SQLite y no son mundos jugables.
 
-Legibilidad, sesiones largas, navegación clara, reducción de movimiento y adaptación al tamaño de ventana son restricciones arquitectónicas de la interfaz, no detalles ornamentales. Los temas ficticios de la primera shell sirven para probar el sistema visual y se etiquetarán como demostraciones, sin implicar que exista un mundo jugable.
+`builtin-theme-schema.ts` analiza un subconjunto deliberadamente pequeño de YAML: mapas, escalares conocidos y un esquema exacto, sin etiquetas, anclas, alias, colecciones libres ni campos adicionales. Valida `schemaVersion`, estado integrado no jugable, identificador permitido, textos, colores `#RRGGBB`, opciones controladas y rutas de imagen específicas bajo `assets/`. Rechaza rutas absolutas, separadores de Windows, `..`, consultas y nombres no previstos. `builtin-theme-catalog.ts` usa `import.meta.glob` con los nueve directorios y nombres de recurso enumerados; Vite convierte YAML e imágenes en módulos y URLs de solo lectura dentro del renderer compilado. No existe lectura arbitraria del sistema de archivos, IPC nuevo, JavaScript o CSS aportado por temas.
+
+Cada definición puede declarar `hero.webp`, `card.webp` o `card.png` y `emblem.png`. El cargador resuelve solo los archivos realmente empaquetados y registra por rol cualquier ausencia; la vista sustituye ese recurso por un fallback local sin invalidar los demás. Inicio usa la ilustración `hero` bajo superposiciones de contraste. Mundos respeta la proporción vertical 3:4 de las tarjetas y reserva el panel inferior para un emblema protagonista sobre un degradado discreto, sin reutilizar allí el `hero`. El logo oficial permanece separado. Los paneles técnicos de Ajustes conservan superficies neutrales y emplean el acento activo con contención.
+
+Legibilidad, sesiones largas, navegación clara, reducción de movimiento y adaptación al tamaño de ventana son restricciones arquitectónicas de la interfaz, no detalles ornamentales. Los ocho mundos del catálogo se etiquetan **Próximamente**: la tarjeta puede seleccionarse para cambiar la ambientación y abrir el detalle, pero no existe todavía un paquete jugable. **No instalado** se reservará para el estado futuro en el que ese paquete ya exista y aún no esté instalado. La selección permanece durante la sesión, sobrevive a la navegación entre secciones, puede volver explícitamente a Fatebound neutral y no se persiste. El acceso a Personajes y Crónicas depende exclusivamente de un futuro mundo instalado activo, nunca del tema visual. Este esquema interno prepara conceptos reutilizables, pero no constituye el contrato definitivo de `.fateworld`.
+
+**Siguiente decisión aprobada, todavía no implementada:** la interfaz de Fatebound se localizará en español, inglés y coreano y conservará una preferencia persistente. El idioma de interfaz será independiente del contenido: cada mundo declarará idiomas disponibles y predeterminado, y el selector solo los mostrará cuando existan datos reales. No se inventarán traducciones ausentes; todavía no existe infraestructura i18n ni se ha fijado su representación en `.fateworld`.
 
 ## 4. Datos portables y SQLite
 
@@ -189,6 +195,12 @@ Las copias locales permanecen en el mismo dispositivo que `data/fatebound.sqlite
 
 Referencias técnicas de la decisión: [API `node:sqlite` de Node 22.23](https://nodejs.org/download/release/latest-jod/docs/api/sqlite.html), [información de sistema de archivos de Node 22](https://nodejs.org/download/release/latest-jod/docs/api/fs.html), [Online Backup API de SQLite](https://www.sqlite.org/backup.html), [PRAGMA de SQLite](https://www.sqlite.org/pragma.html) y [archivos temporales y journals](https://www.sqlite.org/tempfiles.html).
 
+### 4.6 Diagnóstico de almacenamiento
+
+**Implementado:** Ajustes solicita una instantánea solo cuando se abre la sección por primera vez o el usuario pulsa **Actualizar**. Main serializa `quick_check`, `foreign_key_check` y la lectura de la versión de esquema mediante la misma cola que coordina SQLite. En paralelo inspecciona las copias publicadas con el validador existente; el recuento incluye exclusivamente manifiestos v2 de Fatebound cuyo nombre, estructura, tamaño, SHA-256 e integridad son válidos.
+
+La respuesta contiene las rutas activas de datos y base, disponibilidad de SQLite, versión de esquema, resultados correctos de integridad y claves foráneas, cantidad de copias administradas válidas y fecha UTC de la comprobación. Si alguna operación falla, la respuesta no mezcla resultados parciales ni inventa valores: devuelve un estado de error sanitizado y conserva el detalle técnico en main. El diagnóstico no acepta rutas ni SQL desde el renderer, no escribe en la base y no se ejecuta mediante sondeo.
+
 ## 5. Mundos, versiones y recursos
 
 Un mundo es una línea de contenido independiente. Cada versión contiene datos, reglas declarativas, textos, traducciones y referencias a recursos. Los borradores pueden editarse; al publicarse se vuelven inmutables. Editar contenido publicado crea una versión nueva enlazada con su origen.
@@ -203,9 +215,9 @@ Personajes y campañas conservan el identificador exacto de la versión del mund
 
 ### 5.1 Recursos incluidos y perfiles de distribución
 
-Los recursos distribuidos con la aplicación permanecen en el paquete como fuente de solo lectura. El target público implementado usa `extraResources` con una lista explícita: incluye `resources/icon.png` y los siete archivos de `resources/branding/`, conservando nombres y rutas relativas bajo `process.resourcesPath/resources/`. La inspección del portable y la comparación de hashes confirmaron los ocho archivos.
+Los recursos distribuidos con la aplicación permanecen en el paquete como fuente de solo lectura. El target público implementado usa `extraResources` con una lista explícita para los seis PNG de `resources/branding/fatebound/`, conservando nombres y rutas relativas bajo `process.resourcesPath/resources/branding/fatebound/`. `fatebound-app-icon.png`, de 1024×1024, es además la fuente que electron-builder convierte al icono nativo del portable de Windows. Por separado, Vite integra en `app.asar` los YAML y los 27 recursos visuales referenciables del catálogo cerrado: nueve `hero`, nueve `card` y nueve `emblem`. Los glob no aceptan directorios de tema ni nombres de archivo fuera de la allowlist. Los iconos `.ico` e `.icns` fuente para otras plataformas no se regeneran en esta tarea.
 
-`resources/worlds/ronin/clans/` conserva en el repositorio las imágenes existentes `1_1.png` a `6_6.png`, sin alteraciones, pero la lista pública las excluye y la inspección confirmó que no aparecen en `Fatebound.exe`.
+Las ilustraciones bajo `resources/builtin-themes/` son el conjunto propio preparado para Fatebound y permanecen separadas de los materiales originales. `resources/worlds/ronin/clans/` conserva en el repositorio las imágenes existentes `1_1.png` a `6_6.png`, sin alteraciones, pero la lista pública las excluye. La inspección del artefacto portable de esta fase confirmó en `app.asar` las 27 ilustraciones autorizadas —nueve `hero`, nueve `card` y nueve `emblem`—, los dos recursos de marca usados por el renderer y ninguna entrada de contenido restringido de Ronin; los seis PNG oficiales de marca se publicaron por separado mediante `extraResources`. Esta verificación técnica no sustituye mantener el registro formal de procedencia y derechos en el proceso de publicación.
 
 **Propuesta no implementada:** una compilación privada podrá añadir contenido preinstalado permitido mediante un perfil separado y verificable, sin cambiar las garantías del producto. También queda pendiente definir un manifiesto versionado de recursos y sumas de comprobación. Nunca se escribirá sobre una copia incluida.
 
@@ -221,7 +233,7 @@ El importador impedirá escapes de directorio, enlaces inseguros, extensiones no
 
 **Dirección aprobada, todavía no implementada:** las capacidades del motor evolucionarán en tres fases acumulativas.
 
-1. **Mundos compatibles con Ronin:** comparten las mecánicas fundamentales y personalizan mediante datos ambientación, nombres, tablas, técnicas, imágenes y presentación. Ronin, Paladín y Shaolin son ejemplos de perfiles previstos.
+1. **Mundos compatibles con Ronin:** comparten las mecánicas fundamentales y personalizan mediante datos ambientación, nombres, tablas, técnicas, imágenes y presentación. Ronin, Templario y Shaolin son ejemplos de perfiles previstos.
 2. **Mundos Ronin ampliados:** añaden capacidades compatibles con el modelo anterior. Robot y Soldado son ejemplos de perfiles previstos. Los mundos de la fase 1 deben seguir funcionando sin modificaciones obligatorias.
 3. **Mundos avanzados:** incorporan subsistemas especializados, especialmente de combate. Naves espaciales es el ejemplo de referencia, con sistemas, escudos y armamento, sin invalidar los mundos o partidas anteriores.
 
@@ -254,7 +266,7 @@ Las futuras plantillas deberán documentar, como requisitos mínimos:
 - efectos mecánicos, parámetros y condiciones;
 - referencias relativas a imágenes y otros recursos.
 
-El mismo modelo deberá poder importarse, validarse, editarse y exportarse sin pérdida de información. Varias versiones podrán coexistir y los personajes y campañas conservarán su vínculo exacto. El contrato exacto —sintaxis, esquema, organización de archivos, manifiestos, capacidades y estrategia de versiones— se diseñará en una tarea posterior; ni este documento ni la estructura ilustrativa de `WORLD_FORMAT.md` lo fijan todavía.
+El mismo modelo deberá poder importarse, validarse, editarse y exportarse sin pérdida de información. Varias versiones podrán coexistir y los personajes y crónicas conservarán su vínculo exacto. El contrato exacto —sintaxis, esquema, organización de archivos, manifiestos, capacidades y estrategia de versiones— se diseñará en una tarea posterior; ni este documento ni la estructura ilustrativa de `WORLD_FORMAT.md` lo fijan todavía.
 
 El flujo previsto es:
 
@@ -275,17 +287,17 @@ Las técnicas referenciarán un catálogo versionado de efectos mecánicos reuti
 
 El generador de tiradas se abstraerá para permitir reproducción y pruebas. Las entradas y salidas relevantes producirán eventos de campaña.
 
-## 9. Personajes, clanes y campañas
+## 9. Personajes, clanes y crónicas
 
-**Propuesta no implementada:** un personaje pertenece a una versión concreta de mundo y puede referenciar un clan definido en esa misma versión. Una campaña conserva su mundo, versión, participantes, estado y secuencia de eventos.
+**Dirección aprobada, no implementada:** un personaje pertenece a una versión concreta de mundo y puede referenciar un clan definido en esa misma versión. Una crónica conserva su mundo, versión, personaje principal, estado y secuencia de eventos. Inicialmente tendrá un único personaje principal; un personaje podrá protagonizar varias crónicas.
 
-Los casos de uso validarán que las referencias pertenezcan a la misma versión. La actualización o publicación de un mundo no alterará automáticamente personajes o campañas existentes; una migración futura deberá ser explícita, reversible y confirmada.
+Los casos de uso validarán que las referencias pertenezcan a la misma versión. La actualización o publicación de un mundo no alterará automáticamente personajes o crónicas existentes; una migración futura deberá ser explícita, reversible y confirmada. Sigue pendiente decidir si el progreso de un personaje se comparte entre sus crónicas y, en su caso, qué cambios son comunes o específicos de cada historia.
 
 ## 10. Eventos y crónicas
 
-**Propuesta no implementada:** toda partida registrará una secuencia ordenada de acontecimientos, decisiones, tiradas, consecuencias y notas. Un evento tendrá datos estructurados para reconstrucción y una representación legible para la crónica.
+**Propuesta no implementada:** toda crónica registrará una secuencia ordenada de acontecimientos, decisiones, tiradas, consecuencias y notas. Un evento tendrá datos estructurados para reconstrucción y una representación legible para la crónica.
 
-La exportación a Markdown será un caso de uso del proceso main. Generará un archivo legible desde una instantánea coherente de la campaña y utilizará rutas resueltas por el usuario o por el almacenamiento portable. Exportar no modificará la partida.
+La exportación a Markdown será un caso de uso del proceso main. Generará un archivo legible desde una instantánea coherente de la crónica y utilizará rutas resueltas por el usuario o por el almacenamiento portable. Exportar no modificará la crónica.
 
 Debe definirse qué correcciones se representan como nuevos eventos y cuáles pueden editarse como notas, conservando la trazabilidad del resultado mecánico.
 
@@ -299,9 +311,9 @@ El proveedor, el procesamiento local o remoto y las reglas de privacidad siguen 
 
 ## 12. Seguridad y estabilidad
 
-La implementación deberá:
+La implementación mantiene y deberá seguir manteniendo:
 
-- mantener `contextIsolation` y aspirar a ejecutar el renderer con sandbox;
+- `contextIsolation: true`, `nodeIntegration: false` y `sandbox: true` en la ventana principal;
 - validar en main tanto solicitudes como datos importados;
 - usar canales IPC declarados, DTO limitados y errores sanitizados;
 - impedir acceso directo del renderer a Node, archivos y SQLite;
@@ -312,19 +324,20 @@ La implementación deberá:
 - conservar copias recuperables antes de migraciones y operaciones destructivas;
 - registrar errores técnicos sin exponer datos privados en la interfaz.
 
-El preload genérico y `sandbox: false` del scaffold actual son brechas conocidas, no el diseño de seguridad final.
+La API genérica del scaffold y el canal de demostración `ping` se han retirado. La superficie nativa actual queda limitada al diagnóstico tipado y sin argumentos; incorporar otra capacidad exigirá un contrato IPC específico y pruebas equivalentes.
 
 ## 13. Orden de implementación recomendado
 
 1. **Implementado:** resolver y probar la raíz de datos portable y el flujo ante falta de escritura.
 2. **Implementado y validado:** generar el portable de Windows y validar su comportamiento en ejecución.
-3. **Siguiente prioridad:** sustituir la demo por la primera interfaz funcional: shell compartido, navegación, selección visual de mundos de demostración, temas declarativos, estados futuros honestos, marca y diagnóstico de almacenamiento de solo lectura mediante IPC mínimo; comprobar el resultado en el portable.
-4. Completar el endurecimiento de la ventana, retirar las API genéricas del preload y activar el sandbox cuando los contratos requeridos sean compatibles.
-5. **Implementado parcialmente:** SQLite, migraciones, integridad, copias y retención ya existen sin contenido de juego; siguen pendientes los repositorios, la exportación manual y la restauración explícita.
-6. Cerrar en una tarea específica el contrato versionado de paquetes de mundos y crear plantillas originales.
-7. Incorporar importación, validación, edición, exportación y publicación inmutable.
-8. Implementar progresivamente el motor compatible, las campañas, los eventos y la exportación.
-9. Configurar y verificar el perfil privado separado cuando exista autorización para su contenido.
-10. Añadir las fases mecánicas extendida y avanzada y, solo después, la integración opcional de IA.
+3. **Implementado:** primera interfaz funcional, navegación, temas integrados, ocho mundos futuros con estado honesto, nueva marca y diagnóstico SQLite de solo lectura.
+4. **Implementado:** retirada de las API genéricas del preload, canal IPC único y activación de aislamiento, ausencia de Node en renderer y sandbox.
+5. **Siguiente prioridad:** internacionalización de la interfaz en español, inglés y coreano y visualización de los idiomas de contenido disponibles por mundo.
+6. Implementar después la exportación manual y restauración explícita de copias SQLite, sin sobrescritura silenciosa; después, repositorios del dominio sobre la transacción existente.
+7. Cerrar en una tarea específica el contrato versionado de paquetes de mundos y crear plantillas originales.
+8. Incorporar importación, validación, edición, exportación y publicación inmutable.
+9. Implementar progresivamente el motor compatible, las campañas, los eventos y la exportación.
+10. Configurar y verificar el perfil privado separado cuando exista autorización para su contenido.
+11. Añadir las fases mecánicas extendida y avanzada y, solo después, la integración opcional de IA.
 
 `STATUS.md` es la fuente para la prioridad inmediata y el resultado real de cada fase.

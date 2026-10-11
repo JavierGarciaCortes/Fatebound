@@ -1,8 +1,7 @@
-import { ElectronAPI } from '@electron-toolkit/preload'
+import type { FateboundApi } from '../shared/storage-diagnostics.ts'
 
 declare global {
   interface Window {
-    electron: ElectronAPI
-    api: unknown
+    api: FateboundApi
   }
 }

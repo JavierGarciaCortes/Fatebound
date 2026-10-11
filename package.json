@@ -10,7 +10,7 @@
   "scripts": {
     "format": "prettier --write .",
     "lint": "eslint --cache .",
-    "test": "node --test --experimental-test-isolation=none --experimental-strip-types --disable-warning=MODULE_TYPELESS_PACKAGE_JSON src/main/single-instance.test.ts src/main/storage/portable-storage.test.ts src/main/storage/sqlite-backup.test.ts src/main/storage/sqlite-backup-retention.test.ts src/main/storage/sqlite-automatic-backup.test.ts src/main/storage/sqlite-storage.test.ts",
+    "test": "node --test --experimental-test-isolation=none --experimental-strip-types --disable-warning=MODULE_TYPELESS_PACKAGE_JSON src/main/single-instance.test.ts src/main/storage/portable-storage.test.ts src/main/storage/sqlite-backup.test.ts src/main/storage/sqlite-backup-retention.test.ts src/main/storage/sqlite-automatic-backup.test.ts src/main/storage/sqlite-storage.test.ts src/main/storage/storage-diagnostics.test.ts src/preload/fatebound-api.test.ts src/renderer/src/app-shell.test.ts",
     "typecheck:node": "tsc --noEmit -p tsconfig.node.json --composite false",
     "typecheck:web": "vue-tsc --noEmit -p tsconfig.web.json --composite false",
     "typecheck": "npm run typecheck:node && npm run typecheck:web",

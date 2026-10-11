@@ -1,19 +1,19 @@
 # Dirección visual y sistema de diseño
 
-Estado del documento: dirección de producto aprobada; componentes, tokens y temas definitivos pendientes de implementación.
+Estado del documento: dirección de producto aprobada y primera shell implementada; los componentes, tokens y temas definitivos siguen sujetos a evaluación.
 
-Última actualización: 2026-10-10.
+Última actualización: 2026-10-11.
 
 Fatebound debe transmitir la sensación de estar jugando y registrando una aventura. Su lenguaje visual se define como **«RPG cinematográfico + diario de aventuras»**. No debe parecer un dashboard empresarial genérico, un explorador técnico de archivos ni un administrador de base de datos.
 
 ## 1. Objetivos de experiencia
 
 - Crear una aplicación moderna, evocadora e inmersiva sin recargar la interfaz.
-- Mantener una navegación sencilla y predecible entre mundos, personajes, partidas y ajustes.
+- Mantener una navegación sencilla y predecible entre mundos, personajes, crónicas y ajustes.
 - Favorecer sesiones largas mediante texto legible, jerarquía clara y densidad controlada.
 - Permitir que cada mundo tenga identidad propia sin perder la coherencia funcional de Fatebound.
 - Mostrar con honestidad qué contenido es jugable, qué es una demostración visual y qué funcionalidad todavía no existe.
-- Integrar el branding actual de `resources/branding/` cuando resulte apropiado, sin deformarlo ni sustituirlo silenciosamente.
+- Integrar el branding oficial de `resources/branding/fatebound/` cuando resulte apropiado, sin deformarlo ni multiplicar variantes innecesarias en una misma vista.
 
 ## 2. Principios
 
@@ -35,22 +35,22 @@ Contraste, tamaño de texto, foco visible, uso mediante teclado, etiquetas compr
 
 ### 2.5 Veracidad de producto
 
-Una tarjeta de mundo ficticio o un personaje de ejemplo deberá indicar **Demostración visual** o una etiqueta equivalente. Los espacios reservados para personajes, partidas o funciones futuras explicarán su estado y no ofrecerán botones que aparenten guardar o jugar cuando esos casos de uso no existen.
+Una tarjeta de un mundo cuyo paquete jugable todavía no existe deberá indicar **Próximamente**. **No instalado** se reservará para un paquete ya disponible que el usuario aún no haya instalado. Los espacios reservados para personajes, crónicas o funciones futuras explicarán su estado y no ofrecerán botones que aparenten instalar, abrir, guardar o jugar cuando esos casos de uso no existen.
 
 ## 3. Shell compartida
 
 La primera interfaz funcional deberá establecer una shell reutilizable con:
 
-- identidad de Fatebound y acceso claro al inicio;
-- navegación principal consistente;
+- identidad de Fatebound convertida íntegramente en acceso claro al inicio;
+- navegación contextual consistente, limitada a Mundos cuando no haya un mundo jugable activo;
 - selector visual de mundos;
 - área de contenido adaptable al mundo activo;
-- acceso a personajes y partidas con estados vacíos honestos;
-- ajustes y diagnóstico;
+- acceso futuro a Personajes y Crónicas únicamente bajo un contexto real de mundo instalado y versión;
+- Ajustes y diagnóstico como acción global de cabecera;
 - mensajes de error y estados de carga comprensibles;
 - comportamiento adecuado en la ventana de escritorio y en el portable de Windows.
 
-La shell no debe codificar reglas particulares de Ronin ni presuponer un mundo instalado. Iniciar Fatebound sin mundos seguirá siendo un estado válido.
+La shell no debe codificar reglas particulares de Ronin ni presuponer un mundo instalado. Iniciar Fatebound sin mundos es un estado válido y muestra siempre la identidad neutral `fatebound`, nunca una ambientación elegida de forma implícita.
 
 ## 4. Capas visuales
 
@@ -116,41 +116,48 @@ Directrices iniciales:
 
 Estas referencias orientan futuros temas; no son paletas, fuentes ni recursos definitivos:
 
-| Perfil  | Dirección atmosférica                                      |
-| ------- | ----------------------------------------------------------- |
-| Ronin   | Tinta, carmesí y bronce; Japón feudal.                      |
-| Paladín | Azul profundo, piedra y oro.                                |
-| Shaolin | Pergamino, templos y tonos tierra.                          |
-| Robot   | Metal, circuitos y cian.                                    |
-| Naves   | Espacio, estrellas y tonos violetas.                        |
-| Soldado | Verde oliva, acero y lenguaje visual táctico.                |
+| Perfil    | Dirección atmosférica                             |
+| --------- | ------------------------------------------------- |
+| Fatebound | Archivo celestial, piedra oscura y oro; neutral.  |
+| Ronin     | Tinta, carmesí y bronce; Japón feudal.            |
+| Templario | Piedra, carmesí y acero; juramentos y fortalezas. |
+| Ninja     | Sombra, jade y luz lunar; sigilo.                 |
+| Shaolin   | Tonos tierra, azafrán y amanecer.                 |
+| Robot     | Metal, circuitos y cian.                          |
+| Soldado   | Verde oliva, acero y lenguaje visual táctico.     |
+| Naves     | Espacio, estrellas y tonos violetas.              |
+| Mundoplato| Fantasía insólita, pergamino, cobre y humor.      |
 
-Los temas demostrativos de la primera interfaz podrán inspirarse en estos perfiles usando recursos ficticios u originales. No exigirán mundos completos ni acreditarán que sus mecánicas estén implementadas.
+Fatebound es la identidad neutral de la aplicación, no un mundo de la biblioteca. Los ocho perfiles restantes usan recursos originales integrados para anticipar una atmósfera; no acreditan que existan paquetes, reglas o mecánicas jugables.
 
 ## 8. Primera interfaz funcional
 
-La siguiente fase de desarrollo debe sustituir la demo de electron-vite por una interfaz real que permita validar el sistema visual y la arquitectura de procesos. El alcance aprobado es:
+**Implementado:** la demo de electron-vite se ha sustituido por una interfaz real que permite validar el sistema visual y la arquitectura de procesos. El alcance actual es:
 
 1. pantalla principal atractiva con branding y navegación;
 2. selección visual de mundos o temas demostrativos;
 3. cambio perceptible y coherente de tema en la shell y el contenido;
 4. identificación explícita de demostraciones no jugables;
-5. secciones de personajes y partidas preparadas para el futuro, con estados vacíos veraces;
+5. estructura futura de Personajes y Crónicas, oculta de la navegación mientras no haya un mundo jugable activo;
 6. ajustes con un diagnóstico real de almacenamiento SQLite;
 7. verificación visual y funcional en el portable de Windows.
 
-El diagnóstico consultará únicamente los datos necesarios mediante un contrato IPC mínimo, tipado y de solo lectura. Main conserva la autoridad sobre rutas y SQLite; el renderer no recibe la conexión, consultas SQL, acceso general a archivos ni detalles internos innecesarios.
+El diagnóstico consulta únicamente los datos necesarios mediante un contrato IPC mínimo, tipado y de solo lectura. Main conserva la autoridad sobre rutas y SQLite; el renderer no recibe la conexión, consultas SQL, acceso general a archivos ni detalles internos innecesarios.
+
+El tema inicial es Fatebound neutral. No aparece como tarjeta de mundo: es la identidad base sin mundo activo. Ronin, Templario, Ninja, Shaolin, Robot, Soldado, Naves y Mundoplato forman las ocho tarjetas seleccionables, todas con estado **Próximamente**. **Volver a Fatebound** restablece explícitamente la base y la selección dura solo durante la sesión.
+
+Las definiciones visuales proceden de nueve `theme.yaml` bajo `resources/builtin-themes/`, no de valores repetidos en los componentes. Cada tema dispone de `hero`, `card` y `emblem`: el hero domina Inicio bajo degradados de lectura; las ocho tarjetas de mundo conservan una composición vertical 3:4 y forman una cuadrícula 4×2 en anchuras amplias; el emblema protagoniza el panel de detalle sobre una superficie discreta sin otra ilustración detrás. Si un recurso declarado no está empaquetado o no carga, ese rol usa una alternativa gráfica controlada y el resto del tema continúa operativo.
 
 Quedan fuera de esta fase el editor de mundos, la importación completa, las campañas jugables, las reglas avanzadas y la restauración de copias.
 
-## 9. Componentes iniciales a explorar
+## 9. Componentes iniciales
 
-Sin cerrar todavía su API ni su aspecto, la primera shell probablemente necesitará:
+La primera shell implementa o representa ya estos patrones, sin considerar definitiva su API visual:
 
 - marco de aplicación y navegación principal;
 - encabezado o área de contexto del mundo;
 - tarjeta de mundo con estado y versión visible cuando corresponda;
-- distintivo de demostración;
+- distintivo de estado **Próximamente**;
 - selector de tema;
 - estado vacío narrativo;
 - acciones primarias, secundarias y destructivas diferenciadas;
@@ -167,9 +174,30 @@ Cada componente se evaluará por claridad, teclado, foco, contraste, texto largo
 - Esquema de tokens y límites exactos de los temas `.fateworld`.
 - Persistencia de preferencias visuales y de reducción de efectos.
 - Tamaño mínimo de ventana y estrategia de adaptación.
-- Idiomas iniciales y efecto de textos más largos en la composición.
+- Implementación de la interfaz en español, inglés y coreano y efecto de textos más largos en la composición.
+- Presentación independiente de los idiomas de contenido declarados por cada mundo.
 - Presupuesto de memoria, resolución y compresión de imágenes.
 - Alcance exacto del diagnóstico SQLite que resulte útil sin exponer información sensible.
 - Pruebas manuales y automatizadas de accesibilidad visual e interacción por teclado.
 
 Estas decisiones deberán tomarse con prototipos reales en la shell, sin convertir las direcciones atmosféricas en requisitos rígidos antes de comprobar legibilidad y uso prolongado.
+
+## 11. Decisiones de la primera shell
+
+La implementación inicial fija las siguientes decisiones revisables:
+
+- barra lateral persistente en ventanas amplias y navegación inferior compacta en el ancho mínimo admitido;
+- bloque completo de marca como acceso a Inicio, con fondo activo, hover y foco; navegar a Inicio conserva el tema seleccionado;
+- menú contextual sin Inicio ni Ajustes: solo Mundos en el estado actual, y Personajes y Crónicas cuando exista un mundo instalado activo;
+- botón de Ajustes con engranaje en la cabecera, estado activo y etiqueta accesible;
+- tipografía del sistema para lectura y una serif local del sistema para titulares, sin descargar fuentes;
+- logotipo horizontal de `resources/branding/fatebound/` como identidad oficial en la barra amplia y símbolo de la misma familia en variantes compactas, independientes de los emblemas temáticos;
+- ilustraciones propias del catálogo integrado como protagonistas, con geometría abstracta secundaria y sin recursos originales restringidos del manual de Ronin;
+- catálogo YAML validado con una allowlist de nueve temas integrados, Fatebound como base y ocho mundos futuros, esquema cerrado, rutas relativas seguras y recursos empaquetados mediante Vite;
+- selección del tema limitada a la sesión, sin persistencia ni registros de mundos;
+- foco visible, enlace para saltar al contenido, semántica de botones, mensajes `aria-live` y respeto de `prefers-reduced-motion`;
+- diagnóstico solicitado al abrir Ajustes y actualizable por acción expresa, sin sondeo.
+
+La siguiente fase aprobada localizará la interfaz en español, inglés y coreano con preferencia persistente. El idioma de la aplicación será independiente de los idiomas de contenido: cada mundo declarará disponibles y predeterminado, y la interfaz no mostrará opciones ni traducciones que el paquete no aporte.
+
+Antes de estabilizar el sistema visual es obligatorio revisar manualmente los nueve temas, el contraste sobre cada hero, el encuadre completo de las ocho tarjetas 3:4 —incluido Mundoplato—, la cuadrícula 4×2, el panel de emblema, los tamaños 760×620 y 1180×780, la lectura prolongada, la navegación completa por teclado, los fallbacks, la reducción de movimiento, la claridad del nuevo logo y del engranaje como controles y el equilibrio entre inmersión y ruido decorativo. Las pruebas técnicas no sustituyen esta revisión. El catálogo actual demuestra el enfoque, pero no define todavía el contrato futuro de temas `.fateworld`.

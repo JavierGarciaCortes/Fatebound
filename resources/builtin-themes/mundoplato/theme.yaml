@@ -1,0 +1,38 @@
+# Mundoplato: tema visual integrado de un mundo futuro, no paquete jugable instalado.
+# Las lenguas, reglas, tablas y traducciones pertenecerán al futuro world.yaml.
+schemaVersion: 1
+status: builtin-theme
+playable: false
+id: mundoplato
+displayName: Mundoplato
+tagline: Aventuras, magia y despropósitos
+presentation:
+  category: Fantasía insólita
+  description: Ciudades imposibles, mapas caprichosos y magia imprevisible para aventuras de ingenio, asombro y humor.
+  atmosphere: Pergamino · Cobre · Crepúsculo
+visual:
+  mode: dark
+  mood: whimsical
+  motif: crooked-city
+  colors:
+    background: '#282337'
+    surface: '#352E42'
+    surfaceRaised: '#463A50'
+    primary: '#CDA45C'
+    secondary: '#9F584A'
+    text: '#E9D9B8'
+    textMuted: '#C7BACB'
+    border: '#67536C'
+    success: '#79AE9F'
+    warning: '#DEAF68'
+    danger: '#D98179'
+  typography:
+    headingRole: display
+    bodyRole: readable
+  artwork:
+    hero: assets/hero.webp
+    card: assets/card.webp
+    emblem: assets/emblem.png
+  effects:
+    motion: subtle
+    backgroundTexture: subtle

@@ -1,0 +1,37 @@
+# Tema visual integrado de un mundo futuro; NO instala un paquete jugable.
+schemaVersion: 1
+status: builtin-theme
+playable: false
+id: ronin
+displayName: Ronin
+tagline: Honor, acero y destino
+presentation:
+  category: Japón feudal
+  description: Silencio, acero y decisiones que dejan huella en una tierra de montañas, lluvia y arces rojos.
+  atmosphere: Tinta · Carmesí · Bronce
+visual:
+  mode: dark
+  mood: ink
+  motif: ink-brush
+  colors:
+    background: '#141315'
+    surface: '#211B1B'
+    surfaceRaised: '#302324'
+    primary: '#C95E50'
+    secondary: '#B28B60'
+    text: '#F2E6D7'
+    textMuted: '#C3AEA2'
+    border: '#59403D'
+    success: '#6E9B7A'
+    warning: '#D9AD65'
+    danger: '#CD675D'
+  typography:
+    headingRole: display
+    bodyRole: readable
+  artwork:
+    hero: assets/hero.webp
+    card: assets/card.webp
+    emblem: assets/emblem.png
+  effects:
+    motion: subtle
+    backgroundTexture: subtle

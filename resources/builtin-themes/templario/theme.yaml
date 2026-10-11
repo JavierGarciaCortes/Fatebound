@@ -1,0 +1,37 @@
+# Tema visual integrado de un mundo futuro; NO instala un paquete jugable.
+schemaVersion: 1
+status: builtin-theme
+playable: false
+id: templario
+displayName: Templario
+tagline: Juramentos, caminos y fortalezas
+presentation:
+  category: Caballero templario
+  description: Piedra antigua, caminos elevados y juramentos difíciles para aventuras de deber y resistencia.
+  atmosphere: Piedra · Carmesí · Acero
+visual:
+  mode: dark
+  mood: stone
+  motif: heraldic-cross
+  colors:
+    background: '#191C22'
+    surface: '#292C32'
+    surfaceRaised: '#3B3E46'
+    primary: '#C84C48'
+    secondary: '#D8D2C5'
+    text: '#F4EFE5'
+    textMuted: '#BFC0C2'
+    border: '#59555A'
+    success: '#75A18A'
+    warning: '#D6AB62'
+    danger: '#CD655D'
+  typography:
+    headingRole: display
+    bodyRole: readable
+  artwork:
+    hero: assets/hero.webp
+    card: assets/card.webp
+    emblem: assets/emblem.png
+  effects:
+    motion: subtle
+    backgroundTexture: subtle

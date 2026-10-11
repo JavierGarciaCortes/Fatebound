@@ -1,0 +1,37 @@
+# Tema visual integrado de un mundo futuro; NO instala un paquete jugable.
+schemaVersion: 1
+status: builtin-theme
+playable: false
+id: ninja
+displayName: Ninja
+tagline: Silencio, sombra y precisión
+presentation:
+  category: Sigilo
+  description: Tejados mojados, luz de luna y decisiones medidas para historias que avanzan sin hacer ruido.
+  atmosphere: Sombra · Jade · Luz lunar
+visual:
+  mode: dark
+  mood: shadow
+  motif: moon-shadow
+  colors:
+    background: '#111720'
+    surface: '#1C2530'
+    surfaceRaised: '#263540'
+    primary: '#6DAF9F'
+    secondary: '#718AA8'
+    text: '#E4E9E6'
+    textMuted: '#B0C2C7'
+    border: '#374D59'
+    success: '#73A890'
+    warning: '#D1A76A'
+    danger: '#CA6C6B'
+  typography:
+    headingRole: display
+    bodyRole: readable
+  artwork:
+    hero: assets/hero.webp
+    card: assets/card.webp
+    emblem: assets/emblem.png
+  effects:
+    motion: subtle
+    backgroundTexture: subtle

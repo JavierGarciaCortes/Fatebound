@@ -2,7 +2,7 @@
 
 Fatebound es una aplicación de escritorio para Windows destinada a jugar RPG narrativos en solitario. El objetivo es ofrecer una experiencia local y portable: las reglas, los mundos, las partidas y sus crónicas podrán viajar junto a la aplicación y el juego no dependerá de un servidor ni de conexión a Internet.
 
-El repositorio se encuentra en una fase inicial de fundamentos. Actualmente contiene el scaffold funcional de Electron y Vue, la persistencia SQLite portable, comprobaciones de integridad, copias previas a migraciones y copias automáticas con retención segura; el esquema del juego, el motor, la importación de mundos y las interfaces definitivas todavía no están implementados.
+El repositorio se encuentra en una fase inicial de fundamentos. Actualmente contiene una primera shell funcional de Electron y Vue, la persistencia SQLite portable, comprobaciones de integridad, copias previas a migraciones y copias automáticas con retención segura. El esquema del juego, el motor, la importación de mundos y las pantallas jugables todavía no están implementados.
 
 ## Visión de producto
 
@@ -42,7 +42,7 @@ Los comandos siguientes proceden de `package.json`:
 | `npm run dev`          | Inicia Electron con recarga durante el desarrollo.        |
 | `npm run start`        | Abre en modo preview una compilación ya generada.         |
 | `npm run lint`         | Ejecuta ESLint.                                           |
-| `npm test`             | Ejecuta las pruebas del almacenamiento portable y SQLite. |
+| `npm test`             | Ejecuta pruebas de almacenamiento, SQLite, IPC y shell.   |
 | `npm run typecheck`    | Comprueba los tipos de main, preload y renderer.          |
 | `npm run build`        | Comprueba tipos y genera la aplicación con electron-vite. |
 | `npm run build:unpack` | Genera una distribución sin empaquetar.                   |
@@ -51,7 +51,7 @@ Los comandos siguientes proceden de `package.json`:
 
 Fatebound 2.0 tiene Windows como plataforma objetivo. `npm run build:win` comprueba los tipos, compila la aplicación y genera un único ejecutable portable x64 en `dist/Fatebound.exe`; no genera ni exige un instalador. El artefacto se identifica como Fatebound mediante `com.fatebound.app`, `Fatebound` y `Fatebound.exe`.
 
-El empaquetado público usa una lista explícita de recursos propios: conserva `resources/icon.png` y los archivos de `resources/branding/` con sus nombres y rutas relativas. Los recursos de Ronin presentes en el repositorio quedan excluidos. No hay configuración de publicación ni de actualización automática.
+El empaquetado público conserva los seis recursos oficiales de `resources/branding/fatebound/` mediante la lista explícita de `extraResources`; el portable de Windows usa `fatebound-app-icon.png` como fuente y electron-builder genera el icono nativo durante el build. Los 27 recursos del catálogo visual —`hero`, `card` y `emblem` para nueve temas integrados— entran en `app.asar` únicamente a través de imports de Vite limitados a identificadores y nombres de archivo conocidos. Las ilustraciones se han preparado para Fatebound; no son imágenes del manual de Ronin. `resources/worlds/ronin/` continúa excluido. No hay configuración de publicación ni de actualización automática.
 
 El ejecutable generado actualmente no tiene firma Authenticode. Windows puede mostrar una advertencia de editor desconocido hasta que se defina el certificado y el procedimiento de firma para una distribución pública.
 
@@ -105,7 +105,9 @@ La validación manual básica en Windows está completada: el ejecutable se abre
 
 Fatebound debe poder distribuirse públicamente sin mundos instalados y sin incorporar contenido protegido de terceros. Una instalación vacía será un estado válido: el usuario podrá instalar sus propios paquetes de mundos, incluido Ronin para uso personal cuando disponga legítimamente de ese contenido.
 
-La dirección aprobada es distribuir cada mundo como un paquete ZIP instalable. La extensión propuesta es `.fateworld`, pendiente de especificación técnica definitiva. El paquete combinará Markdown, YAML, imágenes, recursos visuales y un tema declarativo; se validará como contenido no confiable y nunca podrá ejecutar código. Varias versiones de un mundo podrán coexistir, y personajes y campañas conservarán su vínculo con la versión exacta con la que fueron creados. Inicialmente los paquetes se prepararán fuera de Fatebound: no es necesario construir primero un editor visual avanzado.
+La dirección aprobada es distribuir cada mundo como un paquete ZIP instalable. La extensión propuesta es `.fateworld`, pendiente de especificación técnica definitiva. El paquete combinará Markdown, YAML, imágenes, recursos visuales y un tema declarativo; se validará como contenido no confiable y nunca podrá ejecutar código. Varias versiones de un mundo podrán coexistir, y personajes y crónicas conservarán su vínculo con la versión exacta con la que fueron creados. Inicialmente los paquetes se prepararán fuera de Fatebound: no es necesario construir primero un editor visual avanzado.
+
+En el modelo futuro, cada crónica tendrá inicialmente un personaje principal y un personaje podrá protagonizar varias crónicas. La política para compartir o aislar el progreso de ese personaje entre crónicas sigue pendiente de diseño; la shell actual no crea ninguno de estos registros.
 
 Ronin, de Tiago Junges, no forma parte obligatoria de la distribución pública. Cuando el usuario lo instale, Fatebound conservará intacta su versión importada, creará versiones nuevas para las modificaciones y la protegerá frente al borrado accidental en el gestor de mundos. Sus reglas, contenido y recursos permanecerán separados de las partidas.
 
@@ -119,17 +121,27 @@ Los demás mundos serán independientes y seguirán el mismo modelo de importaci
 
 La evolución del motor se plantea en tres fases compatibles, todas todavía pendientes de implementación:
 
-1. **Mundos compatibles con Ronin:** comparten sus mecánicas fundamentales y cambian ambientación, nombres, tablas, técnicas, imágenes y presentación mediante datos. Ronin, Paladín y Shaolin son los perfiles de referencia.
+1. **Mundos compatibles con Ronin:** comparten sus mecánicas fundamentales y cambian ambientación, nombres, tablas, técnicas, imágenes y presentación mediante datos. Ronin, Templario y Shaolin son los perfiles de referencia.
 2. **Mundos Ronin ampliados:** añaden capacidades mecánicas compatibles sin obligar a modificar los mundos de la fase 1. Robot y Soldado son los perfiles de referencia.
 3. **Mundos avanzados:** incorporan subsistemas especializados, especialmente de combate. Naves espaciales es el perfil de referencia, con sistemas, escudos y armamento.
 
 Una ampliación nunca deberá romper mundos o partidas existentes sin una estrategia explícita de compatibilidad, pruebas y migración.
 
-## Dirección visual y primera interfaz
+## Primera interfaz funcional
 
-La primera interfaz funcional sustituirá la demo actual de electron-vite por una shell Electron/Vue con pantalla principal, navegación, selección visual de mundos y temas demostrativos que cambien realmente el aspecto. Cualquier mundo que solo sirva como demostración visual estará identificado como tal. Personajes y partidas podrán aparecer como secciones preparadas para el futuro, pero no simularán operaciones inexistentes.
+La demo de electron-vite se ha sustituido por una shell Electron/Vue con destinos globales y navegación contextual separados. Todo el bloque de marca lleva a Inicio y muestra un estado activo completo; Ajustes se abre desde el engranaje de la cabecera. Como todavía no existe un mundo jugable instalado y activo, el menú lateral muestra únicamente **Mundos**. Personajes y Crónicas solo se incorporarán a ese menú cuando exista contexto real de mundo y versión. La navegación conserva durante la sesión la atmósfera seleccionada y se adapta desde una barra lateral completa hasta una navegación compacta para ventanas estrechas.
 
-Los ajustes incluirán un diagnóstico real y limitado del almacenamiento SQLite, consultado mediante contratos IPC/preload seguros y de solo lectura. La interfaz reutilizará el branding de `resources/branding/` cuando proceda y deberá comprobarse también en el portable de Windows. Esta prioridad no incluye todavía editor de mundos, campañas, reglas avanzadas ni restauración de copias.
+Sin un mundo activo, cada arranque comienza en el tema neutral `fatebound`; Fatebound es la identidad base de la aplicación y no aparece como tarjeta de mundo. Elegir uno de los mundos futuros solo cambia la ambientación durante la sesión: no instala ni inicia contenido ni amplía la navegación. **Volver a Fatebound** recupera el estado neutral y pulsar la marca para volver a Inicio conserva la ambientación seleccionada.
+
+La biblioteca muestra exactamente ocho mundos: Ronin, Templario, Ninja, Shaolin, Robot, Soldado, Naves y Mundoplato. Los nueve temas integrados —esos ocho más Fatebound neutral— viven en `resources/builtin-themes/<id>/theme.yaml`. Cada definición aporta identidad, textos breves, paleta y rutas relativas; un validador estricto admite solo el esquema y la lista cerrada, y Vite integra los recursos conocidos durante la compilación. El renderer no lee el sistema de archivos, no ejecuta YAML, JavaScript o CSS de los temas y muestra una alternativa visual si falta o falla una imagen.
+
+Inicio utiliza el `hero` del tema activo como fondo cinematográfico legible. Mundos presenta las ocho `card` en una cuadrícula 4×2 amplia, adaptable a tres, dos o una columna, y usa el `emblem` del mundo seleccionado como protagonista del detalle sobre un fondo temático discreto, sin `hero` detrás. Los nueve temas integrados disponen de los tres recursos en formatos WebP y PNG admitidos. Este catálogo interno no fija el contrato definitivo de futuros paquetes `.fateworld`.
+
+Los ocho mundos se etiquetan **Próximamente** porque todavía no existe un paquete jugable disponible. Más adelante, **No instalado** se reservará para un mundo cuyo paquete jugable sí exista pero aún no esté instalado. Seleccionar una tarjeta futura solo muestra su tono y activa su ambientación visual; no ofrece jugar, instalar ni abrir el mundo.
+
+Ajustes consulta mediante `window.api.storage.getDiagnostics()` una instantánea real de las rutas activas, disponibilidad de SQLite, versión de esquema, integridad, claves foráneas y número de copias administradas válidas. El engranaje permanece disponible desde cualquier sección e indica cuándo Ajustes está abierto. El preload no expone `ipcRenderer`, SQL, la conexión ni acceso general a archivos; la ventana se ejecuta con aislamiento de contexto, sin Node en el renderer y con sandbox. El diagnóstico se ejecuta solo al entrar en Ajustes o al pulsar **Actualizar**.
+
+Personajes y Crónicas conservan vistas estructurales futuras, pero permanecen fuera de la navegación mientras no haya un mundo jugable activo y no ofrecen creación ni juego. Esta interfaz no incluye todavía editor de mundos, crónicas, reglas avanzadas, restauración ni exportación de copias.
 
 ## Plantillas de mundos
 
@@ -161,24 +173,29 @@ El formato deberá permitir importar, validar, editar y exportar un mundo sin p�
 - Protección obligatoria previa a migraciones, sin restauración automática, y bloqueo de instancia única antes de abrir SQLite.
 - Copias automáticas tras dos minutos sin cambios, intervalo mínimo de treinta minutos, estado pendiente persistente y operaciones SQLite serializadas en main.
 - Retención verificada de seis copias automáticas y dos protegidas, sin eliminar copias manuales, inválidas, desconocidas ni la última copia válida.
-- Pruebas SQLite aisladas para creación, persistencia, integridad, copias, migraciones, reapertura, errores y cierre.
-- Recursos de marca y las imágenes de clanes de Ronin presentes en el repositorio, sin mover ni renombrar.
+- Pruebas aisladas para creación, persistencia, integridad, copias, migraciones, reapertura, errores, cierre, diagnóstico, preload, navegación, YAML, rutas y catálogo de temas.
+- Shell visual con Inicio en la marca, Ajustes en la cabecera y navegación contextual accesible y adaptativa.
+- Fatebound neutral como identidad base inicial y ocho mundos futuros declarativos —Ronin, Templario, Ninja, Shaolin, Robot, Soldado, Naves y Mundoplato— claramente separados de mundos instalados.
+- Veintisiete ilustraciones integradas desde `resources/builtin-themes/`, con degradados de legibilidad y alternativas visuales ante ausencias.
+- Diagnóstico SQLite real de solo lectura mediante un único canal IPC tipado y restringido.
+- `contextIsolation`, sandbox y ausencia de Node activados en el renderer; API genérica del preload retirada.
+- Nuevo sistema de marca bajo `resources/branding/fatebound/`, integrado en Inicio y en el icono del portable de Windows; las imágenes de clanes de Ronin permanecen excluidas del artefacto público.
 - Target portable x64 de Windows con identidad de Fatebound y recursos públicos incluidos mediante una lista explícita.
 - Artefacto `dist/Fatebound.exe` generado e inspeccionado sin contenido de Ronin ni configuración de actualización automática.
 - Validación manual básica del portable en Windows, incluida la ubicación de `data/` y el flujo completo ante conflictos de escritura.
 - Documentación de producto, estado y arquitectura propuesta.
-- Visión de producto, dirección visual, formato instalable de mundos y hoja de ruta mecánica documentados, todavía sin implementación de interfaz o contenido.
+- Visión de producto, dirección visual, formato instalable de mundos y hoja de ruta mecánica documentados; el contenido jugable continúa pendiente.
 
 ### Planificado
 
-- Primera interfaz funcional con shell de navegación, selector visual, temas demostrativos y diagnóstico seguro de SQLite.
+- Interfaz en español, inglés y coreano con preferencia persistente, independiente del idioma de contenido. Cada paquete de mundo declarará sus idiomas disponibles y predeterminado; el selector solo los mostrará cuando existan datos reales y no inventará traducciones ausentes.
 - Exportación manual de copias a otra unidad, recuperación explícita y repositorios del dominio sobre SQLite.
 - Validación del portable desde un pendrive físico y desde otro ordenador.
 - Instalaciones válidas sin mundos, importación personal y protección frente al borrado accidental.
 - Separación de compilaciones públicas sin contenido protegido y compilaciones privadas autorizadas.
 - Plantillas originales e importador, validador, editor y exportador de Markdown.
 - Catálogo de efectos mecánicos y motor de reglas.
-- Personajes, clanes, campañas, registro de eventos y exportación de crónicas a Markdown.
+- Personajes, clanes, crónicas, registro de eventos y exportación de crónicas a Markdown.
 - Integración opcional de IA bajo confirmación del jugador; jugar seguirá siendo posible sin conexión.
 
 El seguimiento detallado, las comprobaciones realizadas y la única siguiente prioridad se mantienen en [STATUS.md](STATUS.md).

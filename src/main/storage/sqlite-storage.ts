@@ -207,6 +207,29 @@ export function hasOpenActiveSqliteDatabase(): boolean {
   return activeRuntime?.database.isOpen === true
 }
 
+export interface ActiveSqliteDiagnosticSnapshot {
+  readonly schemaVersion: number
+}
+
+export async function getActiveSqliteDiagnosticSnapshot(): Promise<ActiveSqliteDiagnosticSnapshot> {
+  const runtime = activeRuntime
+  if (!runtime?.database.isOpen) {
+    throw new Error('The Fatebound SQLite database is not available for diagnostics')
+  }
+
+  return runtime.operations.run(() => {
+    if (!runtime.database.isOpen) {
+      throw new Error('The Fatebound SQLite database closed before diagnostics completed')
+    }
+
+    validateSqliteDatabase(runtime.database, 'quick')
+
+    return Object.freeze({
+      schemaVersion: getSqliteMigrationPlan(runtime.database).currentVersion
+    })
+  })
+}
+
 interface TotalChangesRow {
   readonly count: number
 }

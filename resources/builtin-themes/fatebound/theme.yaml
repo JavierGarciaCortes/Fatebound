@@ -1,0 +1,37 @@
+# Identidad visual base integrada; NO representa un mundo jugable.
+schemaVersion: 1
+status: builtin-theme
+playable: false
+id: fatebound
+displayName: Fatebound
+tagline: Archivo de destinos y aventuras
+presentation:
+  category: Identidad neutral
+  description: Un umbral entre mundos para ordenar destinos, crónicas y aventuras sin imponer una ambientación.
+  atmosphere: Archivo celestial · Piedra oscura · Oro
+visual:
+  mode: dark
+  mood: archive
+  motif: celestial-archive
+  colors:
+    background: '#10171D'
+    surface: '#192229'
+    surfaceRaised: '#26313A'
+    primary: '#C5A779'
+    secondary: '#E5D9C5'
+    text: '#F2EDE4'
+    textMuted: '#ACB8BB'
+    border: '#354049'
+    success: '#578F7B'
+    warning: '#D5A75C'
+    danger: '#CC746B'
+  typography:
+    headingRole: display
+    bodyRole: readable
+  artwork:
+    hero: assets/hero.webp
+    card: assets/card.webp
+    emblem: assets/emblem.png
+  effects:
+    motion: subtle
+    backgroundTexture: subtle

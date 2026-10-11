@@ -1,0 +1,37 @@
+# Tema visual integrado de un mundo futuro; NO instala un paquete jugable.
+schemaVersion: 1
+status: builtin-theme
+playable: false
+id: naves
+displayName: Naves
+tagline: Exploración, vacío y estrellas
+presentation:
+  category: Odisea espacial
+  description: Órbitas remotas, naves y horizontes imposibles para aventuras más allá del mapa conocido.
+  atmosphere: Vacío · Violeta · Luz estelar
+visual:
+  mode: dark
+  mood: cosmic
+  motif: star-map
+  colors:
+    background: '#101325'
+    surface: '#1B2039'
+    surfaceRaised: '#282D4D'
+    primary: '#A08CDE'
+    secondary: '#66CAD9'
+    text: '#E9EAFA'
+    textMuted: '#BAC4E1'
+    border: '#414867'
+    success: '#75BFAF'
+    warning: '#DCB573'
+    danger: '#D47B85'
+  typography:
+    headingRole: display
+    bodyRole: readable
+  artwork:
+    hero: assets/hero.webp
+    card: assets/card.webp
+    emblem: assets/emblem.png
+  effects:
+    motion: subtle
+    backgroundTexture: subtle

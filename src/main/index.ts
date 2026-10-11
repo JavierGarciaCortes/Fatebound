@@ -1,7 +1,7 @@
 import { app, shell, BrowserWindow, dialog, ipcMain } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
-import icon from '../../resources/icon.png?asset'
+import icon from '../../resources/branding/fatebound/fatebound-app-icon.png?asset'
 import { initializePortableStorage } from './storage/electron-storage-startup.ts'
 import { activateStoragePaths, hasActiveStoragePaths } from './storage/portable-storage.ts'
 import {
@@ -9,6 +9,8 @@ import {
   hasOpenActiveSqliteDatabase,
   openActiveSqliteDatabase
 } from './storage/sqlite-storage.ts'
+import { readStorageDiagnostics } from './storage/storage-diagnostics.ts'
+import { registerStorageDiagnosticsIpc } from './storage/storage-diagnostics-ipc.ts'
 import { acquireSingleInstanceLock } from './single-instance.ts'
 
 let mainWindow: BrowserWindow | null = null
@@ -24,14 +26,19 @@ function createWindow(): void {
   }
 
   const window = new BrowserWindow({
-    width: 900,
-    height: 670,
+    width: 1180,
+    height: 780,
+    minWidth: 760,
+    minHeight: 620,
     show: false,
+    backgroundColor: '#090b11',
     autoHideMenuBar: true,
     ...(process.platform === 'linux' ? { icon } : {}),
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
-      sandbox: false
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true
     }
   })
   mainWindow = window
@@ -105,6 +112,12 @@ async function startApplication(): Promise<void> {
 }
 
 function registerApplicationLifecycle(): void {
+  registerStorageDiagnosticsIpc(
+    (channel, handler) => ipcMain.handle(channel, handler),
+    readStorageDiagnostics,
+    (error) => console.error('Unable to read Fatebound storage diagnostics', error)
+  )
+
   // This method will be called when Electron has finished
   // initialization and is ready to create browser windows.
   // Some APIs can only be used after this event occurs.
@@ -118,9 +131,6 @@ function registerApplicationLifecycle(): void {
     app.on('browser-window-created', (_, window) => {
       optimizer.watchWindowShortcuts(window)
     })
-
-    // IPC test
-    ipcMain.on('ping', () => console.log('pong'))
 
     app.on('activate', function () {
       if (!hasActiveStoragePaths() || !hasOpenActiveSqliteDatabase()) return

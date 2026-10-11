@@ -72,7 +72,7 @@ La versión del formato de paquete y el nivel de capacidades del motor son conce
 
 ### Fase 1 — Mundos compatibles con Ronin
 
-Los mundos comparten las mecánicas fundamentales de Ronin y pueden cambiar mediante datos la ambientación, los nombres, las tablas, las técnicas, las imágenes y la presentación. Ronin, Paladín y Shaolin son ejemplos de los perfiles previstos.
+Los mundos comparten las mecánicas fundamentales de Ronin y pueden cambiar mediante datos la ambientación, los nombres, las tablas, las técnicas, las imágenes y la presentación. Ronin, Templario y Shaolin son ejemplos de los perfiles previstos.
 
 ### Fase 2 — Mundos Ronin ampliados
 
@@ -116,6 +116,8 @@ Los límites concretos de tamaño, compresión, cantidad de archivos, formatos y
 Un tema podrá describir paletas, tipografía entre opciones controladas, ilustraciones, fondos, símbolos, texturas y parámetros visuales admitidos. La navegación, los estados interactivos, el contraste mínimo, el foco, los mensajes de error y las operaciones sensibles seguirán bajo control de Fatebound.
 
 El paquete no aportará componentes Vue, JavaScript, CSS libre, fuentes remotas ni acceso a Electron. El contrato final deberá limitar los temas a tokens y espacios de recursos validados, incluir alternativas legibles y permitir reducir efectos visuales. La dirección de experiencia se desarrolla en [DESIGN_SYSTEM.md](DESIGN_SYSTEM.md).
+
+`resources/builtin-themes/` no es un ejemplo de estructura `.fateworld` ni un almacén de mundos instalados. Contiene nueve temas de solo lectura integrados en la aplicación: la identidad base Fatebound y las atmósferas de ocho mundos futuros. Estos ocho se muestran como **Próximamente** mientras no exista un paquete jugable. **No instalado** solo será aplicable cuando haya un paquete real disponible y validable; entonces podrán diseñarse su instalación y activación sin reutilizar este catálogo como contrato implícito.
 
 ## 7. Edición y exportación futuras
 

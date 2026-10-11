@@ -1,0 +1,37 @@
+# Tema visual integrado de un mundo futuro; NO instala un paquete jugable.
+schemaVersion: 1
+status: builtin-theme
+playable: false
+id: robot
+displayName: Robot
+tagline: Memoria, acero e identidad
+presentation:
+  category: Ciencia ficción
+  description: Metal, memoria y señales en la oscuridad para historias sobre identidad y tecnología.
+  atmosphere: Grafito · Metal · Cian
+visual:
+  mode: dark
+  mood: industrial
+  motif: circuit-lines
+  colors:
+    background: '#10191F'
+    surface: '#1A2830'
+    surfaceRaised: '#263B44'
+    primary: '#45C8D1'
+    secondary: '#84A5B2'
+    text: '#E5F0F0'
+    textMuted: '#A9C6CC'
+    border: '#34535C'
+    success: '#70B29B'
+    warning: '#E2B56B'
+    danger: '#DF7770'
+  typography:
+    headingRole: display
+    bodyRole: readable
+  artwork:
+    hero: assets/hero.webp
+    card: assets/card.webp
+    emblem: assets/emblem.png
+  effects:
+    motion: subtle
+    backgroundTexture: subtle

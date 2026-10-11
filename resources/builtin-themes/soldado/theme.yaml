@@ -1,0 +1,37 @@
+# Tema visual integrado de un mundo futuro; NO instala un paquete jugable.
+schemaVersion: 1
+status: builtin-theme
+playable: false
+id: soldado
+displayName: Soldado
+tagline: Supervivencia, territorio y misión
+presentation:
+  category: Operaciones especiales
+  description: Terreno hostil, observación y recursos limitados para relatos de misión y supervivencia.
+  atmosphere: Oliva · Arena · Acero
+visual:
+  mode: dark
+  mood: tactical
+  motif: topographic-map
+  colors:
+    background: '#191E19'
+    surface: '#252E26'
+    surfaceRaised: '#374338'
+    primary: '#A3AD74'
+    secondary: '#C3B08A'
+    text: '#E8E8DC'
+    textMuted: '#B6BDAE'
+    border: '#4A5545'
+    success: '#7EAA81'
+    warning: '#D9AE66'
+    danger: '#CF7269'
+  typography:
+    headingRole: display
+    bodyRole: readable
+  artwork:
+    hero: assets/hero.webp
+    card: assets/card.webp
+    emblem: assets/emblem.png
+  effects:
+    motion: subtle
+    backgroundTexture: subtle

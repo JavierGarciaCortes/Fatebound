@@ -1,0 +1,37 @@
+# Tema visual integrado de un mundo futuro; NO instala un paquete jugable.
+schemaVersion: 1
+status: builtin-theme
+playable: false
+id: shaolin
+displayName: Shaolin
+tagline: Disciplina, camino y compasión
+presentation:
+  category: Artes marciales
+  description: Montañas, templos y disciplina interior para relatos de aprendizaje, equilibrio y compasión.
+  atmosphere: Tierra · Azafrán · Amanecer
+visual:
+  mode: dark
+  mood: earth
+  motif: mountain-temple
+  colors:
+    background: '#211A16'
+    surface: '#32241C'
+    surfaceRaised: '#453128'
+    primary: '#D58147'
+    secondary: '#C2A06C'
+    text: '#F3E6CF'
+    textMuted: '#C7B39A'
+    border: '#634838'
+    success: '#7FA17C'
+    warning: '#DEA755'
+    danger: '#C66D58'
+  typography:
+    headingRole: display
+    bodyRole: readable
+  artwork:
+    hero: assets/hero.webp
+    card: assets/card.webp
+    emblem: assets/emblem.png
+  effects:
+    motion: subtle
+    backgroundTexture: subtle
