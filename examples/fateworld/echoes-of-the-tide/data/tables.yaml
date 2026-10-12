@@ -1,0 +1,24 @@
+tables:
+  - id: horizons
+    titles:
+      es: Horizontes
+    entries:
+      - id: silent-lighthouse
+        texts:
+          es: Un faro sin llama dibuja una ruta plateada sobre el agua.
+        references:
+          - tableId: omens
+            entryId: glass-bell
+      - id: drifting-quay
+        texts:
+          es: Un muelle vacío deriva contra la corriente y conserva huellas recientes.
+        references:
+          - tableId: omens
+  - id: omens
+    titles:
+      es: Presagios
+    entries:
+      - id: glass-bell
+        texts:
+          es: Una campana de vidrio suena bajo la superficie sin llegar a romperse.
+        references: []

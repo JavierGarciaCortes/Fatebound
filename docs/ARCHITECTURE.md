@@ -1,10 +1,10 @@
 # Arquitectura de Fatebound 2.0
 
-Estado del documento: arquitectura aprobada con el resolvedor, la seguridad SQLite, la exportación y restauración manual de backups, la primera shell visual y el empaquetado portable de Windows ya implementados; el dominio y el motor continúan pendientes.
+Estado del documento: arquitectura aprobada con almacenamiento SQLite, shell visual, empaquetado portable y contrato/validador `.fateworld` v1 implementados; la instalación de mundos, el dominio jugable y el motor continúan pendientes.
 
 Última actualización: 2026-10-12.
 
-Este documento describe la dirección aprobada para Fatebound y marca expresamente lo que todavía no existe. La única tabla actual controla migraciones; no se ha definido el esquema SQL del juego ni se consideran implementados los demás subsistemas propuestos. La dirección específica de paquetes se mantiene en [WORLD_FORMAT.md](WORLD_FORMAT.md) y la de interfaz en [DESIGN_SYSTEM.md](DESIGN_SYSTEM.md).
+Este documento describe la dirección aprobada para Fatebound y marca expresamente lo que todavía no existe. La única tabla actual controla migraciones; no se ha definido el esquema SQL del juego ni se consideran implementados los demás subsistemas propuestos. La especificación normativa de paquetes v1 se mantiene en [WORLD_FORMAT.md](WORLD_FORMAT.md) y la dirección de interfaz en [DESIGN_SYSTEM.md](DESIGN_SYSTEM.md).
 
 ## 1. Punto de partida real
 
@@ -19,9 +19,10 @@ El repositorio contiene actualmente:
 - un empaquetado público con lista explícita de recursos propios; la variante privada todavía no está configurada;
 - un resolvedor central, una comprobación de escritura y una conexión SQLite ejecutados en main antes de crear la ventana principal;
 - migraciones SQL versionadas y transaccionales con una única migración técnica inicial;
-- integridad, copias previas a migraciones o restauraciones, copias automáticas, retención segura, exportación y restauración manual ejecutadas exclusivamente en main.
+- integridad, copias previas a migraciones o restauraciones, copias automáticas, retención segura, exportación y restauración manual ejecutadas exclusivamente en main;
+- un servicio interno de main que valida paquetes `.fateworld` v1 sin extraerlos ni instalarlos, más una muestra técnica original reproducible.
 
-No están implementados el esquema de persistencia del juego, los repositorios del dominio, los mundos jugables, el importador, el editor, el motor de reglas, las campañas, las crónicas ni la integración de IA. Las tarjetas de mundos y los estados futuros de la shell son demostraciones de presentación, no datos instalados.
+No están implementados el esquema de persistencia del juego, los repositorios del dominio, los mundos jugables, el importador/instalador, el editor, el motor de reglas, las campañas, las crónicas ni la integración de IA. Las tarjetas de mundos y los estados futuros de la shell son demostraciones de presentación, no datos instalados. El validador v1 tampoco convierte la muestra técnica en contenido jugable.
 
 ## 2. Principios
 
@@ -91,7 +92,7 @@ La presentación se divide en una shell estable de Fatebound, un tema declarativ
 
 Cada definición puede declarar `hero.webp`, `card.webp` o `card.png` y `emblem.png`. El cargador resuelve solo los archivos realmente empaquetados y registra por rol cualquier ausencia; la vista sustituye ese recurso por un fallback local sin invalidar los demás. Inicio usa la ilustración `hero` bajo superposiciones de contraste. Mundos respeta la proporción vertical 3:4 de las tarjetas y reserva el panel inferior para un emblema protagonista sobre un degradado discreto, sin reutilizar allí el `hero`. El logo oficial permanece separado. Los paneles técnicos de Ajustes conservan superficies neutrales y emplean el acento activo con contención.
 
-Legibilidad, sesiones largas, navegación clara, reducción de movimiento y adaptación al tamaño de ventana son restricciones arquitectónicas de la interfaz, no detalles ornamentales. Los ocho mundos del catálogo se etiquetan **Próximamente**: la tarjeta puede seleccionarse para cambiar la ambientación y abrir el detalle, pero no existe todavía un paquete jugable. **No instalado** se reservará para el estado futuro en el que ese paquete ya exista y aún no esté instalado. La selección permanece durante la sesión, sobrevive a la navegación entre secciones, puede volver explícitamente a Fatebound neutral y no se persiste. El acceso a Personajes y Crónicas depende exclusivamente de un futuro mundo instalado activo, nunca del tema visual. Este esquema interno prepara conceptos reutilizables, pero no constituye el contrato definitivo de `.fateworld`.
+Legibilidad, sesiones largas, navegación clara, reducción de movimiento y adaptación al tamaño de ventana son restricciones arquitectónicas de la interfaz, no detalles ornamentales. Los ocho mundos del catálogo se etiquetan **Próximamente**: la tarjeta puede seleccionarse para cambiar la ambientación y abrir el detalle, pero no existe todavía un paquete jugable. **No instalado** se reservará para el estado futuro en el que ese paquete ya exista y aún no esté instalado. La selección permanece durante la sesión, sobrevive a la navegación entre secciones, puede volver explícitamente a Fatebound neutral y no se persiste. El acceso a Personajes y Crónicas depende exclusivamente de un futuro mundo instalado activo, nunca del tema visual. Este esquema interno prepara conceptos reutilizables, pero no forma parte del contrato `.fateworld` v1 ni define todavía temas de paquete.
 
 ### 3.7 Internacionalización y preferencias
 
@@ -200,7 +201,7 @@ La retención solo empieza después de que la copia nueva esté publicada y veri
 
 Las copias locales permanecen en el mismo dispositivo que `data/fatebound.sqlite`: protegen frente a una migración o modificación lógica, pero no frente a pérdida o avería física de la unidad. La exportación manual permite conservar una copia verificada en otra ubicación y la restauración SQLite exige selección y confirmación expresas.
 
-**Dirección aprobada, todavía no implementada:** la recuperación completa no podrá limitarse a SQLite. También deberá identificar y recuperar las versiones exactas de los paquetes `.fateworld` instalados que necesiten personajes y Crónicas. Esta decisión no define todavía un formato de archivo de recuperación, un manifiesto de paquete ni un procedimiento de restauración.
+**Dirección aprobada, todavía no implementada:** la recuperación completa no podrá limitarse a SQLite. También deberá identificar y recuperar las versiones exactas de los paquetes `.fateworld` instalados que necesiten personajes y Crónicas. Esta decisión no define todavía un formato conjunto de recuperación ni un procedimiento de restauración de paquetes.
 
 Referencias técnicas de la decisión: [API `node:sqlite` de Node 22.23](https://nodejs.org/download/release/latest-jod/docs/api/sqlite.html), [información de sistema de archivos de Node 22](https://nodejs.org/download/release/latest-jod/docs/api/fs.html), [Online Backup API de SQLite](https://www.sqlite.org/backup.html), [PRAGMA de SQLite](https://www.sqlite.org/pragma.html) y [archivos temporales y journals](https://www.sqlite.org/tempfiles.html).
 
@@ -242,10 +243,10 @@ Un mundo es una línea de contenido independiente. Cada versión contiene datos,
 
 Las reglas, el contenido del mundo y el estado de las partidas se almacenarán como responsabilidades diferentes:
 
-- **paquete `.fateworld`:** definiciones versionadas de reglas y contenido del mundo, incluidos clanes, técnicas, textos, tablas, traducciones y recursos;
+- **paquete `.fateworld`:** el v1 contiene identidad, contenido narrativo, tablas enlazadas, traducciones y recursos opcionales; futuras versiones podrán añadir definiciones mecánicas cuando exista su contrato;
 - **SQLite:** fichas base de personajes, progreso y estado por Crónica, secundarios, clanes, relaciones, tiradas, combates, decisiones, efectos pendientes y eventos.
 
-Personajes y Crónicas conservarán el identificador exacto de la versión del mundo con la que fueron creados. Una actualización del mundo no migrará una partida de forma implícita. Esta separación está aprobada pero todavía no existe en el esquema SQL ni fija la estructura interna del paquete.
+Personajes y Crónicas conservarán el identificador exacto de la versión del mundo con la que fueron creados. Una actualización del mundo no migrará una partida de forma implícita. Esta separación está aprobada pero todavía no existe en el esquema SQL. La estructura mínima implementada del paquete se define normativamente en `WORLD_FORMAT.md` y todavía no incluye esos vínculos persistentes.
 
 ### 5.1 Recursos incluidos y perfiles de distribución
 
@@ -259,15 +260,15 @@ Los artefactos públicos y privados tendrán nombres y procesos de salida inequ�
 
 ### 5.2 Recursos de mundos adicionales
 
-**Propuesta no implementada:** al importar un mundo, sus archivos válidos se copiarán a un espacio administrado bajo la raíz portable, aislado por identificador de mundo y de versión. La base de datos guardará referencias relativas, nunca rutas absolutas del equipo de origen.
+**Validación implementada, instalación pendiente:** `src/main/worlds/fateworld-validator.ts` abre un `.fateworld` como ZIP no confiable, impone límites antes y durante la lectura, valida rutas portables y colisiones Windows, rechaza enlaces y tipos especiales, verifica CRC-32 y analiza el subconjunto YAML seguro. `fateworld-contract.ts` valida manifiesto, idiomas, archivos declarados, firmas de imagen, tablas, identificadores y referencias. El servicio devuelve una unión tipada de información normalizada o errores sanitizados y no se expone por IPC.
 
-El importador impedirá escapes de directorio, enlaces inseguros, extensiones no admitidas y archivos que excedan los límites configurados. La publicación congelará las referencias de esa versión; una sustitución de recursos creará otra versión.
+El validador no extrae, copia ni instala archivos y no modifica SQLite. **Propuesta no implementada:** el futuro importador copiará paquetes válidos a un espacio administrado bajo la raíz portable, aislado por identificador de mundo y versión. La base de datos guardará referencias relativas, nunca rutas absolutas del equipo de origen, y la publicación congelará las referencias de esa versión.
 
 ### 5.3 Hoja de ruta mecánica y compatibilidad
 
 **Dirección aprobada, todavía no implementada:** el primer motor será fiel a las mecánicas originales de Ronin: dados Yin/Yang, tablas enlazadas, atributos, interacciones, técnicas, combate, bloqueos, efectos y consecuencias. Los primeros mundos compartirán ese motor y cambiarán principalmente la ambientación, el contenido y la organización declarativa de tablas y técnicas.
 
-Las tablas tendrán identificadores estables independientes de su orden o posición visible. Cada mundo podrá reorganizar, sustituir u omitir las tablas y reglas que no necesite, siempre que el paquete valide todas sus referencias y no deje enlaces internos rotos.
+**Implementado en el contrato de datos v1:** las tablas y sus entradas tienen identificadores estables independientes de su orden o posición visible. Cada mundo puede reorganizar, sustituir u omitir las tablas narrativas que no necesite; el validador rechaza identificadores duplicados, referencias repetidas y destinos ausentes. Esto no implementa resultados de dados ni reglas mecánicas.
 
 El motor evolucionará en tres fases acumulativas:
 
@@ -275,7 +276,7 @@ El motor evolucionará en tres fases acumulativas:
 2. **Mundos Ronin ampliados:** añaden capacidades compatibles con el modelo anterior. Robot y Soldado son ejemplos de perfiles previstos. Los mundos de la fase 1 deben seguir funcionando sin modificaciones obligatorias.
 3. **Mundos avanzados:** incorporan subsistemas especializados, especialmente de combate. Naves espaciales es el ejemplo de referencia, con sistemas, escudos y armamento, sin invalidar los mundos o partidas anteriores.
 
-El formato del paquete, la versión del mundo y el conjunto de capacidades mecánicas se versionarán como conceptos distintos. Las ampliaciones preferirán capacidades aditivas y valores por defecto compatibles. Cualquier cambio que necesite transformar mundos o partidas existentes exigirá detección explícita de versión, migración protegida, copias recuperables, pruebas con versiones anteriores y un resultado comprensible para el usuario. No se aceptará una ruptura implícita.
+El formato del paquete, la versión del mundo y el conjunto de capacidades mecánicas están separados en el manifiesto v1. Como todavía no existe motor ni catálogo mecánico, `requiredCapabilities` debe estar vacío y cualquier valor se rechaza. Las futuras ampliaciones preferirán capacidades aditivas y valores por defecto compatibles. Cualquier cambio que necesite transformar mundos o partidas existentes exigirá detección explícita de versión, migración protegida, copias recuperables, pruebas con versiones anteriores y un resultado comprensible para el usuario. No se aceptará una ruptura implícita.
 
 ## 6. Ronin como mundo instalable
 
@@ -293,27 +294,21 @@ Actualmente solo existen los recursos gráficos indicados; no se ha importado el
 
 ## 7. Paquetes de mundos, importador y editor
 
-**Dirección aprobada, todavía no implementada:** los mundos se distribuirán mediante paquetes ZIP instalables con extensión `.fateworld`. Cada paquete contendrá definiciones versionadas de reglas y contenido y podrá combinar Markdown legible, YAML estructurado, imágenes, recursos visuales y un tema declarativo versionado. Fatebound incluirá plantillas y ejemplos originales, sin textos, tablas ni reglas copiadas de Ronin o de otros terceros.
+**Formato y validador v1 implementados y validados:** los mundos usan paquetes ZIP declarativos con extensión `.fateworld`. El v1 contiene un manifiesto, Markdown por idioma, un YAML de tablas enlazadas e imágenes opcionales. Su contrato es cerrado, distingue versión de formato, identidad/versión del mundo y capacidades, y exige traducciones reales para cada idioma declarado. Las comprobaciones superaron 99/99 tests generales y 19/19 pruebas específicas del validador tras corregir la comprobación de caracteres de control.
 
-Las futuras plantillas deberán documentar, como requisitos mínimos:
+La muestra original **Ecos de la marea** entrega fuentes y paquete reproducible bajo `examples/fateworld/`. No contiene reglas de Ronin, capacidades mecánicas ni estado de juego, no se instala y no aparece en la interfaz.
 
-- identificadores estables y relaciones entre elementos;
-- metadatos del mundo y de sus versiones;
-- tablas con identificadores estables independientes de su posición visible, resultados de dados y referencias validadas;
-- textos traducibles y asociación de traducciones;
-- efectos mecánicos, parámetros y condiciones;
-- referencias relativas a imágenes y otros recursos.
+El servicio usa `yauzl` para lectura ZIP limitada y `yaml` con esquema `failsafe`; ambas son dependencias directas de producción. El generador determinista de la muestra utiliza solo API estándar de Node. El renderer, preload y contrato IPC no cambian.
 
-El mismo modelo deberá poder importarse, validarse, editarse y exportarse sin pérdida de información. Varias versiones podrán coexistir y los personajes y Crónicas conservarán su vínculo exacto. Cada mundo podrá reorganizar, sustituir u omitir tablas o reglas, pero la validación deberá comprobar la totalidad de las referencias estables. El contrato exacto —sintaxis, esquema, organización de archivos, manifiestos, capacidades y estrategia de versiones— se diseñará en una tarea posterior; ni este documento ni la estructura ilustrativa de `WORLD_FORMAT.md` lo fijan todavía.
+**Pendiente:** el mismo modelo deberá poder importarse, instalarse, editarse y exportarse sin pérdida de información. Varias versiones podrán coexistir y los personajes y Crónicas conservarán su vínculo exacto. El v1 no define todavía temas de mundo, reglas mecánicas, procedencia, firmas, dependencias entre paquetes ni datos SQLite.
 
-El flujo previsto es:
+El flujo futuro parte ahora de una primera etapa reutilizable ya disponible:
 
-1. seleccionar un paquete y copiarlo a un área temporal controlada;
-2. inspeccionar el ZIP y analizar metadatos, YAML y Markdown sin ejecutar scripts;
-3. validar esquema, versión, capacidades, rutas, referencias, tamaños y tipos de recursos;
-4. mostrar errores y una vista previa normalizada;
-5. crear un borrador editable;
-6. publicar una versión inmutable mediante una transacción.
+1. **Implementado:** validar el ZIP en origen, sin extracción ni efectos secundarios, y devolver información estructurada o errores sanitizados.
+2. **Pendiente:** seleccionar el paquete mediante main y preparar una copia en un área temporal controlada.
+3. **Pendiente:** mostrar errores y una vista previa normalizada.
+4. **Pendiente:** publicar una versión inmutable de forma transaccional bajo `data/worlds/`.
+5. **Pendiente:** crear borradores editables y exportar versiones nuevas.
 
 El editor modifica borradores o crea una versión derivada. Al principio los paquetes podrán prepararse con procesos propios sin construir un editor visual avanzado. El texto natural explica ambientación y reglas a las personas, pero no se convierte ni evalúa como código. HTML activo, JavaScript, CSS arbitrario y rutas remotas no se consideran confiables.
 
@@ -364,7 +359,11 @@ La implementación mantiene y deberá seguir manteniendo:
 - conservar copias recuperables antes de migraciones y operaciones destructivas;
 - registrar errores técnicos sin exponer datos privados en la interfaz.
 
-La API genérica del scaffold y el canal de demostración `ping` se han retirado. La superficie nativa actual queda limitada al diagnóstico tipado, la exportación manual, las tres fases explícitas de restauración y la lectura/escritura validada del idioma. Los contratos de almacenamiento no aceptan rutas desde el renderer; incorporar otra capacidad exigirá un IPC específico y pruebas equivalentes.
+La API genérica del scaffold y el canal de demostración `ping` se han retirado. La superficie nativa actual queda limitada al diagnóstico tipado, la exportación manual, las tres fases explícitas de restauración y la lectura/escritura validada del idioma. El validador `.fateworld` permanece como servicio interno de main y no añade IPC ni selector. Los contratos de almacenamiento no aceptan rutas desde el renderer; incorporar otra capacidad exigirá un IPC específico y pruebas equivalentes.
+
+La auditoría de dependencias ejecutada por el usuario informó 10 vulnerabilidades en el árbol completo —8 moderadas y 2 altas— y 6 al omitir dependencias de desarrollo —4 moderadas y 2 altas—. Los informes señalan Electron 39 y dependencias relacionadas, incluidas `extract-zip`, `@electron/get`, `sprintf-js` y herramientas de empaquetado. `yauzl` y `yaml` no aparecen como vulnerables en esos informes, pero esa ausencia no garantiza que estén libres de vulnerabilidades.
+
+Queda pendiente una revisión y actualización controlada de Electron y toda su cadena de dependencias. La solución forzada propuesta por npm migraría a Electron 44.7.0 e introduciría cambios mayores, por lo que no se aplicará automáticamente. Este cierre documental no ejecuta `npm audit fix` ni modifica dependencias.
 
 ## 13. Orden de implementación recomendado
 
@@ -375,8 +374,8 @@ La API genérica del scaffold y el canal de demostración `ping` se han retirado
 5. **Implementado, pendiente de verificación manual:** internacionalización de la interfaz en español, inglés y coreano con preferencia portable, manteniendo separados los futuros idiomas de contenido.
 6. **Implementado y validado:** exportación manual de copias SQLite a una carpeta elegida en main, sin rutas en el renderer ni sobrescritura silenciosa.
 7. **Implementado y validado en flujo normal y rechazos:** restauración manual SQLite con confirmación, copia protegida y recuperación guiada por journal. Las interrupciones reales y la recuperación conjunta de paquetes siguen pendientes.
-8. Cerrar en una tarea específica el contrato versionado de paquetes de mundos y crear plantillas originales.
-9. Incorporar importación, validación, edición, exportación y publicación inmutable.
+8. **Implementado y validado:** contrato `.fateworld` v1, validador seguro sin extracción y muestra original reproducible.
+9. Incorporar selección, importación, instalación, edición, exportación y publicación inmutable reutilizando el validador.
 10. Implementar progresivamente el motor compatible, las Crónicas, los eventos y la exportación.
 11. Configurar y verificar el perfil privado separado cuando exista autorización para su contenido.
 12. Añadir las fases mecánicas extendida y avanzada y, solo después, la integración opcional de IA.

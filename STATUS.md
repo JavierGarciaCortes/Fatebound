@@ -14,7 +14,7 @@ La exportación quedó validada con 74/74 tests, lint, typecheck, builds y porta
 
 Fatebound 2.0 dispone ya de una primera interfaz visual funcional sobre Electron y Vue. La shell carga nueve temas visuales y está traducida al español, inglés y coreano, con cambio inmediato y preferencia portable. Sin un mundo activo comienza en Fatebound neutral, el menú muestra solo Mundos y Ajustes reúne idioma, diagnóstico SQLite, exportación y restauración manual de backups.
 
-El producto continúa en fase de fundamentos: no existen todavía esquema del juego, mundos instalados, personajes, campañas, reglas ni importación `.fateworld`. Ronin, Templario, Ninja, Shaolin, Robot, Soldado, Naves y Mundoplato figuran como **Próximamente** y solo permiten explorar su ambientación; ninguno representa contenido jugable disponible o instalado.
+El producto continúa en fase de fundamentos: el contrato y el validador `.fateworld` v1 ya están implementados y validados técnicamente, pero no existen todavía esquema del juego, mundos instalados, personajes, campañas, reglas ni importación persistente. Ronin, Templario, Ninja, Shaolin, Robot, Soldado, Naves y Mundoplato figuran como **Próximamente** y solo permiten explorar su ambientación; ninguno representa contenido jugable disponible o instalado.
 
 ## Implementado
 
@@ -63,6 +63,19 @@ El producto continúa en fase de fundamentos: no existen todavía esquema del ju
 - [x] Copias automáticas después de cambios confirmados, estado persistente y retención segura 6/2.
 - [x] Cierre coordinado de escrituras, copias y conexión.
 
+### Formato `.fateworld` v1
+
+- [x] Especificación normativa cerrada con versión de formato separada de la identidad y versión semántica del mundo.
+- [x] Manifiesto con idiomas reales, predeterminado, títulos localizados, Markdown, YAML de tablas, imágenes opcionales y lista de capacidades mecánicas obligatoriamente vacía en v1.
+- [x] Servicio interno tipado en main, independiente de UI e instalador, que no extrae archivos, no modifica SQLite y no añade IPC.
+- [x] Inspección ZIP real con CRC-32, límites de archivo/entrada/expansión/ratio/profundidad, métodos Stored o Deflate y rechazo de cifrado, enlaces, tipos especiales y reparse points.
+- [x] Rutas relativas NFC, sin escapes, duplicados, nombres reservados ni colisiones relevantes en Windows.
+- [x] Subconjunto YAML 1.2 `failsafe`, sin alias, anclas, etiquetas, merge, documentos múltiples, claves duplicadas ni campos desconocidos.
+- [x] Tablas y entradas con identificadores estables, traducciones completas, referencias únicas y resolución de destinos.
+- [x] Resultados estructurados con errores sanitizados que no exponen la ruta absoluta de origen.
+- [x] Fuentes originales y paquete reproducible **Ecos de la marea** bajo `examples/fateworld/`, sin capacidades mecánicas ni condición jugable.
+- [x] Pruebas focalizadas para aceptación, incompatibilidades, rutas/límites, tipos peligrosos, IDs/referencias y YAML peligroso; las 19 pruebas específicas del validador quedaron correctas tras reforzar la comprobación de caracteres de control.
+
 ### Exportación manual SQLite
 
 - [x] Acción accesible en Ajustes con estados localizados de trabajo, éxito, cancelación y error en español, inglés y coreano.
@@ -91,16 +104,18 @@ El producto continúa en fase de fundamentos: no existen todavía esquema del ju
 - La selección temática dura solo durante la sesión y comienza de nuevo en Fatebound neutral al abrir la aplicación.
 - Personajes y Crónicas no aparecen en el menú sin un mundo jugable activo; sus vistas estructurales no crean, editan ni persisten datos.
 - Ajustes ofrece idioma, diagnóstico, exportación y restauración manual de backups SQLite; no ofrece exploración general de archivos ni cambio de la raíz activa.
-- No existe todavía importador, editor de mundos, motor de reglas, campañas jugables o IA.
+- La muestra **Ecos de la marea** está destinada a verificar el contrato como artefacto técnico; no está instalada ni aparece en la interfaz.
+- No existe todavía selector/importador, instalación persistente, editor de mundos, motor de reglas, campañas jugables o IA.
 
 ## Siguiente tarea prioritaria
 
-**Validar manualmente interrupciones reales durante las distintas fases de sustitución y la recuperación resultante al siguiente arranque.**
+**Revisar y actualizar de forma controlada Electron y su cadena de dependencias, evaluando la migración mayor antes de iniciar el importador.**
 
 ## Pendientes por fases
 
 ### Seguridad y recuperación
 
+- Revisar y actualizar de forma controlada Electron y su cadena de dependencias. La solución forzada propuesta por npm elevaría Electron a 44.7.0 e introduciría cambios mayores, por lo que no debe aplicarse automáticamente.
 - Diseñar la recuperación conjunta de SQLite y las versiones instaladas de paquetes que necesiten sus datos.
 - Diseñar la cuarentena y recuperación asistida de una base activa dañada fuera de una restauración registrada.
 - Validar la aplicación desde un pendrive físico y otro ordenador.
@@ -114,8 +129,8 @@ El producto continúa en fase de fundamentos: no existen todavía esquema del ju
 
 - Mantener pendiente la recuperación conjunta con paquetes, sin sobrescritura silenciosa.
 - Implementar repositorios sobre la transacción central SQLite.
-- Especificar y versionar definitivamente el contrato `.fateworld`.
-- Implementar importación segura, versiones inmutables y vínculos exactos de personajes y crónicas.
+- Implementar selección, vista previa, importación segura e instalación inmutable reutilizando el validador v1.
+- Definir los vínculos exactos de personajes y crónicas con identidad y versión de mundo.
 - Implementar la ficha base permanente y el progreso independiente por Crónica, impidiendo que una ficha participe en dos Crónicas en curso.
 - Conservar la ocupación tras cerrar la aplicación; liberar la ficha solo al finalizar o abandonar definitivamente, con abandono irreversible e historial consultable.
 - Permitir reutilizar una ficha base en otra Crónica después de la muerte del personaje en una anterior.
@@ -144,15 +159,17 @@ El producto continúa en fase de fundamentos: no existen todavía esquema del ju
 - La recuperación ante fallos está cubierta parcialmente por pruebas automatizadas, pero no se considera infalible ni equivale a haber provocado y verificado manualmente una interrupción real.
 - Retirar una unidad durante una escritura sigue siendo inseguro incluso con la configuración conservadora de SQLite.
 - `node:sqlite` permanece ligado a la versión de Node incluida en Electron 39.
-- No existe una especificación normativa de `.fateworld`, un esquema del juego ni un motor mecánico.
+- La especificación normativa y el validador `.fateworld` v1 han superado sus comprobaciones técnicas, pero todavía no existen importador, instalación desde la interfaz, esquema del juego ni motor mecánico.
+- La auditoría completa ejecutada por el usuario informó 10 vulnerabilidades npm —8 moderadas y 2 altas—; con `--omit=dev` permanecen 6 —4 moderadas y 2 altas—.
+- Los informes señalan Electron 39 y dependencias relacionadas, entre ellas `extract-zip`, `@electron/get`, `sprintf-js` y herramientas de empaquetado. `yauzl` y `yaml` no aparecen como vulnerables en esos informes, lo que no garantiza que estén libres de vulnerabilidades.
+- La corrección forzada propuesta por npm actualizaría Electron a 44.7.0 con cambios mayores. No se ha ejecutado `npm audit fix` ni se han alterado dependencias; queda pendiente una revisión y actualización controlada de toda la cadena.
 
 ## Decisiones pendientes
 
 - Confirmar tras revisión visual si la composición, los recortes, el contraste y la densidad de los nueve temas y las ocho tarjetas son la dirección adecuada.
 - Decidir si la preferencia de tema se persistirá como ajuste de aplicación cuando existan mundos reales.
 - Definir los tokens y recursos admitidos por los temas `.fateworld` sin convertir el catálogo interno actual en una especificación prematura.
-- Definir manifiesto, esquema, límites, capacidades y traducciones del formato de mundos.
-- Concretar en la futura especificación `.fateworld` el contrato independiente de idiomas disponibles y predeterminado por mundo sin inventar traducciones.
+- Definir el futuro catálogo de capacidades mecánicas y su primera versión compatible; el v1 actual rechaza cualquier capacidad.
 - Concretar la recuperación conjunta de SQLite y paquetes instalados, además de la cuarentena asistida de bases activas dañadas no vinculadas a un journal de restauración.
 - Definir firma de Windows, perfil privado y condiciones de licencia antes de distribuir contenido de terceros.
 
@@ -162,11 +179,27 @@ El producto continúa en fase de fundamentos: no existen todavía esquema del ju
 - Finalizar o abandonar definitivamente una Crónica liberará la ficha. El abandono será irreversible y conservará el historial consultable. Morir en una Crónica no impedirá reutilizar la ficha base en otra nueva.
 - El primer motor será fiel a las mecánicas originales de Ronin. Los primeros mundos compartirán motor y variarán principalmente en ambientación, contenido y organización declarativa.
 - Las tablas tendrán identificadores estables independientes de sus posiciones visibles. Cada mundo podrá reorganizar, sustituir u omitir tablas o reglas si sus referencias siguen siendo válidas.
-- Los paquetes `.fateworld` contendrán definiciones versionadas de reglas y contenido. SQLite almacenará fichas base, progreso y estado por Crónica, secundarios, clanes, relaciones, tiradas, combates, decisiones, efectos pendientes y eventos.
+- El paquete `.fateworld` v1 contiene identidad, contenido narrativo y tablas enlazadas; futuras versiones incorporarán definiciones mecánicas versionadas. SQLite almacenará fichas base, progreso y estado por Crónica, secundarios, clanes, relaciones, tiradas, combates, decisiones, efectos pendientes y eventos.
 - El motor evolucionará de Ronin-compatible a ampliado y después especializado, preservando los mundos y partidas anteriores.
 - La futura recuperación completa tendrá en cuenta SQLite y las versiones instaladas de los paquetes.
 
-Estas decisiones no constituyen un esquema SQL, un manifiesto `.fateworld`, un importador ni un motor implementado.
+Estas decisiones no constituyen un esquema SQL, un importador ni un motor implementado. El manifiesto y las tablas narrativas v1 sí están definidos, pero no expresan todavía esas mecánicas ni el estado de juego.
+
+## Verificación del hito `.fateworld` v1
+
+Resultados reales comunicados por el usuario:
+
+- `npm test`: 99/99 correctos.
+- Primera ejecución de ESLint: seis errores, corregidos posteriormente.
+- `npm run lint -- --quiet`: correcto tras las correcciones.
+- `npm run typecheck`: correcto.
+- `npm run build`: correcto.
+- `npm run build:win`: ejecutable portable de Windows generado.
+- Pruebas específicas del validador repetidas tras corregir la comprobación de caracteres de control: 19/19 correctas.
+- `npm run build:example-world`: correcto.
+- SHA-256 del paquete de ejemplo antes y después de regenerarlo: idéntico, `7B87AC86C2681AE79A1D8490D3FF697CFE1368A31318BB89A8C3364F658A5B31`.
+
+No se ha probado la importación ni la instalación desde la interfaz porque esas funciones todavía no están implementadas.
 
 ## Verificación histórica del hito de exportación
 
@@ -250,3 +283,8 @@ Los recursos gráficos de Ronin presentes en el repositorio no autorizan su dist
 - Completada la validación automatizada del hito con 80/80 tests, lint, typecheck y build correctos.
 - Generado y probado el portable de Windows; restauración normal, hashes de la base restaurada y la copia `protected`, reapertura, diagnóstico, cancelación y rechazo de una copia manipulada comprobados con bases técnicas.
 - Mantenidas como pendientes las interrupciones reales, los fallos de permisos o espacio, la revisión exhaustiva en inglés y coreano, las confirmaciones repetidas y las pruebas en pendrive físico y otro ordenador.
+- Definido el contrato normativo `.fateworld` v1 con manifiesto, idiomas, rutas, límites, tablas enlazadas y política de capacidades desconocidas.
+- Implementado el validador ZIP/YAML sin extracción ni efectos secundarios y completada su validación técnica: 99/99 pruebas totales, 19/19 específicas del validador, lint, typecheck y builds correctos.
+- Añadidas las fuentes y el paquete reproducible original **Ecos de la marea** como muestra técnica no jugable.
+- Confirmada la reproducción determinista de **Ecos de la marea** mediante un SHA-256 idéntico antes y después de regenerar el paquete.
+- Registradas las vulnerabilidades comunicadas por `npm audit` y aplazada cualquier actualización mayor de Electron a una revisión controlada de dependencias.

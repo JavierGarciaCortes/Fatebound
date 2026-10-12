@@ -1,0 +1,18 @@
+formatVersion: '1'
+world:
+  id: com.fatebound.samples.echoes-of-the-tide
+  version: 1.0.0
+  titles:
+    es: Ecos de la marea
+  defaultLanguage: es
+  languages:
+    - es
+compatibility:
+  requiredCapabilities: []
+content:
+  descriptions:
+    es: content/es/description.md
+data:
+  tables: data/tables.yaml
+resources:
+  images: []
