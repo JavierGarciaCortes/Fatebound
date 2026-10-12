@@ -7,16 +7,25 @@ import { activateStoragePaths, hasActiveStoragePaths } from './storage/portable-
 import {
   closeActiveSqliteDatabase,
   hasOpenActiveSqliteDatabase,
-  openActiveSqliteDatabase
+  openActiveSqliteDatabase,
+  restoreActiveSqliteBackup
 } from './storage/sqlite-storage.ts'
 import { readStorageDiagnostics } from './storage/storage-diagnostics.ts'
 import { registerStorageDiagnosticsIpc } from './storage/storage-diagnostics-ipc.ts'
 import { registerManualSqliteExportIpc } from './storage/sqlite-manual-export-ipc.ts'
 import { exportManualSqliteBackup } from './storage/sqlite-manual-export.ts'
+import { registerSqliteRestoreIpc } from './storage/sqlite-safe-restore-ipc.ts'
+import {
+  inspectRestorableSqliteBackup,
+  recoverInterruptedSqliteRestore
+} from './storage/sqlite-safe-restore.ts'
 import { acquireSingleInstanceLock } from './single-instance.ts'
 import { registerApplicationPreferencesIpc } from './preferences/application-preferences-ipc.ts'
 import { readActiveApplicationLanguage } from './preferences/application-preferences.ts'
-import { DEFAULT_APPLICATION_LANGUAGE, type ApplicationLanguage } from '../shared/application-language.ts'
+import {
+  DEFAULT_APPLICATION_LANGUAGE,
+  type ApplicationLanguage
+} from '../shared/application-language.ts'
 import { translate, type MessageKey } from '../shared/i18n/index.ts'
 
 let mainWindow: BrowserWindow | null = null
@@ -35,6 +44,20 @@ async function selectManualSqliteExportDestination(): Promise<string | undefined
     title: mainT('native.export.chooseTitle'),
     buttonLabel: mainT('native.export.chooseButton'),
     properties: ['openDirectory', 'createDirectory', 'promptToCreate', 'dontAddToRecent']
+  }
+  const result =
+    mainWindow && !mainWindow.isDestroyed()
+      ? await dialog.showOpenDialog(mainWindow, options)
+      : await dialog.showOpenDialog(options)
+
+  return result.canceled || result.filePaths.length !== 1 ? undefined : result.filePaths[0]
+}
+
+async function selectSqliteRestoreSource(): Promise<string | undefined> {
+  const options: OpenDialogOptions = {
+    title: mainT('native.restore.chooseTitle'),
+    buttonLabel: mainT('native.restore.chooseButton'),
+    properties: ['openDirectory', 'dontAddToRecent']
   }
   const result =
     mainWindow && !mainWindow.isDestroyed()
@@ -99,6 +122,10 @@ async function startApplication(): Promise<void> {
   }
 
   activateStoragePaths(storageResult.paths)
+  const recovery = await recoverInterruptedSqliteRestore(storageResult.paths)
+  if (recovery !== 'none') {
+    console.warn(`Recovered interrupted Fatebound SQLite restore: ${recovery}`)
+  }
   const languageResult = await readActiveApplicationLanguage()
   mainApplicationLanguage = languageResult.language
   await openActiveSqliteDatabase({
@@ -139,8 +166,7 @@ async function startApplication(): Promise<void> {
 
 function registerApplicationLifecycle(): void {
   registerApplicationPreferencesIpc(
-    (channel, handler) =>
-      ipcMain.handle(channel, (_event, ...args: unknown[]) => handler(...args)),
+    (channel, handler) => ipcMain.handle(channel, (_event, ...args: unknown[]) => handler(...args)),
     {
       onLanguageSelected(language) {
         mainApplicationLanguage = language
@@ -162,6 +188,14 @@ function registerApplicationLifecycle(): void {
     selectManualSqliteExportDestination,
     exportManualSqliteBackup,
     (error) => console.error('Unable to export a manual Fatebound SQLite backup', error)
+  )
+
+  registerSqliteRestoreIpc(
+    (channel, handler) => ipcMain.handle(channel, () => handler()),
+    selectSqliteRestoreSource,
+    inspectRestorableSqliteBackup,
+    restoreActiveSqliteBackup,
+    (error) => console.error('Unable to restore a Fatebound SQLite backup safely', error)
   )
 
   // This method will be called when Electron has finished
@@ -194,10 +228,7 @@ function registerApplicationLifecycle(): void {
         return
       }
 
-      dialog.showErrorBox(
-        mainT('native.database.title'),
-        mainT('native.database.detail')
-      )
+      dialog.showErrorBox(mainT('native.database.title'), mainT('native.database.detail'))
       app.quit()
     })
   })

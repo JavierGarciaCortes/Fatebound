@@ -96,6 +96,39 @@ export const ko = {
   'settings.export.inProgressError': '백업 내보내기가 이미 진행 중입니다.',
   'settings.export.genericError':
     '내보내기를 완료하지 못했습니다. 활성 데이터베이스와 기존 백업은 변경되지 않았습니다.',
+  'settings.restore.eyebrow': '제어된 복구',
+  'settings.restore.title': '백업 복원',
+  'settings.restore.body':
+    'Fatebound 백업 폴더를 선택하세요. 복원을 제안하기 전에 백업을 완전히 검증합니다.',
+  'settings.restore.action': '백업 선택',
+  'settings.restore.selecting': '백업 선택 및 검증 중…',
+  'settings.restore.selectionCancelled': '선택을 취소했습니다. 데이터는 변경되지 않았습니다.',
+  'settings.restore.invalidError':
+    '선택한 폴더에 완전하고 읽을 수 있으며 검증 가능한 Fatebound 백업이 없습니다.',
+  'settings.restore.incompatibleError':
+    '이 백업의 스키마 버전은 현재 Fatebound 버전에서 복원할 수 없습니다.',
+  'settings.restore.changedError':
+    '미리 보기 이후 백업이 변경되었습니다. 다시 선택하여 검증하세요.',
+  'settings.restore.selectionRequiredError': '확인하기 전에 백업을 선택하고 검증하세요.',
+  'settings.restore.inProgressError': '백업 복원이 이미 진행 중입니다.',
+  'settings.restore.recoveryRequiredError':
+    'Fatebound가 안전한 데이터베이스를 다시 열지 못했습니다. 시작 복구를 실행하려면 앱을 닫았다가 다시 여세요. 데이터 파일을 이동하거나 삭제하지 마세요.',
+  'settings.restore.genericError':
+    '복원을 완료하지 못했습니다. Fatebound가 이전 데이터베이스를 보존하거나 복구하려고 시도했습니다.',
+  'settings.restore.working': '현재 데이터베이스를 보호하고 백업을 복원하는 중…',
+  'settings.restore.success': '백업을 복원하고 SQLite 데이터베이스 검증을 완료했습니다.',
+  'settings.restore.cancelAction': '취소',
+  'settings.restore.confirmAction': '복원 확인',
+  'settings.restore.previewDate': '백업 날짜',
+  'settings.restore.previewType': '유형',
+  'settings.restore.previewSchema': '스키마 버전',
+  'settings.restore.previewSize': '크기',
+  'settings.restore.warning':
+    '확인하면 활성 SQLite 데이터가 교체됩니다. 먼저 Fatebound가 현재 데이터베이스의 보호 백업을 만들고 검증합니다.',
+  'settings.restore.reason.preMigration': '마이그레이션 전',
+  'settings.restore.reason.protected': '보호됨',
+  'settings.restore.reason.automatic': '자동',
+  'settings.restore.reason.manual': '수동',
   'settings.diagnostics.readOnly': '읽기 전용',
   'settings.diagnostics.title': 'SQLite 저장소',
   'settings.diagnostics.checking': '확인 중…',
@@ -144,7 +177,8 @@ export const ko = {
   'theme.shaolin.name': 'Shaolin',
   'theme.shaolin.tagline': '수련, 길, 자비',
   'theme.shaolin.category': '무예',
-  'theme.shaolin.description': '산과 사원, 내면의 수련을 통해 배움과 균형, 자비의 이야기를 펼칩니다.',
+  'theme.shaolin.description':
+    '산과 사원, 내면의 수련을 통해 배움과 균형, 자비의 이야기를 펼칩니다.',
   'theme.shaolin.atmosphere': '대지 · 황갈색 · 새벽',
   'theme.robot.name': 'Robot',
   'theme.robot.tagline': '기억, 강철, 정체성',
@@ -160,8 +194,7 @@ export const ko = {
   'theme.naves.name': 'Naves',
   'theme.naves.tagline': '탐험, 공허, 별',
   'theme.naves.category': '우주 오디세이',
-  'theme.naves.description':
-    '먼 궤도와 우주선, 불가능한 지평선 너머 미지의 모험을 떠납니다.',
+  'theme.naves.description': '먼 궤도와 우주선, 불가능한 지평선 너머 미지의 모험을 떠납니다.',
   'theme.naves.atmosphere': '공허 · 보라 · 별빛',
   'theme.mundoplato.name': 'Mundoplato',
   'theme.mundoplato.tagline': '모험, 마법, 소동',
@@ -183,8 +216,10 @@ export const ko = {
     '기본 데이터베이스와 이전 백업은 교체되지 않았습니다. Fatebound를 계속 사용할 수 있지만, 진행하기 전에 여유 공간과 드라이브를 확인하세요.',
   'native.export.chooseTitle': 'Fatebound 백업을 저장할 폴더 선택',
   'native.export.chooseButton': '여기에 내보내기',
+  'native.restore.chooseTitle': 'Fatebound 백업 선택',
+  'native.restore.chooseButton': '이 백업 검증',
   'native.common.accept': '확인',
   'native.database.title': 'Fatebound가 데이터를 열 수 없습니다',
   'native.database.detail':
-    'SQLite 무결성 검사, 백업 또는 마이그레이션을 완료하지 못했습니다. Fatebound는 인터페이스를 열지 않고 종료하며 데이터베이스를 자동으로 복원하거나 교체하지 않습니다.'
+    'SQLite 무결성 검사, 백업, 마이그레이션 또는 복구를 완료하지 못했습니다. Fatebound는 인터페이스를 열지 않고 종료하며 복구 가능한 파일 위에 빈 데이터베이스를 초기화하지 않습니다.'
 } satisfies TranslationMessages

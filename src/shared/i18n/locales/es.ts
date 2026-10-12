@@ -52,8 +52,7 @@ export const es = {
   'characters.body':
     'La creación y gestión de personajes se implementará cuando exista el esquema del juego. Esta pantalla no guarda datos ni ofrece acciones simuladas.',
   'characters.future.title': 'Preparado para el futuro',
-  'characters.future.body':
-    'Cada personaje quedará vinculado a una versión exacta de su mundo.',
+  'characters.future.body': 'Cada personaje quedará vinculado a una versión exacta de su mundo.',
   'chronicles.eyebrow': 'Crónicas',
   'chronicles.title': 'No hay historias en curso',
   'chronicles.body':
@@ -95,6 +94,39 @@ export const es = {
   'settings.export.inProgressError': 'Ya hay una exportación en curso.',
   'settings.export.genericError':
     'No se pudo completar la exportación. La base activa y las copias anteriores no se han modificado.',
+  'settings.restore.eyebrow': 'Recuperación controlada',
+  'settings.restore.title': 'Restaurar copia de seguridad',
+  'settings.restore.body':
+    'Selecciona una carpeta de backup de Fatebound. La copia se verificará antes de ofrecer la restauración.',
+  'settings.restore.action': 'Seleccionar copia',
+  'settings.restore.selecting': 'Seleccionando y verificando la copia…',
+  'settings.restore.selectionCancelled': 'Selección cancelada. No se ha modificado ningún dato.',
+  'settings.restore.invalidError':
+    'La carpeta no contiene una copia completa, legible y verificable de Fatebound.',
+  'settings.restore.incompatibleError':
+    'La copia usa una versión de esquema que esta versión de Fatebound no puede restaurar.',
+  'settings.restore.changedError':
+    'La copia ha cambiado desde la vista previa. Vuelve a seleccionarla y compruébala de nuevo.',
+  'settings.restore.selectionRequiredError': 'Selecciona y verifica una copia antes de confirmar.',
+  'settings.restore.inProgressError': 'Ya hay una operación de restauración en curso.',
+  'settings.restore.recoveryRequiredError':
+    'Fatebound no pudo reabrir una base segura. Cierra y vuelve a abrir la aplicación para ejecutar la recuperación de arranque; no muevas ni borres los archivos de datos.',
+  'settings.restore.genericError':
+    'No se pudo completar la restauración. Fatebound ha intentado conservar o recuperar la base anterior.',
+  'settings.restore.working': 'Protegiendo la base actual y restaurando la copia…',
+  'settings.restore.success': 'Copia restaurada y base SQLite comprobada correctamente.',
+  'settings.restore.cancelAction': 'Cancelar',
+  'settings.restore.confirmAction': 'Confirmar restauración',
+  'settings.restore.previewDate': 'Fecha de la copia',
+  'settings.restore.previewType': 'Tipo',
+  'settings.restore.previewSchema': 'Versión de esquema',
+  'settings.restore.previewSize': 'Tamaño',
+  'settings.restore.warning':
+    'Al confirmar se sustituirán los datos SQLite activos. Antes, Fatebound creará y verificará una copia protegida de la base actual.',
+  'settings.restore.reason.preMigration': 'Previa a migración',
+  'settings.restore.reason.protected': 'Protegida',
+  'settings.restore.reason.automatic': 'Automática',
+  'settings.restore.reason.manual': 'Manual',
   'settings.diagnostics.readOnly': 'Solo lectura',
   'settings.diagnostics.title': 'Almacenamiento SQLite',
   'settings.diagnostics.checking': 'Comprobando…',
@@ -180,16 +212,17 @@ export const es = {
   'native.storage.chooseTitle': 'Elegir carpeta de datos de Fatebound',
   'native.storage.chooseButton': 'Usar esta carpeta',
   'native.backup.title': 'Copia de seguridad no completada',
-  'native.backup.message':
-    'Fatebound no ha podido crear o mantener la copia automática de SQLite.',
+  'native.backup.message': 'Fatebound no ha podido crear o mantener la copia automática de SQLite.',
   'native.backup.detail':
     'La base de datos principal y las copias anteriores no se han sustituido. Puedes seguir usando Fatebound, pero conviene revisar el espacio disponible y la unidad antes de continuar.',
   'native.export.chooseTitle': 'Elegir destino para la copia de Fatebound',
   'native.export.chooseButton': 'Exportar aquí',
+  'native.restore.chooseTitle': 'Elegir copia de seguridad de Fatebound',
+  'native.restore.chooseButton': 'Verificar esta copia',
   'native.common.accept': 'Entendido',
   'native.database.title': 'Fatebound no puede abrir sus datos',
   'native.database.detail':
-    'La comprobación de integridad, la copia de seguridad o la migración de SQLite no se pudo completar. Fatebound se cerrará sin abrir la interfaz y no restaurará ni sustituirá automáticamente la base de datos.'
+    'La comprobación de integridad, la copia, la migración o la recuperación SQLite no se pudo completar. Fatebound se cerrará sin abrir la interfaz y no inicializará una base vacía sobre archivos recuperables.'
 } as const
 
 export type MessageKey = keyof typeof es

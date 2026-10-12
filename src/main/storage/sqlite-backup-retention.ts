@@ -23,6 +23,7 @@ export interface SqliteBackupCatalogEntry {
 export interface SqliteBackupRetentionOptions {
   readonly automaticLimit?: number
   readonly protectedLimit?: number
+  readonly preserveDirectories?: readonly string[]
 }
 
 export interface SqliteBackupRetentionResult {
@@ -145,6 +146,11 @@ function assertRetentionLimit(limit: number, name: string): void {
   }
 }
 
+function retentionPathKey(directory: string): string {
+  const resolvedDirectory = resolve(directory)
+  return process.platform === 'win32' ? resolvedDirectory.toLowerCase() : resolvedDirectory
+}
+
 export async function enforceSqliteBackupRetention(
   backupsDirectory: string,
   options: SqliteBackupRetentionOptions = {}
@@ -152,6 +158,7 @@ export async function enforceSqliteBackupRetention(
   const resolvedBackupsDirectory = resolve(backupsDirectory)
   const automaticLimit = options.automaticLimit ?? AUTOMATIC_BACKUP_RETENTION_LIMIT
   const protectedLimit = options.protectedLimit ?? PROTECTED_BACKUP_RETENTION_LIMIT
+  const preservedDirectories = new Set((options.preserveDirectories ?? []).map(retentionPathKey))
   assertRetentionLimit(automaticLimit, 'automaticLimit')
   assertRetentionLimit(protectedLimit, 'protectedLimit')
 
@@ -161,8 +168,12 @@ export async function enforceSqliteBackupRetention(
   )
   const protectedBackups = oldestFirst(validBackups.filter(isProtectedBackup))
   const candidates = [
-    ...automatic.slice(0, Math.max(0, automatic.length - automaticLimit)),
-    ...protectedBackups.slice(0, Math.max(0, protectedBackups.length - protectedLimit))
+    ...automatic
+      .filter((entry) => !preservedDirectories.has(retentionPathKey(entry.directory)))
+      .slice(0, Math.max(0, automatic.length - automaticLimit)),
+    ...protectedBackups
+      .filter((entry) => !preservedDirectories.has(retentionPathKey(entry.directory)))
+      .slice(0, Math.max(0, protectedBackups.length - protectedLimit))
   ]
   const deletedDirectories: string[] = []
   let remainingValidBackups = validBackups.length

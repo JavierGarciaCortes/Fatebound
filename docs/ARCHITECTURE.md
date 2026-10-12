@@ -1,8 +1,8 @@
 # Arquitectura de Fatebound 2.0
 
-Estado del documento: arquitectura aprobada con el resolvedor, la seguridad SQLite, la exportación manual de backups, la primera shell visual y el empaquetado portable de Windows ya implementados; el dominio y el motor continúan pendientes.
+Estado del documento: arquitectura aprobada con el resolvedor, la seguridad SQLite, la exportación y restauración manual de backups, la primera shell visual y el empaquetado portable de Windows ya implementados; el dominio y el motor continúan pendientes.
 
-Última actualización: 2026-10-11.
+Última actualización: 2026-10-12.
 
 Este documento describe la dirección aprobada para Fatebound y marca expresamente lo que todavía no existe. La única tabla actual controla migraciones; no se ha definido el esquema SQL del juego ni se consideran implementados los demás subsistemas propuestos. La dirección específica de paquetes se mantiene en [WORLD_FORMAT.md](WORLD_FORMAT.md) y la de interfaz en [DESIGN_SYSTEM.md](DESIGN_SYSTEM.md).
 
@@ -10,8 +10,8 @@ Este documento describe la dirección aprobada para Fatebound y marca expresamen
 
 El repositorio contiene actualmente:
 
-- un proceso main que crea una ventana, gestiona el ciclo de vida y atiende diagnóstico y exportación SQLite;
-- un preload restringido que expone únicamente contratos específicos de diagnóstico, exportación y preferencias;
+- un proceso main que crea una ventana, gestiona el ciclo de vida y atiende diagnóstico, exportación y restauración SQLite;
+- un preload restringido que expone únicamente contratos específicos de diagnóstico, exportación, restauración y preferencias;
 - un renderer Vue con shell de Fatebound, identidad base y nueve temas YAML integrados con ilustraciones empaquetadas;
 - TypeScript estricto, ESLint, Prettier, electron-vite y electron-builder;
 - recursos de marca y 36 imágenes de combinaciones de dados para los clanes de Ronin;
@@ -19,7 +19,7 @@ El repositorio contiene actualmente:
 - un empaquetado público con lista explícita de recursos propios; la variante privada todavía no está configurada;
 - un resolvedor central, una comprobación de escritura y una conexión SQLite ejecutados en main antes de crear la ventana principal;
 - migraciones SQL versionadas y transaccionales con una única migración técnica inicial;
-- integridad, copias previas a migraciones, copias automáticas, retención segura y exportación manual ejecutadas exclusivamente en main.
+- integridad, copias previas a migraciones o restauraciones, copias automáticas, retención segura, exportación y restauración manual ejecutadas exclusivamente en main.
 
 No están implementados el esquema de persistencia del juego, los repositorios del dominio, los mundos jugables, el importador, el editor, el motor de reglas, las campañas, las crónicas ni la integración de IA. Las tarjetas de mundos y los estados futuros de la shell son demostraciones de presentación, no datos instalados.
 
@@ -44,7 +44,7 @@ flowchart LR
     UI[Vue renderer\nPresentación] -->|API mínima tipada| PRE[Preload\nContext bridge]
     PRE -->|IPC validado| APP[Main\nServicios de aplicación]
     APP --> DOM[Dominio\nMundos, reglas y partidas]
-    APP --> INF[Infraestructura\nSQLite, archivos y exportación]
+    APP --> INF[Infraestructura\nSQLite, archivos, backups y recuperación]
     DOM --> PORTS[Puertos de repositorio]
     INF --> PORTS
     INF --> DATA[(Datos portables)]
@@ -53,13 +53,13 @@ flowchart LR
 
 ### 3.1 Renderer — presentación
 
-Vue representa vistas, formularios y estados de interacción. Puede solicitar operaciones mediante la API del preload, pero no recibe consultas SQL, módulos de Node ni acceso general a rutas. El diagnóstico presenta las rutas activas de datos y base sin permitir elegir, recorrer, leer ni modificar otros archivos. La exportación solicita que main abra el selector del sistema, sin enviar o recibir la ruta seleccionada. Las respuestas son DTO tipados y sin detalles internos innecesarios.
+Vue representa vistas, formularios y estados de interacción. Puede solicitar operaciones mediante la API del preload, pero no recibe consultas SQL, módulos de Node ni acceso general a rutas. El diagnóstico presenta las rutas activas de datos y base sin permitir elegir, recorrer, leer ni modificar otros archivos. Exportación y restauración solicitan que main abra el selector del sistema, sin enviar o recibir la ruta seleccionada. Las respuestas son DTO tipados y sin detalles internos innecesarios.
 
 **Implementado:** la demo de electron-vite se ha sustituido por una shell que separa navegación global y contextual. La marca completa es el acceso a Inicio, Ajustes es un botón de cabecera y el menú lateral contiene solo Mundos mientras no exista un mundo jugable instalado y activo. La estructura admite Mundos, Personajes y Crónicas cuando reciba en el futuro un contexto real con identificador y versión. El arranque usa `fatebound` como identidad visual neutral, no como mundo del catálogo. Ronin, Templario, Ninja, Shaolin, Robot, Soldado, Naves y Mundoplato pueden cambiar la ambientación durante la sesión, pero no instalan mundos ni amplían la navegación.
 
 ### 3.2 Preload — frontera nativa
 
-**Implementado:** el preload ya no expone `@electron-toolkit/preload` ni `ipcRenderer`. Ofrece únicamente `window.api.storage.getDiagnostics()`, `window.api.storage.exportSqliteBackup()` y `window.api.preferences.getLanguage()`/`setLanguage()` sobre canales fijos. La exportación no acepta argumentos ni devuelve la ruta elegida; solo comunica éxito con el nombre generado, cancelación o un código conocido. Los contratos compartidos son tipados, el idioma se valida tanto en preload como en main y no se aceptan rutas ni identificadores arbitrarios. Capacidades futuras se añadirán expresamente, sin primitivas generales de archivos, SQL ni la conexión SQLite.
+**Implementado:** el preload ya no expone `@electron-toolkit/preload` ni `ipcRenderer`. Ofrece únicamente operaciones fijas de diagnóstico, exportación, selección/confirmación/cancelación de restauración y preferencia de idioma. Ninguna operación de backup acepta una ruta: main conserva tanto el destino de exportación como la selección de restauración. La vista previa devuelve solo fecha, motivo, versión de esquema y tamaño; la confirmación tampoco acepta metadatos ni identificadores del renderer. Los contratos compartidos son tipados, el idioma se valida tanto en preload como en main y no existen primitivas generales de archivos, SQL ni acceso a la conexión SQLite.
 
 ### 3.3 Main — aplicación
 
@@ -170,7 +170,7 @@ La configuración inicial es deliberadamente conservadora para almacenamiento ex
 - claves foráneas activas, extensiones cargables deshabilitadas, literales de cadena con comillas dobles deshabilitados y `trusted_schema=OFF`.
 - `temp_store=MEMORY`, para que los temporales no transaccionales no dependan de la carpeta temporal del sistema, y un timeout de bloqueos de cinco segundos.
 
-Esta configuración no puede garantizar durabilidad si el sistema operativo, el controlador o la propia unidad informan de una sincronización antes de persistir los datos, ni puede hacer segura la retirada física durante una escritura. Sigue pendiente probar una unidad extraíble real y completar la recuperación explícita; la exportación manual ya está implementada.
+Esta configuración no puede garantizar durabilidad si el sistema operativo, el controlador o la propia unidad informan de una sincronización antes de persistir los datos, ni puede hacer segura la retirada física durante una escritura. Sigue pendiente probar una unidad extraíble real y la recuperación conjunta con paquetes; la exportación manual de SQLite está validada y, para la restauración, se han comprobado en el portable el flujo normal y los rechazos, pero no interrupciones reales durante la sustitución.
 
 `src/main/storage/sqlite-migrations.ts` contiene un manifiesto ordenado de migraciones con versión, nombre y SQL. El planificador compara toda la historia aplicada con el manifiesto integrado antes de modificar la base; una versión futura, un hueco o un nombre distinto bloquean el arranque. Cada migración pendiente se ejecuta de forma independiente con `BEGIN IMMEDIATE`, registra su versión dentro de la misma transacción y termina con `COMMIT`; cualquier error ejecuta `ROLLBACK` para esa migración.
 
@@ -178,7 +178,7 @@ La migración 1, `initialize_migration_tracking`, crea únicamente `fatebound_sc
 
 ### 4.5 Integridad y copias de seguridad SQLite
 
-**Implementado en dos fases:** una base que ya existía antes del arranque debe superar `PRAGMA quick_check` y `PRAGMA foreign_key_check` antes de planificar cualquier migración. Si existen migraciones pendientes, debe superar además `PRAGMA integrity_check` antes de crear la copia protegida y después de terminar las migraciones. La base nueva también se comprueba tras su migración inicial, pero no genera una copia vacía. Un error de lectura, corrupción o infracción de claves foráneas cierra la conexión y bloquea el arranque normal; Fatebound no borra, regenera, restaura ni sustituye automáticamente el archivo.
+**Implementado en dos fases:** una base que ya existía antes del arranque debe superar `PRAGMA quick_check` y `PRAGMA foreign_key_check` antes de planificar cualquier migración. Si existen migraciones pendientes, debe superar además `PRAGMA integrity_check` antes de crear la copia protegida y después de terminar las migraciones. La base nueva también se comprueba tras su migración inicial, pero no genera una copia vacía. Un error de lectura, corrupción o infracción de claves foráneas cierra la conexión y bloquea el arranque normal. La única sustitución automática admitida es la recuperación conservadora de una restauración explícita interrumpida y reconocida por su journal propio; nunca se inicializa silenciosamente una base vacía sobre archivos recuperables.
 
 `src/main/storage/sqlite-backup.ts` usa exclusivamente `backup()` de `node:sqlite` sobre la conexión abierta en main. No copia directamente `fatebound.sqlite`. El procedimiento actual es:
 
@@ -198,7 +198,7 @@ La cola `SqliteOperationQueue` impide solapar escrituras gestionadas y copias. E
 
 La retención solo empieza después de que la copia nueva esté publicada y verificada. Conserva como máximo seis copias `automatic` y dos protegidas en conjunto (`pre-migration` y `protected`); ignora siempre `manual`. Antes de eliminar un directorio se comprueban de nuevo el marcador de aplicación, el nombre derivado del manifiesto, los dos archivos exactos, tamaño, SHA-256, `integrity_check` y claves foráneas. La última copia válida nunca se elimina. Manifiestos v1 anteriores, manifiestos inválidos, archivos adicionales y rutas desconocidas no se consideran administrados y permanecen intactos. Una imposibilidad de aplicar retención se informa pero no invalida una copia nueva ya publicada. No existe un umbral fijo de espacio ni se eliminan copias antiguas para hacer sitio antes de crear otra.
 
-Las copias locales permanecen en el mismo dispositivo que `data/fatebound.sqlite`: protegen frente a una migración o modificación lógica, pero no frente a pérdida o avería física de la unidad. La exportación manual ya permite conservar una copia verificada en otra ubicación. La restauración explícita todavía no está implementada y nunca sobrescribirá datos sin una decisión expresa del usuario.
+Las copias locales permanecen en el mismo dispositivo que `data/fatebound.sqlite`: protegen frente a una migración o modificación lógica, pero no frente a pérdida o avería física de la unidad. La exportación manual permite conservar una copia verificada en otra ubicación y la restauración SQLite exige selección y confirmación expresas.
 
 **Dirección aprobada, todavía no implementada:** la recuperación completa no podrá limitarse a SQLite. También deberá identificar y recuperar las versiones exactas de los paquetes `.fateworld` instalados que necesiten personajes y Crónicas. Esta decisión no define todavía un formato de archivo de recuperación, un manifiesto de paquete ni un procedimiento de restauración.
 
@@ -206,15 +206,31 @@ Referencias técnicas de la decisión: [API `node:sqlite` de Node 22.23](https:/
 
 ### 4.6 Exportación manual de backups
 
-**Implementada, pendiente de validación manual:** Ajustes invoca un canal IPC específico y sin argumentos. Main abre el selector nativo de carpetas con el idioma activo y conserva la ruta íntegramente dentro del proceso privilegiado. El renderer recibe únicamente uno de tres resultados: éxito con el nombre seguro del directorio creado, cancelación o un código de error sanitizado.
+**Implementada y validada:** Ajustes invoca un canal IPC específico y sin argumentos. Main abre el selector nativo de carpetas con el idioma activo y conserva la ruta íntegramente dentro del proceso privilegiado. El renderer recibe únicamente uno de tres resultados: éxito con el nombre seguro del directorio creado, cancelación o un código de error sanitizado.
 
 Main resuelve la ruta real y rechaza destinos iguales o contenidos en los directorios activos de datos o backups, incluidos alias mediante enlaces que puedan resolverse. La creación se serializa en `SqliteOperationQueue` junto con escrituras, copias automáticas y cierre. Reutiliza `createSqliteBackup()` con motivo `manual`, por lo que ejecuta `backup()` sobre la conexión abierta, comprueba espacio cuando es posible, genera manifiesto v2 y publica un directorio único sin sustituir datos existentes.
 
 Antes de responder con éxito, la operación vuelve a pasar el directorio por `inspectManagedSqliteBackup()`: exige exactamente `fatebound.sqlite` y `manifest.json`, nombre coherente, tamaño, SHA-256, `integrity_check` y claves foráneas. Esta comprobación final permanece dentro de la cola, de modo que el cierre seguro espera también su finalización. Un fallo elimina los temporales marcados por el servicio; si la publicación recién creada no supera la validación final, solo se elimina esa ruta propia después de volver a comprobar su nombre, motivo, padre y archivos esperados. Cancelar el selector no crea archivos.
 
-La exportación externa no altera el estado del programador automático ni participa en la retención 6/2 de `data/backups/`. No implementa restauración, exploración general de archivos ni cambio de la raíz activa.
+La exportación externa no altera el estado del programador automático ni participa en la retención 6/2 de `data/backups/`. No ofrece exploración general de archivos ni cambio de la raíz activa.
 
-### 4.7 Diagnóstico de almacenamiento
+### 4.7 Restauración manual y recuperación de interrupciones
+
+**Implementada y validada en su flujo normal y sus rechazos:** Ajustes inicia un selector nativo de carpeta y main exige un backup v2 administrado completo: nombre derivado del manifiesto, aplicación, archivo esperado, tamaño, SHA-256, `integrity_check`, claves foráneas e historia de migraciones compatible. La vista previa devuelve únicamente fecha, motivo, versión y tamaño. Main conserva la entrada validada; Cancelar la descarta y Confirmar vuelve a inspeccionar esa misma entrada. Si cambia el directorio, el manifiesto o el contenido, la confirmación falla antes de tocar la base activa.
+
+La candidata confirmada se copia a un workspace único bajo `data/` y vuelve a validarse allí, de modo que un cambio durante la copia tampoco llega a la sustitución. La operación detiene el programador automático, espera las operaciones SQLite anteriores y usa la misma cola. Antes de cerrar la conexión crea con `backup()` una copia de motivo `protected`, la vuelve a inspeccionar y registra su nombre en un journal. La retención queda aplazada hasta que termine la recuperación, por lo que esa copia no puede desaparecer durante la secuencia.
+
+La sustitución no se describe como atómica: con SQLite cerrado, primero se renombra la base activa a `previous.sqlite` dentro del workspace del mismo volumen y después se mueve la candidata a `data/fatebound.sqlite`. La nueva base se abre con la configuración portable, aplica migraciones compatibles si las necesita, supera la validación completa y solo entonces el journal pasa a `completed`. La conexión y el programador se reconstruyen en la misma sesión; el cierre de Electron espera la promesa de restauración antes de cerrar la conexión resultante. Al reanudar la retención se excluyen la carpeta que sirvió como origen y la copia `protected` recién creada, por lo que la misma operación no elimina ninguna de las dos aunque el reloj del sistema altere su orden cronológico.
+
+El arranque ejecuta `recoverInterruptedSqliteRestore()` antes de abrir SQLite. Si la operación no alcanzó `completed`, recupera `previous.sqlite`; si esa candidata falta o no es válida, puede reconstruirla desde la copia `protected` verificada. Si el journal indica finalización, mantiene la base nueva únicamente después de volver a comprobarla. Los archivos desplazados y el workspace solo se eliminan cuando pertenecen al identificador registrado. Un journal incoherente o la ausencia de toda candidata segura bloquea el arranque y conserva los archivos para recuperación manual, en vez de crear una base vacía. La copia seleccionada como origen nunca se modifica ni se elimina.
+
+Este flujo restaura exclusivamente SQLite. No recupera `worlds/`, versiones `.fateworld`, preferencias ni otros archivos portables; la recuperación conjunta continúa como decisión aprobada pendiente.
+
+La validación manual en una instalación portable aislada confirmó la restauración normal, la coincidencia SHA-256 de la base restaurada con el backup seleccionado, la conservación exacta de la base anterior en la copia `protected`, la reapertura y el diagnóstico SQLite. También confirmó que cancelar después de verificar y rechazar un manifiesto con SHA-256 manipulado no modifican la base ni crean backups adicionales. Estas comprobaciones se realizaron con bases técnicas, todavía sin personajes ni Crónicas.
+
+Las pruebas automatizadas cubren parte del rollback y del fallback a la copia protegida, pero siguen pendientes las interrupciones reales en las distintas fases y su recuperación al siguiente arranque, los fallos de permisos o espacio, la revisión exhaustiva en inglés y coreano, las confirmaciones repetidas y los ensayos en un pendrive físico y otro ordenador. La sustitución continúa siendo una secuencia de varios pasos, no una operación atómica, y la recuperación no se considera infalible.
+
+### 4.8 Diagnóstico de almacenamiento
 
 **Implementado:** Ajustes solicita una instantánea solo cuando se abre la sección por primera vez o el usuario pulsa **Actualizar**. Main serializa `quick_check`, `foreign_key_check` y la lectura de la versión de esquema mediante la misma cola que coordina SQLite. En paralelo inspecciona las copias publicadas con el validador existente; el recuento incluye exclusivamente manifiestos v2 de Fatebound cuyo nombre, estructura, tamaño, SHA-256 e integridad son válidos.
 
@@ -348,7 +364,7 @@ La implementación mantiene y deberá seguir manteniendo:
 - conservar copias recuperables antes de migraciones y operaciones destructivas;
 - registrar errores técnicos sin exponer datos privados en la interfaz.
 
-La API genérica del scaffold y el canal de demostración `ping` se han retirado. La superficie nativa actual queda limitada al diagnóstico tipado sin argumentos, la exportación manual sin rutas y la lectura/escritura validada del idioma; incorporar otra capacidad exigirá un contrato IPC específico y pruebas equivalentes.
+La API genérica del scaffold y el canal de demostración `ping` se han retirado. La superficie nativa actual queda limitada al diagnóstico tipado, la exportación manual, las tres fases explícitas de restauración y la lectura/escritura validada del idioma. Los contratos de almacenamiento no aceptan rutas desde el renderer; incorporar otra capacidad exigirá un IPC específico y pruebas equivalentes.
 
 ## 13. Orden de implementación recomendado
 
@@ -357,8 +373,8 @@ La API genérica del scaffold y el canal de demostración `ping` se han retirado
 3. **Implementado:** primera interfaz funcional, navegación, temas integrados, ocho mundos futuros con estado honesto, nueva marca y diagnóstico SQLite de solo lectura.
 4. **Implementado:** retirada de las API genéricas del preload, canales IPC específicos y activación de aislamiento, ausencia de Node en renderer y sandbox.
 5. **Implementado, pendiente de verificación manual:** internacionalización de la interfaz en español, inglés y coreano con preferencia portable, manteniendo separados los futuros idiomas de contenido.
-6. **Implementado, pendiente de validación manual:** exportación manual de copias SQLite a una carpeta elegida en main, sin rutas en el renderer ni sobrescritura silenciosa.
-7. **Siguiente prioridad:** diseñar la restauración explícita y la recuperación conjunta de SQLite y paquetes instalados; después, repositorios del dominio sobre la transacción existente.
+6. **Implementado y validado:** exportación manual de copias SQLite a una carpeta elegida en main, sin rutas en el renderer ni sobrescritura silenciosa.
+7. **Implementado y validado en flujo normal y rechazos:** restauración manual SQLite con confirmación, copia protegida y recuperación guiada por journal. Las interrupciones reales y la recuperación conjunta de paquetes siguen pendientes.
 8. Cerrar en una tarea específica el contrato versionado de paquetes de mundos y crear plantillas originales.
 9. Incorporar importación, validación, edición, exportación y publicación inmutable.
 10. Implementar progresivamente el motor compatible, las Crónicas, los eventos y la exportación.

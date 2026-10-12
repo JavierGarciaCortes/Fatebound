@@ -6,6 +6,13 @@ import type {
 } from '../../shared/storage-diagnostics'
 import type { ApplicationLanguage } from '../../shared/application-language'
 import type { SqliteManualExportResult } from '../../shared/sqlite-manual-export'
+import type {
+  SqliteRestoreBackupReason,
+  SqliteRestoreCancellationResult,
+  SqliteRestoreConfirmationResult,
+  SqliteRestoreErrorCode,
+  SqliteRestoreSelectionResult
+} from '../../shared/sqlite-safe-restore'
 import type { MessageKey } from '../../shared/i18n'
 import brandLogoHorizontal from '../../../resources/branding/fatebound/fatebound-logo-horizontal.png'
 import brandSymbol from '../../../resources/branding/fatebound/fatebound-symbol.png'
@@ -36,6 +43,12 @@ const diagnostics = ref<StorageDiagnosticsResult | null>(null)
 const diagnosticsLoading = ref(false)
 const backupExportResult = ref<SqliteManualExportResult | null>(null)
 const backupExporting = ref(false)
+const backupRestoreSelection = ref<SqliteRestoreSelectionResult | null>(null)
+const backupRestoreAction = ref<
+  SqliteRestoreConfirmationResult | SqliteRestoreCancellationResult | null
+>(null)
+const backupRestoreSelecting = ref(false)
+const backupRestoring = ref(false)
 const failedArtwork = ref<readonly string[]>([])
 
 const activeTheme = computed(() => resolveBuiltinTheme(activeThemeId.value))
@@ -88,8 +101,30 @@ const backupExportMessage = computed(() => {
   if (result.code === 'export-in-progress') return t('settings.export.inProgressError')
   return t('settings.export.genericError')
 })
-const backupExportFailed = computed(
-  () => backupExportResult.value?.status === 'error'
+const backupExportFailed = computed(() => backupExportResult.value?.status === 'error')
+const backupRestorePreview = computed(() => {
+  const selection = backupRestoreSelection.value
+  return selection?.status === 'ready' ? selection.backup : null
+})
+const backupRestoreBusy = computed(() => backupRestoreSelecting.value || backupRestoring.value)
+const backupRestoreMessage = computed(() => {
+  if (backupRestoreSelecting.value) return t('settings.restore.selecting')
+  if (backupRestoring.value) return t('settings.restore.working')
+
+  const action = backupRestoreAction.value
+  if (action?.status === 'success') return t('settings.restore.success')
+  if (action?.status === 'cancelled') return t('settings.restore.selectionCancelled')
+  if (action?.status === 'error') return restoreErrorMessage(action.code)
+
+  const selection = backupRestoreSelection.value
+  if (selection?.status === 'cancelled') return t('settings.restore.selectionCancelled')
+  if (selection?.status === 'error') return restoreErrorMessage(selection.code)
+  return null
+})
+const backupRestoreFailed = computed(
+  () =>
+    backupRestoreSelection.value?.status === 'error' ||
+    backupRestoreAction.value?.status === 'error'
 )
 
 function navigationLabel(sectionId: AppSectionId): string {
@@ -110,7 +145,10 @@ function languageName(value: ApplicationLanguage): string {
   return t(languageNameKeys[value])
 }
 
-function themeText(themeId: BuiltinThemeId, field: 'name' | 'tagline' | 'category' | 'description' | 'atmosphere'): string {
+function themeText(
+  themeId: BuiltinThemeId,
+  field: 'name' | 'tagline' | 'category' | 'description' | 'atmosphere'
+): string {
   return t(`theme.${themeId}.${field}` as MessageKey)
 }
 
@@ -173,16 +211,46 @@ function formatCheckedAt(value: string): string {
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return value
 
+  return new Intl.DateTimeFormat(applicationLocale(), {
+    dateStyle: 'medium',
+    timeStyle: 'short'
+  }).format(date)
+}
+
+function applicationLocale(): string {
   const dateLocales: Readonly<Record<ApplicationLanguage, string>> = {
     es: 'es-ES',
     en: 'en-GB',
     ko: 'ko-KR'
   }
+  return dateLocales[language.value]
+}
 
-  return new Intl.DateTimeFormat(dateLocales[language.value], {
-    dateStyle: 'medium',
-    timeStyle: 'short'
-  }).format(date)
+function formatFileSize(value: number): string {
+  return `${new Intl.NumberFormat(applicationLocale()).format(value)} B`
+}
+
+function formatBackupReason(reason: SqliteRestoreBackupReason): string {
+  const reasonKeys: Readonly<Record<SqliteRestoreBackupReason, MessageKey>> = {
+    'pre-migration': 'settings.restore.reason.preMigration',
+    protected: 'settings.restore.reason.protected',
+    automatic: 'settings.restore.reason.automatic',
+    manual: 'settings.restore.reason.manual'
+  }
+  return t(reasonKeys[reason])
+}
+
+function restoreErrorMessage(code: SqliteRestoreErrorCode): string {
+  const errorKeys: Readonly<Record<SqliteRestoreErrorCode, MessageKey>> = {
+    'invalid-backup': 'settings.restore.invalidError',
+    'incompatible-backup': 'settings.restore.incompatibleError',
+    'backup-changed': 'settings.restore.changedError',
+    'selection-required': 'settings.restore.selectionRequiredError',
+    'restore-in-progress': 'settings.restore.inProgressError',
+    'recovery-required': 'settings.restore.recoveryRequiredError',
+    'restore-failed': 'settings.restore.genericError'
+  }
+  return t(errorKeys[code])
 }
 
 function changeLanguage(value: ApplicationLanguage): void {
@@ -202,6 +270,57 @@ async function exportSqliteBackup(): Promise<void> {
     backupExportResult.value = { status: 'error', code: 'export-failed' }
   } finally {
     backupExporting.value = false
+  }
+}
+
+async function selectSqliteBackupForRestore(): Promise<void> {
+  if (backupRestoreBusy.value) return
+
+  backupRestoreSelecting.value = true
+  backupRestoreSelection.value = null
+  backupRestoreAction.value = null
+
+  try {
+    backupRestoreSelection.value = await window.api.storage.selectSqliteBackupForRestore()
+  } catch {
+    backupRestoreSelection.value = { status: 'error', code: 'invalid-backup' }
+  } finally {
+    backupRestoreSelecting.value = false
+  }
+}
+
+async function confirmSqliteBackupRestore(): Promise<void> {
+  if (backupRestoreBusy.value || backupRestorePreview.value === null) return
+
+  backupRestoring.value = true
+  backupRestoreAction.value = null
+
+  try {
+    const result = await window.api.storage.confirmSqliteBackupRestore()
+    backupRestoreAction.value = result
+    backupRestoreSelection.value = null
+    if (result.status === 'success') {
+      void loadDiagnostics()
+    }
+  } catch {
+    backupRestoreSelection.value = null
+    backupRestoreAction.value = { status: 'error', code: 'restore-failed' }
+  } finally {
+    backupRestoring.value = false
+  }
+}
+
+async function cancelSqliteBackupRestore(): Promise<void> {
+  if (backupRestoreBusy.value) return
+
+  try {
+    const result = await window.api.storage.cancelSqliteBackupRestore()
+    backupRestoreAction.value = result
+    if (result.status === 'cancelled') {
+      backupRestoreSelection.value = null
+    }
+  } catch {
+    backupRestoreAction.value = { status: 'error', code: 'restore-failed' }
   }
 }
 </script>
@@ -260,7 +379,9 @@ async function exportSqliteBackup(): Promise<void> {
           </span>
           <div>
             <strong>{{ themeText(activeTheme.id, 'name') }}</strong>
-            <small>{{ activeTheme.isNeutral ? t('common.noActiveWorld') : t('common.upcoming') }}</small>
+            <small>{{
+              activeTheme.isNeutral ? t('common.noActiveWorld') : t('common.upcoming')
+            }}</small>
           </div>
         </div>
       </div>
@@ -280,16 +401,26 @@ async function exportSqliteBackup(): Promise<void> {
         <div class="topbar-actions">
           <div class="topbar-world" :aria-label="t('a11y.activeVisualTheme')">
             <span>{{ themeText(activeTheme.id, 'name') }}</span>
-            <strong>{{ activeTheme.isNeutral ? t('common.baseIdentity') : t('common.upcoming') }}</strong>
+            <strong>{{
+              activeTheme.isNeutral ? t('common.baseIdentity') : t('common.upcoming')
+            }}</strong>
           </div>
           <button
             class="settings-button"
             :class="{ 'settings-button--active': activeSection === 'settings' }"
             type="button"
-            :aria-label="activeSection === 'settings' ? t('navigation.settings.opened') : t('navigation.settings.open')"
+            :aria-label="
+              activeSection === 'settings'
+                ? t('navigation.settings.opened')
+                : t('navigation.settings.open')
+            "
             :aria-current="activeSection === 'settings' ? 'page' : undefined"
             :aria-pressed="activeSection === 'settings'"
-            :title="activeSection === 'settings' ? t('navigation.settings.opened') : t('navigation.settings.open')"
+            :title="
+              activeSection === 'settings'
+                ? t('navigation.settings.opened')
+                : t('navigation.settings.open')
+            "
             @click="navigateTo('settings')"
           >
             <AppIcon name="settings" />
@@ -320,9 +451,7 @@ async function exportSqliteBackup(): Promise<void> {
             <div class="hero-content">
               <div class="preview-badge">
                 <span aria-hidden="true"></span>
-                {{
-                  activeTheme.isNeutral ? t('home.neutralBadge') : t('home.futureBadge')
-                }}
+                {{ activeTheme.isNeutral ? t('home.neutralBadge') : t('home.futureBadge') }}
               </div>
               <p class="hero-overline">{{ themeText(activeTheme.id, 'category') }}</p>
               <h2 id="home-title">{{ themeText(activeTheme.id, 'tagline') }}</h2>
@@ -554,7 +683,12 @@ async function exportSqliteBackup(): Promise<void> {
             <p
               v-if="languageStatusKey"
               class="language-status"
-              :class="{ 'language-status--error': preferenceState === 'load-error' || preferenceState === 'save-error' || preferenceState === 'invalid' }"
+              :class="{
+                'language-status--error':
+                  preferenceState === 'load-error' ||
+                  preferenceState === 'save-error' ||
+                  preferenceState === 'invalid'
+              }"
               aria-live="polite"
             >
               {{ t(languageStatusKey) }}
@@ -586,6 +720,83 @@ async function exportSqliteBackup(): Promise<void> {
             </p>
           </article>
 
+          <article class="backup-restore-panel panel" aria-labelledby="backup-restore-title">
+            <div class="backup-restore-panel__copy">
+              <span class="eyebrow">{{ t('settings.restore.eyebrow') }}</span>
+              <h3 id="backup-restore-title">{{ t('settings.restore.title') }}</h3>
+              <p>{{ t('settings.restore.body') }}</p>
+            </div>
+            <button
+              class="button button--secondary"
+              type="button"
+              :disabled="backupRestoreBusy"
+              @click="selectSqliteBackupForRestore"
+            >
+              <AppIcon name="database" />
+              {{
+                backupRestoreSelecting
+                  ? t('settings.restore.selecting')
+                  : t('settings.restore.action')
+              }}
+            </button>
+
+            <div v-if="backupRestorePreview" class="backup-restore-preview">
+              <dl>
+                <div>
+                  <dt>{{ t('settings.restore.previewDate') }}</dt>
+                  <dd>{{ formatCheckedAt(backupRestorePreview.createdAt) }}</dd>
+                </div>
+                <div>
+                  <dt>{{ t('settings.restore.previewType') }}</dt>
+                  <dd>{{ formatBackupReason(backupRestorePreview.reason) }}</dd>
+                </div>
+                <div>
+                  <dt>{{ t('settings.restore.previewSchema') }}</dt>
+                  <dd>{{ backupRestorePreview.schemaVersion }}</dd>
+                </div>
+                <div>
+                  <dt>{{ t('settings.restore.previewSize') }}</dt>
+                  <dd>{{ formatFileSize(backupRestorePreview.sizeBytes) }}</dd>
+                </div>
+              </dl>
+              <p class="backup-restore-warning" role="alert">
+                <AppIcon name="shield" />
+                <span>{{ t('settings.restore.warning') }}</span>
+              </p>
+              <div class="backup-restore-actions">
+                <button
+                  class="button button--secondary"
+                  type="button"
+                  :disabled="backupRestoreBusy"
+                  @click="cancelSqliteBackupRestore"
+                >
+                  {{ t('settings.restore.cancelAction') }}
+                </button>
+                <button
+                  class="button button--danger"
+                  type="button"
+                  :disabled="backupRestoreBusy"
+                  @click="confirmSqliteBackupRestore"
+                >
+                  {{
+                    backupRestoring
+                      ? t('settings.restore.working')
+                      : t('settings.restore.confirmAction')
+                  }}
+                </button>
+              </div>
+            </div>
+
+            <p
+              v-if="backupRestoreMessage"
+              class="backup-restore-status"
+              :class="{ 'backup-restore-status--error': backupRestoreFailed }"
+              aria-live="polite"
+            >
+              {{ backupRestoreMessage }}
+            </p>
+          </article>
+
           <article class="diagnostics-panel panel" aria-labelledby="diagnostics-title">
             <div class="diagnostics-heading">
               <div>
@@ -602,7 +813,11 @@ async function exportSqliteBackup(): Promise<void> {
                 @click="loadDiagnostics"
               >
                 <AppIcon name="refresh" :class="{ 'icon--spinning': diagnosticsLoading }" />
-                {{ diagnosticsLoading ? t('settings.diagnostics.checking') : t('settings.diagnostics.refresh') }}
+                {{
+                  diagnosticsLoading
+                    ? t('settings.diagnostics.checking')
+                    : t('settings.diagnostics.refresh')
+                }}
               </button>
             </div>
 
@@ -628,7 +843,11 @@ async function exportSqliteBackup(): Promise<void> {
                   <span class="health-icon"><AppIcon name="shield" /></span>
                   <div>
                     <strong>{{ t('settings.diagnostics.readyTitle') }}</strong>
-                    <span>{{ t('settings.diagnostics.readyBody', { date: formatCheckedAt(diagnostics.checkedAt) }) }}</span>
+                    <span>{{
+                      t('settings.diagnostics.readyBody', {
+                        date: formatCheckedAt(diagnostics.checkedAt)
+                      })
+                    }}</span>
                   </div>
                 </div>
 
@@ -643,7 +862,9 @@ async function exportSqliteBackup(): Promise<void> {
                   </div>
                   <div>
                     <dt>{{ t('settings.diagnostics.sqliteStatus') }}</dt>
-                    <dd><span class="value-ok">{{ t('settings.diagnostics.available') }}</span></dd>
+                    <dd>
+                      <span class="value-ok">{{ t('settings.diagnostics.available') }}</span>
+                    </dd>
                   </div>
                   <div>
                     <dt>{{ t('settings.diagnostics.schemaVersion') }}</dt>
@@ -651,7 +872,9 @@ async function exportSqliteBackup(): Promise<void> {
                   </div>
                   <div>
                     <dt>{{ t('settings.diagnostics.integrity') }}</dt>
-                    <dd><span class="value-ok">{{ t('settings.diagnostics.correct') }}</span></dd>
+                    <dd>
+                      <span class="value-ok">{{ t('settings.diagnostics.correct') }}</span>
+                    </dd>
                   </div>
                   <div>
                     <dt>{{ t('settings.diagnostics.backups') }}</dt>

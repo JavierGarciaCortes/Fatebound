@@ -161,9 +161,13 @@ test('future-world cards select atmosphere without offering playable actions', (
   )
 })
 
-test('Settings exposes manual backup export without collecting a renderer path', () => {
+test('Settings exposes backup export and restore without collecting a renderer path', () => {
   assert.match(appSource, /window\.api\.storage\.exportSqliteBackup\(\)/)
   assert.match(appSource, /settings\.export\.action/)
+  assert.match(appSource, /window\.api\.storage\.selectSqliteBackupForRestore\(\)/)
+  assert.match(appSource, /window\.api\.storage\.confirmSqliteBackupRestore\(\)/)
+  assert.match(appSource, /window\.api\.storage\.cancelSqliteBackupRestore\(\)/)
+  assert.match(appSource, /settings\.restore\.warning/)
   assert.doesNotMatch(appSource, /type="file"/)
 })
 

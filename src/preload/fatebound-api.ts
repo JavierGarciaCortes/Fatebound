@@ -15,6 +15,14 @@ import {
   SQLITE_MANUAL_EXPORT_CHANNEL,
   type SqliteManualExportResult
 } from '../shared/sqlite-manual-export.ts'
+import {
+  SQLITE_RESTORE_CANCEL_CHANNEL,
+  SQLITE_RESTORE_CONFIRM_CHANNEL,
+  SQLITE_RESTORE_SELECT_CHANNEL,
+  type SqliteRestoreCancellationResult,
+  type SqliteRestoreConfirmationResult,
+  type SqliteRestoreSelectionResult
+} from '../shared/sqlite-safe-restore.ts'
 
 export type IpcInvoke = (channel: string, ...args: readonly unknown[]) => Promise<unknown>
 
@@ -26,6 +34,15 @@ export function createFateboundApi(invoke: IpcInvoke): FateboundApi {
       },
       async exportSqliteBackup(): Promise<SqliteManualExportResult> {
         return (await invoke(SQLITE_MANUAL_EXPORT_CHANNEL)) as SqliteManualExportResult
+      },
+      async selectSqliteBackupForRestore(): Promise<SqliteRestoreSelectionResult> {
+        return (await invoke(SQLITE_RESTORE_SELECT_CHANNEL)) as SqliteRestoreSelectionResult
+      },
+      async confirmSqliteBackupRestore(): Promise<SqliteRestoreConfirmationResult> {
+        return (await invoke(SQLITE_RESTORE_CONFIRM_CHANNEL)) as SqliteRestoreConfirmationResult
+      },
+      async cancelSqliteBackupRestore(): Promise<SqliteRestoreCancellationResult> {
+        return (await invoke(SQLITE_RESTORE_CANCEL_CHANNEL)) as SqliteRestoreCancellationResult
       }
     }),
     preferences: Object.freeze({

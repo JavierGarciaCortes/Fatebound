@@ -89,6 +89,19 @@ test('retention never deletes the final valid managed backup', async () => {
   })
 })
 
+test('retention preserves an explicitly protected source directory for the current operation', async () => {
+  await withRetentionFixture(async (database, backupsDirectory) => {
+    const automatic = await createBackups(database, backupsDirectory, 'automatic', 7)
+    const result = await enforceSqliteBackupRetention(backupsDirectory, {
+      preserveDirectories: [automatic[0]]
+    })
+
+    assert.equal(result.deletedDirectories.includes(automatic[0]), false)
+    assert.equal((await readdir(automatic[0])).length, 2)
+    assert.equal(result.deletedDirectories.length, 1)
+  })
+})
+
 test('invalid manifests, extra files, and unknown paths remain outside retention', async () => {
   await withRetentionFixture(async (database, backupsDirectory) => {
     const automatic = await createBackups(database, backupsDirectory, 'automatic', 9)

@@ -1,16 +1,18 @@
 # Estado de desarrollo
 
-Última actualización: 2026-10-11
+Última actualización: 2026-10-12
 
-Hito histórico documentado: exportación manual segura de backups SQLite, desarrollada originalmente en `feature/sqlite-manual-export`.
+Base histórica de esta línea de trabajo: `feature/app-shell` ya estaba integrada en `main` en el commit `67350b7`. En ese punto se habían superado 67 pruebas, lint, typecheck y los builds, y la interfaz multilingüe se había verificado manualmente.
 
-Base histórica del hito: `main` después de integrar `feature/app-shell`, último commit base `67350b7`.
+Hito de restauración SQLite: desarrollado originalmente en `feature/sqlite-safe-restore`.
 
-Validación heredada de esa base: 67 tests correctos, lint, typecheck y builds superados; interfaz multilingüe verificada manualmente. Estos resultados son históricos y han quedado sustituidos por la validación final del hito recogida más abajo.
+Hito base ya validado: exportación manual segura de backups SQLite, desarrollada originalmente en `feature/sqlite-manual-export`.
+
+La exportación quedó validada con 74/74 tests, lint, typecheck, builds y portable de Windows correctos, además de una exportación real con manifiesto, tamaño, SHA-256, integridad y claves foráneas comprobados. La restauración cuenta ya con validación automatizada y comprobación manual de su flujo normal y sus rechazos; las interrupciones reales y los escenarios excepcionales indicados más abajo continúan pendientes.
 
 ## Estado general
 
-Fatebound 2.0 dispone ya de una primera interfaz visual funcional sobre Electron y Vue. La shell carga nueve temas visuales y está traducida al español, inglés y coreano, con cambio inmediato y preferencia portable. Sin un mundo activo comienza en Fatebound neutral, el menú muestra solo Mundos y Ajustes reúne el selector de idioma, el diagnóstico SQLite de solo lectura y la exportación manual de backups.
+Fatebound 2.0 dispone ya de una primera interfaz visual funcional sobre Electron y Vue. La shell carga nueve temas visuales y está traducida al español, inglés y coreano, con cambio inmediato y preferencia portable. Sin un mundo activo comienza en Fatebound neutral, el menú muestra solo Mundos y Ajustes reúne idioma, diagnóstico SQLite, exportación y restauración manual de backups.
 
 El producto continúa en fase de fundamentos: no existen todavía esquema del juego, mundos instalados, personajes, campañas, reglas ni importación `.fateworld`. Ronin, Templario, Ninja, Shaolin, Robot, Soldado, Naves y Mundoplato figuran como **Próximamente** y solo permiten explorar su ambientación; ninguno representa contenido jugable disponible o instalado.
 
@@ -46,7 +48,7 @@ El producto continúa en fase de fundamentos: no existen todavía esquema del ju
 ### Diagnóstico y frontera de procesos
 
 - [x] Canal fijo `fatebound:storage:get-diagnostics`, sin argumentos y con respuesta compartida tipada.
-- [x] Preload reducido a diagnóstico, exportación manual y preferencia de idioma mediante operaciones específicas; retirados `electronAPI`, `ipcRenderer` expuesto y el canal `ping`.
+- [x] Preload reducido a diagnóstico, exportación, selección/confirmación/cancelación de restauración y preferencia de idioma mediante operaciones específicas; retirados `electronAPI`, `ipcRenderer` expuesto y el canal `ping`.
 - [x] Ventana con `contextIsolation: true`, `nodeIntegration: false` y `sandbox: true`.
 - [x] Comprobación puntual de `quick_check`, claves foráneas y versión de esquema, serializada con la cola SQLite.
 - [x] Recuento de copias administradas que vuelven a superar manifiesto, estructura, tamaño, SHA-256 e integridad.
@@ -71,31 +73,46 @@ El producto continúa en fase de fundamentos: no existen todavía esquema del ju
 - [x] Limpieza limitada a temporales con marcador propio y a la candidata recién publicada que falle la validación final; cancelación sin escritura.
 - [x] Copias exportadas fuera de la retención 6/2 y del estado del programador automático.
 
+### Restauración manual SQLite
+
+- [x] Acción separada en Ajustes, con selector nativo de main, vista previa fiable de fecha, tipo, esquema y tamaño, advertencia de sustitución y confirmación explícita.
+- [x] Tres contratos IPC sin argumentos para seleccionar, confirmar o cancelar; main conserva la selección validada y el renderer no recibe ni aporta rutas o metadatos de confianza.
+- [x] Validación del backup v2 mediante los validadores existentes: estructura exacta, aplicación, nombre, tamaño, SHA-256, integridad, claves foráneas e historia de migraciones compatible.
+- [x] Revalidación al confirmar y segunda verificación de la copia preparada en un workspace controlado para detectar cambios posteriores a la vista previa.
+- [x] Operación serializada con escrituras, backups automáticos y cierre; copia `protected` de la base activa creada y verificada antes de cerrar SQLite.
+- [x] Sustitución con la conexión cerrada, reapertura, migración compatible y comprobación completa antes de declarar éxito; la retención se aplaza hasta terminar.
+- [x] Journal persistente de restauración: una interrupción incompleta recupera la base previa, una finalizada conserva la nueva solo si vuelve a validarse y una situación ambigua bloquea el arranque sin crear una base vacía.
+- [x] Copia de origen inmutable y limpieza limitada al journal, temporales y workspace propios de la operación.
+
 ## Funciones demostrativas o pendientes
 
 - Los ocho mundos son un catálogo interno de presentación; no son paquetes `.fateworld`, no aparecen en SQLite y no contienen reglas. Fatebound neutral es la identidad base y no forma parte de esas ocho tarjetas.
 - **Próximamente** significa que el paquete jugable aún no existe; **No instalado** se reservará para un paquete futuro ya disponible pero ausente de la biblioteca local.
 - La selección temática dura solo durante la sesión y comienza de nuevo en Fatebound neutral al abrir la aplicación.
 - Personajes y Crónicas no aparecen en el menú sin un mundo jugable activo; sus vistas estructurales no crean, editan ni persisten datos.
-- Ajustes ofrece idioma, diagnóstico y exportación manual de backups; no ofrece restauración, exploración de archivos ni cambio de la raíz activa.
+- Ajustes ofrece idioma, diagnóstico, exportación y restauración manual de backups SQLite; no ofrece exploración general de archivos ni cambio de la raíz activa.
 - No existe todavía importador, editor de mundos, motor de reglas, campañas jugables o IA.
 
 ## Siguiente tarea prioritaria
 
-**Diseñar la restauración explícita y la recuperación conjunta de SQLite y versiones instaladas de paquetes, sin sobrescritura silenciosa.**
+**Validar manualmente interrupciones reales durante las distintas fases de sustitución y la recuperación resultante al siguiente arranque.**
 
 ## Pendientes por fases
 
 ### Seguridad y recuperación
 
-- Diseñar el flujo de restauración y cuarentena de una base dañada.
 - Diseñar la recuperación conjunta de SQLite y las versiones instaladas de paquetes que necesiten sus datos.
+- Diseñar la cuarentena y recuperación asistida de una base activa dañada fuera de una restauración registrada.
 - Validar la aplicación desde un pendrive físico y otro ordenador.
+- Probar manualmente interrupciones reales durante una restauración y comprobar la recuperación al siguiente arranque; las pruebas automatizadas de rollback y fallback no sustituyen este ensayo.
+- Probar fallos de permisos y espacio insuficiente durante la restauración.
+- Revisar exhaustivamente los textos y estados del nuevo flujo en inglés y coreano.
+- Probar confirmaciones repetidas y otros escenarios excepcionales todavía no cubiertos manualmente.
 - Probar manualmente dos ejecutables simultáneos y el cierre durante una copia grande.
 
 ### Persistencia y mundos
 
-- Mantener pendiente la recuperación explícita, sin sobrescritura silenciosa.
+- Mantener pendiente la recuperación conjunta con paquetes, sin sobrescritura silenciosa.
 - Implementar repositorios sobre la transacción central SQLite.
 - Especificar y versionar definitivamente el contrato `.fateworld`.
 - Implementar importación segura, versiones inmutables y vínculos exactos de personajes y crónicas.
@@ -121,7 +138,10 @@ El producto continúa en fase de fundamentos: no existen todavía esquema del ju
 - El portable de Windows convierte `fatebound-app-icon.png` durante el build; `build/icon.ico` y `build/icon.icns` no se han regenerado y deben revisarse en una tarea específica si se reutilizan para otros targets.
 - La portabilidad no se ha validado desde un pendrive físico ni desde otro ordenador.
 - `Fatebound.exe` no tiene firma Authenticode.
-- Las copias locales comparten dispositivo con la base; la exportación externa ya existe, pero depende de que el usuario elija y conserve otra unidad. La recuperación manual continúa pendiente.
+- Las copias locales comparten dispositivo con la base; la exportación externa depende de que el usuario elija y conserve otra unidad. La restauración actual recupera solo SQLite y no las versiones de paquetes `.fateworld`.
+- El flujo normal y los rechazos de restauración se han validado manualmente en una instalación portable aislada; no se han probado interrupciones reales durante la sustitución ni la recuperación posterior en una unidad extraíble física.
+- La sustitución de archivos requiere varios pasos y no es atómica; la seguridad depende del journal persistente, `previous.sqlite` y la copia `protected`, y no elimina el riesgo físico de retirar o perder la unidad durante la operación.
+- La recuperación ante fallos está cubierta parcialmente por pruebas automatizadas, pero no se considera infalible ni equivale a haber provocado y verificado manualmente una interrupción real.
 - Retirar una unidad durante una escritura sigue siendo inseguro incluso con la configuración conservadora de SQLite.
 - `node:sqlite` permanece ligado a la versión de Node incluida en Electron 39.
 - No existe una especificación normativa de `.fateworld`, un esquema del juego ni un motor mecánico.
@@ -133,7 +153,7 @@ El producto continúa en fase de fundamentos: no existen todavía esquema del ju
 - Definir los tokens y recursos admitidos por los temas `.fateworld` sin convertir el catálogo interno actual en una especificación prematura.
 - Definir manifiesto, esquema, límites, capacidades y traducciones del formato de mundos.
 - Concretar en la futura especificación `.fateworld` el contrato independiente de idiomas disponibles y predeterminado por mundo sin inventar traducciones.
-- Concretar la experiencia de restauración y cuarentena SQLite y su relación con las versiones de paquetes instaladas.
+- Concretar la recuperación conjunta de SQLite y paquetes instalados, además de la cuarentena asistida de bases activas dañadas no vinculadas a un journal de restauración.
 - Definir firma de Windows, perfil privado y condiciones de licencia antes de distribuir contenido de terceros.
 
 ## Decisiones aprobadas todavía no implementadas
@@ -148,7 +168,7 @@ El producto continúa en fase de fundamentos: no existen todavía esquema del ju
 
 Estas decisiones no constituyen un esquema SQL, un manifiesto `.fateworld`, un importador ni un motor implementado.
 
-## Verificación de esta actualización
+## Verificación histórica del hito de exportación
 
 Resultados reales comunicados por el usuario:
 
@@ -164,6 +184,27 @@ Resultados reales comunicados por el usuario:
 - `git diff --check`: sin errores; únicamente las advertencias conocidas de LF/CRLF.
 
 Siguen pendientes y no se han realizado manualmente las pruebas excepcionales de permisos insuficientes, espacio agotado, cancelación, exportaciones repetidas sin sobrescritura y cierre de Fatebound durante copias grandes.
+
+## Verificación del hito de restauración
+
+Resultados reales comunicados por el usuario:
+
+- `npm test`: 80/80 correctos.
+- `npm run lint -- --quiet`: correcto.
+- `npm run typecheck`: correcto.
+- `npm run build`: correcto.
+- Portable de Windows: ejecutable generado y probado.
+- Restauración manual real desde una instalación portable aislada: correcta.
+- SHA-256 de la base restaurada: coincide exactamente con el backup seleccionado.
+- Copia `protected`: contiene exactamente la base anterior, comprobado mediante SHA-256.
+- Reapertura de Fatebound y diagnóstico SQLite posterior: correctos.
+- Cancelación después de verificar una copia: sin modificación de la base ni creación de backups adicionales.
+- Copia con el SHA-256 del manifiesto deliberadamente manipulado: rechazada antes de permitir la confirmación.
+- Rechazo de la copia manipulada: sin modificación de la base ni creación de backups adicionales.
+
+Estas comprobaciones se realizaron con bases técnicas de prueba, todavía sin personajes ni Crónicas. Las pruebas automatizadas cubren parte del rollback, el fallback a la copia protegida y la coordinación del IPC, pero no equivalen a haber verificado manualmente una interrupción real.
+
+Siguen pendientes las interrupciones reales en las distintas fases y la recuperación al siguiente arranque, los fallos de permisos y espacio insuficiente, la revisión exhaustiva del flujo en inglés y coreano, las confirmaciones repetidas y otros escenarios excepcionales, y los ensayos en un pendrive físico y otro ordenador.
 
 ## Registro de cambios
 
@@ -200,3 +241,12 @@ Los recursos gráficos de Ronin presentes en el repositorio no autorizan su dist
 - Documentadas como aprobadas y todavía no implementadas las invariantes de ficha base y Crónica, el motor fiel a Ronin, los identificadores estables de tablas, la separación `.fateworld`/SQLite y la recuperación conjunta futura.
 - Implementada la exportación manual de backups SQLite desde Ajustes mediante selector nativo de main, cola compartida, manifiesto verificable, destino único y resultados localizados.
 - Añadidas pruebas focalizadas de exportación real, destinos activos, limpieza propia, cancelación, concurrencia y contrato IPC; la validación final del hito alcanzó 74/74 tests correctos.
+- Implementada la restauración manual SQLite desde Ajustes con vista previa, confirmación explícita, IPC sin rutas, revalidación, copia previa protegida y reapertura con comprobación completa.
+- Añadido un journal de sustitución y recuperación al arranque que conserva o recupera la base verificable según la fase alcanzada, sin presentar la secuencia de archivos como atómica.
+- Añadidas pruebas focalizadas de restauración, rechazo e interrupción.
+
+### 2026-10-12
+
+- Completada la validación automatizada del hito con 80/80 tests, lint, typecheck y build correctos.
+- Generado y probado el portable de Windows; restauración normal, hashes de la base restaurada y la copia `protected`, reapertura, diagnóstico, cancelación y rechazo de una copia manipulada comprobados con bases técnicas.
+- Mantenidas como pendientes las interrupciones reales, los fallos de permisos o espacio, la revisión exhaustiva en inglés y coreano, las confirmaciones repetidas y las pruebas en pendrive físico y otro ordenador.

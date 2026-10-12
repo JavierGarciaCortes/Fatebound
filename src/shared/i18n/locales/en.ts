@@ -96,6 +96,39 @@ export const en = {
   'settings.export.inProgressError': 'A backup export is already in progress.',
   'settings.export.genericError':
     'The export could not be completed. The active database and earlier backups were not modified.',
+  'settings.restore.eyebrow': 'Controlled recovery',
+  'settings.restore.title': 'Restore backup',
+  'settings.restore.body':
+    'Select a Fatebound backup folder. The backup will be verified before restoration is offered.',
+  'settings.restore.action': 'Select backup',
+  'settings.restore.selecting': 'Selecting and verifying the backup…',
+  'settings.restore.selectionCancelled': 'Selection cancelled. No data was modified.',
+  'settings.restore.invalidError':
+    'The folder does not contain a complete, readable, and verifiable Fatebound backup.',
+  'settings.restore.incompatibleError':
+    'The backup uses a schema version that this version of Fatebound cannot restore.',
+  'settings.restore.changedError':
+    'The backup changed after the preview. Select it again and verify it once more.',
+  'settings.restore.selectionRequiredError': 'Select and verify a backup before confirming.',
+  'settings.restore.inProgressError': 'A restore operation is already in progress.',
+  'settings.restore.recoveryRequiredError':
+    'Fatebound could not reopen a safe database. Close and reopen the application to run startup recovery; do not move or delete the data files.',
+  'settings.restore.genericError':
+    'The restore could not be completed. Fatebound attempted to preserve or recover the previous database.',
+  'settings.restore.working': 'Protecting the active database and restoring the backup…',
+  'settings.restore.success': 'Backup restored and the SQLite database verified successfully.',
+  'settings.restore.cancelAction': 'Cancel',
+  'settings.restore.confirmAction': 'Confirm restore',
+  'settings.restore.previewDate': 'Backup date',
+  'settings.restore.previewType': 'Type',
+  'settings.restore.previewSchema': 'Schema version',
+  'settings.restore.previewSize': 'Size',
+  'settings.restore.warning':
+    'Confirming will replace the active SQLite data. Fatebound will first create and verify a protected backup of the current database.',
+  'settings.restore.reason.preMigration': 'Pre-migration',
+  'settings.restore.reason.protected': 'Protected',
+  'settings.restore.reason.automatic': 'Automatic',
+  'settings.restore.reason.manual': 'Manual',
   'settings.diagnostics.readOnly': 'Read only',
   'settings.diagnostics.title': 'SQLite storage',
   'settings.diagnostics.checking': 'Checking…',
@@ -185,8 +218,10 @@ export const en = {
     'The main database and previous backups were not replaced. You can keep using Fatebound, but check the available space and the drive before continuing.',
   'native.export.chooseTitle': 'Choose destination for the Fatebound backup',
   'native.export.chooseButton': 'Export here',
+  'native.restore.chooseTitle': 'Choose a Fatebound backup',
+  'native.restore.chooseButton': 'Verify this backup',
   'native.common.accept': 'Understood',
   'native.database.title': 'Fatebound cannot open your data',
   'native.database.detail':
-    'The SQLite integrity check, backup, or migration could not be completed. Fatebound will close without opening the interface and will not restore or replace the database automatically.'
+    'The SQLite integrity check, backup, migration, or recovery could not be completed. Fatebound will close without opening the interface and will not initialize an empty database over recoverable files.'
 } satisfies TranslationMessages
