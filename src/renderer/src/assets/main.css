@@ -853,11 +853,27 @@ a:focus-visible,
   line-height: 1.65;
 }
 
+.world-catalog-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+.world-package-add-status,
 .world-catalog-status {
   min-height: 1.2em;
   margin: -4px 0 14px;
   color: var(--text-muted);
   font-size: 0.72rem;
+}
+
+.world-package-add-status {
+  color: var(--success);
+}
+
+.world-package-add-status--error {
+  color: var(--danger);
 }
 
 .world-card-grid {
@@ -1879,6 +1895,10 @@ a:focus-visible,
   .world-catalog-actions {
     justify-items: start;
     max-width: none;
+  }
+
+  .world-catalog-buttons {
+    justify-content: flex-start;
   }
 
   .world-detail {

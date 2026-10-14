@@ -136,6 +136,8 @@ test('detected packages map to built-in cards only through explicit stable world
   assert.equal(resolveKnownWorldPresentationId('com.fatebound.worlds.ronin'), 'ronin')
   assert.equal(resolveKnownWorldPresentationId('other.publisher.ronin'), undefined)
   assert.match(appSource, /window\.api\.worlds\.getPackageCatalog\(\)/)
+  assert.match(appSource, /window\.api\.worlds\.addPackage\(\)/)
+  assert.match(appSource, /worlds\.add\.action/)
   assert.match(appSource, /common\.packageAvailable/)
   assert.doesNotMatch(appSource, /type="file"/)
   assert.doesNotMatch(appSource, />\s*(?:Instalar|Install|설치)\s*</)

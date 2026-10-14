@@ -43,6 +43,26 @@ export const ko = {
   'worlds.title': '모험의 분위기를 선택하세요',
   'worlds.intro':
     '여덟 가지 배경을 살펴보고 Fatebound 옆에서 감지된 패키지를 확인하세요. 사용 가능한 패키지는 아직 설치되거나 플레이 가능하지 않습니다.',
+  'worlds.add.action': '세계 추가',
+  'worlds.add.processing': '선택, 검증 및 복사 중…',
+  'worlds.add.success':
+    '{worldId} v{worldVersion} 패키지를 worlds/에 추가했습니다. 아직 설치되지 않았습니다.',
+  'worlds.add.cancelled': '선택을 취소했습니다. 복사하거나 설치한 항목이 없습니다.',
+  'worlds.add.alreadyAvailable':
+    '{worldId} v{worldVersion} 패키지가 이미 worlds/에 있습니다. 중복 복사하지 않았습니다.',
+  'worlds.add.invalid':
+    '유효한 .fateworld v1 패키지가 아니거나 크기가 너무 크거나 일반 파일이 아닙니다.',
+  'worlds.add.incompatible':
+    '패키지 형식 또는 기능이 이 Fatebound 버전과 호환되지 않습니다.',
+  'worlds.add.changed':
+    '작업 중 파일이 변경되었습니다. 불완전한 복사본은 공개되지 않았습니다.',
+  'worlds.add.versionConflict':
+    '같은 세계와 버전을 선언하는 다른 패키지가 이미 있습니다. 추가하기 전 패키지 버전을 변경하세요.',
+  'worlds.add.destinationUnavailable':
+    'worlds/ 폴더를 안전하게 확인하거나 준비할 수 없습니다.',
+  'worlds.add.copyFailed':
+    '패키지를 복사할 수 없습니다. 권한과 여유 공간을 확인하세요. 다른 패키지는 변경되지 않았습니다.',
+  'worlds.add.inProgress': '이미 세계 패키지를 추가하고 있습니다.',
   'worlds.catalog.refresh': '카탈로그 새로고침',
   'worlds.catalog.refreshing': '새로고침 중…',
   'worlds.catalog.summary': '사용 가능한 패키지 {packages}개 · 문제 {issues}개',
@@ -242,6 +262,9 @@ export const ko = {
   'native.export.chooseButton': '여기에 내보내기',
   'native.restore.chooseTitle': 'Fatebound 백업 선택',
   'native.restore.chooseButton': '이 백업 검증',
+  'native.worlds.add.chooseTitle': 'Fatebound 세계 패키지 선택',
+  'native.worlds.add.chooseButton': '이 패키지 추가',
+  'native.worlds.add.fileType': 'Fatebound 세계 패키지',
   'native.common.accept': '확인',
   'native.database.title': 'Fatebound가 데이터를 열 수 없습니다',
   'native.database.detail':

@@ -14,6 +14,10 @@ import type {
   SqliteRestoreSelectionResult
 } from '../../shared/sqlite-safe-restore'
 import type { MessageKey } from '../../shared/i18n'
+import type {
+  WorldPackageAddErrorCode,
+  WorldPackageAddResult
+} from '../../shared/world-package-add'
 import {
   resolveKnownWorldPresentationId,
   type AvailableWorldPackage,
@@ -58,6 +62,8 @@ const backupRestoring = ref(false)
 const failedArtwork = ref<readonly string[]>([])
 const worldPackageCatalog = ref<WorldPackageCatalogResult | null>(null)
 const worldPackageCatalogLoading = ref(false)
+const worldPackageAddResult = ref<WorldPackageAddResult | null>(null)
+const worldPackageAdding = ref(false)
 
 const activeTheme = computed(() => resolveBuiltinTheme(activeThemeId.value))
 const activeWorldTheme = computed(() =>
@@ -155,6 +161,26 @@ const worldPackageCatalogStatus = computed(() => {
     issues: catalog.issues.length
   })
 })
+const worldPackageAddMessage = computed(() => {
+  if (worldPackageAdding.value) return t('worlds.add.processing')
+  const result = worldPackageAddResult.value
+  if (result === null) return null
+  if (result.status === 'success') {
+    return t('worlds.add.success', {
+      worldId: result.worldId,
+      worldVersion: result.worldVersion
+    })
+  }
+  if (result.status === 'already-available') {
+    return t('worlds.add.alreadyAvailable', {
+      worldId: result.worldId,
+      worldVersion: result.worldVersion
+    })
+  }
+  if (result.status === 'cancelled') return t('worlds.add.cancelled')
+  return worldPackageAddErrorMessage(result.code)
+})
+const worldPackageAddFailed = computed(() => worldPackageAddResult.value?.status === 'error')
 
 type WorldLibraryAvailability = 'upcoming' | 'package-available' | 'installed'
 
@@ -237,6 +263,19 @@ function catalogIssueMessage(issue: WorldPackageCatalogIssue): string {
     : t('worlds.catalog.issue.invalid')
 }
 
+function worldPackageAddErrorMessage(code: WorldPackageAddErrorCode): string {
+  const keys: Readonly<Record<WorldPackageAddErrorCode, MessageKey>> = {
+    'invalid-package': 'worlds.add.invalid',
+    'incompatible-package': 'worlds.add.incompatible',
+    'package-changed': 'worlds.add.changed',
+    'version-conflict': 'worlds.add.versionConflict',
+    'destination-unavailable': 'worlds.add.destinationUnavailable',
+    'copy-failed': 'worlds.add.copyFailed',
+    'add-in-progress': 'worlds.add.inProgress'
+  }
+  return t(keys[code])
+}
+
 function hexToRgb(value: string): string {
   const color = Number.parseInt(value.slice(1), 16)
   return `${(color >> 16) & 255}, ${(color >> 8) & 255}, ${color & 255}`
@@ -288,6 +327,25 @@ async function loadWorldPackageCatalog(): Promise<void> {
     worldPackageCatalog.value = { status: 'error', code: 'catalog-unavailable' }
   } finally {
     worldPackageCatalogLoading.value = false
+  }
+}
+
+async function addWorldPackage(): Promise<void> {
+  if (worldPackageAdding.value || worldPackageCatalogLoading.value) return
+
+  worldPackageAdding.value = true
+  worldPackageAddResult.value = null
+
+  try {
+    const result = await window.api.worlds.addPackage()
+    worldPackageAddResult.value = result
+    if (result.status === 'success' || result.status === 'already-available') {
+      await loadWorldPackageCatalog()
+    }
+  } catch {
+    worldPackageAddResult.value = { status: 'error', code: 'copy-failed' }
+  } finally {
+    worldPackageAdding.value = false
   }
 }
 
@@ -634,24 +692,44 @@ async function cancelSqliteBackupRestore(): Promise<void> {
             </div>
             <div class="world-catalog-actions">
               <p>{{ t('worlds.intro') }}</p>
-              <button
-                class="button button--secondary button--compact"
-                type="button"
-                :disabled="worldPackageCatalogLoading"
-                @click="loadWorldPackageCatalog"
-              >
-                <AppIcon
-                  name="refresh"
-                  :class="{ 'icon--spinning': worldPackageCatalogLoading }"
-                />
-                {{
-                  worldPackageCatalogLoading
-                    ? t('worlds.catalog.refreshing')
-                    : t('worlds.catalog.refresh')
-                }}
-              </button>
+              <div class="world-catalog-buttons">
+                <button
+                  class="button button--primary button--compact"
+                  type="button"
+                  :disabled="worldPackageAdding || worldPackageCatalogLoading"
+                  @click="addWorldPackage"
+                >
+                  <AppIcon name="worlds" />
+                  {{ worldPackageAdding ? t('worlds.add.processing') : t('worlds.add.action') }}
+                </button>
+                <button
+                  class="button button--secondary button--compact"
+                  type="button"
+                  :disabled="worldPackageCatalogLoading || worldPackageAdding"
+                  @click="loadWorldPackageCatalog"
+                >
+                  <AppIcon
+                    name="refresh"
+                    :class="{ 'icon--spinning': worldPackageCatalogLoading }"
+                  />
+                  {{
+                    worldPackageCatalogLoading
+                      ? t('worlds.catalog.refreshing')
+                      : t('worlds.catalog.refresh')
+                  }}
+                </button>
+              </div>
             </div>
           </div>
+
+          <p
+            v-if="worldPackageAddMessage"
+            class="world-package-add-status"
+            :class="{ 'world-package-add-status--error': worldPackageAddFailed }"
+            aria-live="polite"
+          >
+            {{ worldPackageAddMessage }}
+          </p>
 
           <p v-if="worldPackageCatalogStatus" class="world-catalog-status" aria-live="polite">
             {{ worldPackageCatalogStatus }}

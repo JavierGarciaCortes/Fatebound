@@ -2,7 +2,7 @@
 
 Fatebound es una aplicación de escritorio para Windows destinada a jugar RPG narrativos en solitario. El objetivo es ofrecer una experiencia local y portable: las reglas, los mundos, las partidas y sus crónicas podrán viajar junto a la aplicación y el juego no dependerá de un servidor ni de conexión a Internet.
 
-El repositorio se encuentra en una fase inicial de fundamentos. Actualmente contiene una primera shell funcional de Electron y Vue, interfaz en español, inglés y coreano, preferencias portables, persistencia SQLite protegida, el contrato/validador `.fateworld` v1 y detección de paquetes disponibles en una bandeja portable de solo lectura. El esquema del juego, el motor, la importación e instalación persistente de mundos y las pantallas jugables todavía no están implementados.
+El repositorio se encuentra en una fase inicial de fundamentos. Actualmente contiene una primera shell funcional de Electron y Vue, interfaz en español, inglés y coreano, preferencias portables, persistencia SQLite protegida, el contrato/validador `.fateworld` v1 y una bandeja portable donde detectar o incorporar paquetes disponibles. El esquema del juego, el motor, la instalación persistente de mundos y las pantallas jugables todavía no están implementados.
 
 ## Visión de producto
 
@@ -61,7 +61,7 @@ El ejecutable generado actualmente no tiene firma Authenticode. Windows puede mo
 
 La aplicación conserva los tres contextos de Electron:
 
-- `src/main/`: ciclo de vida, ventanas, conexión SQLite, backups, selectores controlados de exportación/restauración, validador `.fateworld` y catálogo de paquetes disponibles; los servicios de dominio continúan pendientes.
+- `src/main/`: ciclo de vida, ventanas, conexión SQLite, backups, selectores controlados de exportación/restauración y mundos, validador `.fateworld`, catálogo e incorporación de paquetes disponibles; los servicios de dominio continúan pendientes.
 - `src/preload/`: frontera segura y tipada entre Electron y la interfaz.
 - `src/renderer/`: interfaz Vue sin acceso directo a SQLite o al sistema de archivos.
 
@@ -112,9 +112,13 @@ La validación manual básica en Windows está completada: el ejecutable se abre
 
 Fatebound debe poder distribuirse públicamente sin mundos instalados y sin incorporar contenido protegido de terceros. Una instalación vacía será un estado válido: el usuario podrá instalar sus propios paquetes de mundos, incluido Ronin para uso personal cuando disponga legítimamente de ese contenido.
 
-El contrato técnico `.fateworld` v1 ya está definido: es un ZIP declarativo cerrado con manifiesto, Markdown por idioma, un YAML de tablas enlazadas e imágenes opcionales. Main consulta hasta 32 paquetes directos de `worlds/` dentro de un máximo de 256 entradas, rechaza enlaces y fuentes que salgan de la bandeja, reutiliza el validador y devuelve un catálogo tipado sin extraer ni instalar. Los duplicados exactos de `world.id + world.version` se omiten como conflicto; versiones distintas pueden aparecer a la vez. Su lista de capacidades mecánicas debe estar vacía mientras no exista el motor.
+El contrato técnico `.fateworld` v1 ya está definido: es un ZIP declarativo cerrado con manifiesto, Markdown por idioma, un YAML de tablas enlazadas e imágenes opcionales. Main combina los `.fateworld` copiados directamente a `worlds/` con los paquetes publicados por la aplicación bajo `.fatebound-managed-v1/`, dentro de límites conjuntos de 256 entradas y 32 candidatos. Rechaza enlaces, estructuras inesperadas y fuentes que salgan de su directorio, reutiliza el validador y devuelve un catálogo tipado sin extraer ni instalar. Los duplicados exactos de `world.id + world.version` se omiten como conflicto; versiones distintas pueden aparecer a la vez. Su lista de capacidades mecánicas debe estar vacía mientras no exista el motor.
 
-El selector, la importación y la instalación siguen pendientes. Detectar un paquete solo permite presentarlo como disponible; no lo mueve, copia, registra en SQLite ni publica bajo `data/worlds/`. SQLite conservará en el futuro las fichas base, el progreso y estado por Crónica, secundarios, clanes, relaciones, tiradas, combates, decisiones, efectos pendientes y eventos. Varias versiones de un mundo podrán coexistir, y personajes y Crónicas conservarán su vínculo con la versión exacta con la que fueron creados. Inicialmente los paquetes se prepararán fuera de Fatebound: no es necesario construir primero un editor visual avanzado.
+La pantalla **Mundos** permite pulsar **Añadir mundo** y elegir un único `.fateworld` mediante el selector nativo. Main valida el archivo, conserva el original y, si no existe ya, crea un directorio UUID exclusivo en `worlds/.fatebound-managed-v1/`, que el usuario no necesita manipular. Dentro guarda `owner`, un único `managed-<uuid>.fateworld` y, solo después de sincronizar cuando es posible y revalidar identidad y SHA-256, crea de forma exclusiva el marcador vacío `ready`. El mismo `world.id` + `world.version` y contenido se considera ya disponible; con contenido distinto se informa de conflicto, mientras que versiones diferentes pueden coexistir. Cancelar no crea la bandeja ni copia archivos.
+
+El catálogo ignora por completo los directorios gestionados sin `ready` y vuelve a validar el paquete completo aunque el marcador exista. La creación exclusiva de `ready` es el único paso que cambia el estado lógico a disponible: no se usan enlaces físicos ni `rename()` como garantía de ausencia de sobrescritura, y nunca se copia directamente a un nombre final explorado por el catálogo. Este protocolo usa operaciones disponibles en NTFS, FAT32 y exFAT, pero no convierte la publicación en durable frente a extracción física o corte de alimentación; tras reiniciar, un paquete o metadato dañado se rechaza y queda pendiente de revisión. Los ensayos reales de esas interrupciones en unidades FAT32/exFAT siguen pendientes.
+
+Esta incorporación solo deja el paquete disponible: no lo extrae, no lo registra en SQLite y no crea nada bajo `data/worlds/`. La instalación persistente sigue pendiente. SQLite conservará en el futuro las fichas base, el progreso y estado por Crónica, secundarios, clanes, relaciones, tiradas, combates, decisiones, efectos pendientes y eventos. Personajes y Crónicas conservarán su vínculo con la versión exacta con la que fueron creados. Inicialmente los paquetes se prepararán fuera de Fatebound: no es necesario construir primero un editor visual avanzado.
 
 En el modelo aprobado todavía no implementado, cada personaje tendrá una ficha base permanente y progreso independiente por Crónica. Solo podrá participar en una Crónica en curso, aunque se cierre la aplicación. Finalizarla o abandonarla definitivamente liberará la ficha; el abandono será irreversible y conservará el historial consultable. La muerte en una Crónica no impedirá reutilizar la ficha base en otra nueva. La shell actual no crea ninguno de estos registros y todavía no existe su esquema SQL.
 
@@ -150,9 +154,11 @@ Inicio utiliza el `hero` del tema activo como fondo cinematográfico legible. Mu
 
 Cada tarjeta integrada se etiqueta **Próximamente** mientras no exista un paquete detectado que corresponda a su ID estable y cambia a **Paquete disponible** cuando lo hay. El namespace reservado para ese enlace es `com.fatebound.worlds.<id-del-tema>`; otros IDs nunca se asocian por nombre de archivo o título. **Instalado** permanece separado y no puede producirse mediante esta etapa. Seleccionar una tarjeta solo muestra su tono y activa su ambientación visual; no ofrece jugar, instalar ni abrir el mundo.
 
+El encabezado de Mundos incluye **Añadir mundo** junto a **Actualizar catálogo**. La primera acción selecciona, valida e incorpora el paquete a `worlds/`; después actualiza automáticamente las tarjetas sin cambiar la sección ni el tema. La interfaz diferencia éxito, cancelación, paquete inválido o incompatible, archivo cambiado, paquete ya disponible, conflicto de versión y fallos de destino o copia. No existe todavía una acción **Instalar ahora**.
+
 Ajustes permite cambiar inmediatamente la interfaz entre **Español**, **English** y **한국어** sin perder la sección ni el tema activo. La preferencia se valida en preload y main y se publica atómicamente en `data/preferences.json`; una ausencia o valor inválido usa español. Un fallo de guardado mantiene el cambio solo durante la sesión y se comunica expresamente. Las traducciones viven en archivos independientes bajo `src/shared/i18n/locales/`, tienen claves coherentes y fallback explícito al español; las fechas visibles usan `Intl` con el idioma activo.
 
-Ajustes también consulta mediante `window.api.storage.getDiagnostics()` una instantánea real de las rutas activas, disponibilidad de SQLite, versión de esquema, integridad, claves foráneas y número de copias administradas válidas. Desde la misma sección puede solicitar exportación y restauración mediante operaciones específicas sin proporcionar rutas. El preload expone además `window.api.worlds.getPackageCatalog()`, una consulta sin argumentos que devuelve solo títulos, IDs, versiones, idiomas, nombres de archivo e incidencias sanitizadas; no acepta rutas ni ofrece acceso general a archivos. Tampoco expone `ipcRenderer`, SQL ni la conexión. La ventana conserva aislamiento de contexto, ausencia de Node y sandbox.
+Ajustes también consulta mediante `window.api.storage.getDiagnostics()` una instantánea real de las rutas activas, disponibilidad de SQLite, versión de esquema, integridad, claves foráneas y número de copias administradas válidas. Desde la misma sección puede solicitar exportación y restauración mediante operaciones específicas sin proporcionar rutas. El preload expone además `window.api.worlds.getPackageCatalog()` y `window.api.worlds.addPackage()`: ambas operaciones carecen de argumentos; el selector y toda ruta permanecen en main, y el renderer solo recibe catálogo o resultados sanitizados. Tampoco se expone `ipcRenderer`, SQL, la conexión ni acceso general a archivos. La ventana conserva aislamiento de contexto, ausencia de Node y sandbox.
 
 Personajes y Crónicas conservan vistas estructurales futuras, pero permanecen fuera de la navegación mientras no haya un mundo jugable activo y no ofrecen creación ni juego. Esta interfaz no incluye todavía editor de mundos, crónicas ni reglas avanzadas.
 
@@ -160,7 +166,7 @@ Personajes y Crónicas conservan vistas estructurales futuras, pero permanecen f
 
 La especificación normativa está en [docs/WORLD_FORMAT.md](docs/WORLD_FORMAT.md). Separa `formatVersion`, identidad y versión semántica del mundo, idiomas reales y capacidades mecánicas. El v1 admite únicamente contenido narrativo y tablas enlazadas; dados Yin/Yang, atributos, técnicas y combate continúan fuera del formato implementado.
 
-Las fuentes originales de **Ecos de la marea** están en `examples/fateworld/echoes-of-the-tide/` y el paquete reproducible en `examples/fateworld/echoes-of-the-tide-1.0.0.fateworld`. La muestra declara solo español, incluye una descripción Markdown y dos tablas con referencias válidas. Es material técnico y no se instala; si el usuario copia expresamente el paquete a la bandeja `worlds/`, aparece como entrada neutral disponible y no modifica las ocho tarjetas integradas.
+Las fuentes originales de **Ecos de la marea** están en `examples/fateworld/echoes-of-the-tide/` y el paquete reproducible en `examples/fateworld/echoes-of-the-tide-1.0.0.fateworld`. La muestra declara solo español, incluye una descripción Markdown y dos tablas con referencias válidas. Es material técnico y no se instala; si el usuario lo incorpora con **Añadir mundo** o lo copia expresamente a la bandeja `worlds/`, aparece como entrada neutral disponible y no modifica las ocho tarjetas integradas.
 
 ## Estado actual
 
@@ -182,7 +188,8 @@ Las fuentes originales de **Ecos de la marea** están en `examples/fateworld/ech
 - Exportación manual desde Ajustes a una carpeta elegida en main, con copia SQLite autocontenida, validación completa, publicación única y resultados localizados.
 - Restauración manual SQLite desde Ajustes con vista previa, confirmación separada, revalidación, copia previa protegida, sustitución con SQLite cerrado y recuperación por journal al siguiente arranque.
 - Contrato normativo `.fateworld` v1 y servicio interno tipado que valida ZIP, límites, rutas, YAML, idiomas, imágenes, identificadores y referencias sin extraer ni instalar.
-- Detección manualmente actualizable de paquetes directos en `worlds/`, mediante IPC sin argumentos, con límites, rechazo de enlaces/cambios durante lectura, versiones y conflictos duplicados explícitos.
+- Detección manualmente actualizable de paquetes directos y gestionados en `worlds/`, mediante IPC sin argumentos, con límites conjuntos, rechazo de enlaces/cambios durante lectura, versiones y conflictos duplicados explícitos.
+- Incorporación desde Mundos mediante selector nativo en main, copia exclusiva y revalidada bajo `.fatebound-managed-v1/`, publicación lógica mediante `ready` y actualización automática del catálogo, sin instalar ni escribir en SQLite.
 - Fuentes y paquete reproducible de la muestra técnica original **Ecos de la marea**, separados del catálogo visual y de cualquier contenido de terceros.
 - Pruebas aisladas para creación, persistencia, integridad, copias, migraciones, restauración, reapertura, errores, cierre, diagnóstico, preload, navegación, YAML, rutas y catálogo de temas.
 - Shell visual con Inicio en la marca, Ajustes en la cabecera y navegación contextual accesible y adaptativa.
@@ -200,7 +207,7 @@ Las fuentes originales de **Ecos de la marea** están en `examples/fateworld/ech
 
 ### Planificado
 
-- Selector nativo, vista previa previa a confirmación, importación e instalación inmutable bajo `data/worlds/` reutilizando el mismo catálogo y validador.
+- Vista previa previa a confirmación e instalación inmutable bajo `data/worlds/` reutilizando el mismo catálogo y validador.
 - Recuperación conjunta de SQLite y versiones instaladas de paquetes, cuarentena de bases dañadas y repositorios del dominio sobre SQLite.
 - Validación del portable desde un pendrive físico y desde otro ordenador.
 - Instalaciones válidas sin mundos, importación personal y protección frente al borrado accidental.

@@ -33,6 +33,9 @@ import {
 import { translate, type MessageKey } from '../shared/i18n/index.ts'
 import { readWorldPackageCatalog } from './worlds/world-package-catalog.ts'
 import { registerWorldPackageCatalogIpc } from './worlds/world-package-catalog-ipc.ts'
+import { addWorldPackageToInbox } from './worlds/world-package-add.ts'
+import { registerWorldPackageAddIpc } from './worlds/world-package-add-ipc.ts'
+import { createWorldPackageOpenDialogOptions } from './worlds/world-package-selector.ts'
 
 let mainWindow: BrowserWindow | null = null
 let shutdownStarted = false
@@ -74,6 +77,20 @@ async function selectSqliteRestoreSource(): Promise<string | undefined> {
     buttonLabel: mainT('native.restore.chooseButton'),
     properties: ['openDirectory', 'dontAddToRecent']
   }
+  const result =
+    mainWindow && !mainWindow.isDestroyed()
+      ? await dialog.showOpenDialog(mainWindow, options)
+      : await dialog.showOpenDialog(options)
+
+  return result.canceled || result.filePaths.length !== 1 ? undefined : result.filePaths[0]
+}
+
+async function selectWorldPackageSource(): Promise<string | undefined> {
+  const options = createWorldPackageOpenDialogOptions({
+    title: mainT('native.worlds.add.chooseTitle'),
+    button: mainT('native.worlds.add.chooseButton'),
+    fileType: mainT('native.worlds.add.fileType')
+  })
   const result =
     mainWindow && !mainWindow.isDestroyed()
       ? await dialog.showOpenDialog(mainWindow, options)
@@ -217,6 +234,13 @@ function registerApplicationLifecycle(): void {
     (channel, handler) => ipcMain.handle(channel, () => handler()),
     () => readWorldPackageCatalog(getWorldPackageInboxDirectory()),
     (error) => console.error('Unable to read the Fatebound world package catalog', error)
+  )
+
+  registerWorldPackageAddIpc(
+    (channel, handler) => ipcMain.handle(channel, () => handler()),
+    selectWorldPackageSource,
+    (selectedPath) => addWorldPackageToInbox(selectedPath, getWorldPackageInboxDirectory()),
+    (error) => console.error('Unable to add the selected Fatebound world package', error)
   )
 
   // This method will be called when Electron has finished

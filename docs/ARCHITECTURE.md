@@ -1,6 +1,6 @@
 # Arquitectura de Fatebound 2.0
 
-Estado del documento: arquitectura aprobada con Electron 44.7.0, almacenamiento SQLite, shell visual, empaquetado portable y contrato/validador `.fateworld` v1 implementados; la instalación de mundos, el dominio jugable y el motor continúan pendientes.
+Estado del documento: arquitectura aprobada con Electron 44.7.0, almacenamiento SQLite, shell visual, empaquetado portable, contrato/validador `.fateworld` v1 y incorporación segura a la bandeja implementados; la instalación de mundos, el dominio jugable y el motor continúan pendientes.
 
 Última actualización: 2026-10-14.
 
@@ -22,7 +22,7 @@ El repositorio contiene actualmente:
 - integridad, copias previas a migraciones o restauraciones, copias automáticas, retención segura, exportación y restauración manual ejecutadas exclusivamente en main;
 - un servicio interno de main que valida paquetes `.fateworld` v1 sin extraerlos ni instalarlos, más una muestra técnica original reproducible.
 
-No están implementados el esquema de persistencia del juego, los repositorios del dominio, los mundos jugables, el importador/instalador, el editor, el motor de reglas, las campañas, las crónicas ni la integración de IA. Las tarjetas de mundos y los estados futuros de la shell son demostraciones de presentación, no datos instalados. El validador v1 tampoco convierte la muestra técnica en contenido jugable.
+No están implementados el esquema de persistencia del juego, los repositorios del dominio, los mundos jugables, el instalador persistente, el editor, el motor de reglas, las campañas, las crónicas ni la integración de IA. La incorporación actual termina en la bandeja externa. Las tarjetas de mundos y los estados futuros de la shell son demostraciones de presentación, no datos instalados. El validador v1 tampoco convierte la muestra técnica en contenido jugable.
 
 ## 2. Principios
 
@@ -60,7 +60,7 @@ Vue representa vistas, formularios y estados de interacción. Puede solicitar op
 
 ### 3.2 Preload — frontera nativa
 
-**Implementado:** el preload ya no expone `@electron-toolkit/preload` ni `ipcRenderer`. Ofrece únicamente operaciones fijas de diagnóstico, exportación, selección/confirmación/cancelación de restauración, preferencia de idioma y consulta del catálogo de paquetes. Ninguna acepta una ruta desde el renderer: main conserva los destinos, selecciones y la bandeja `worlds/`. La vista previa de restauración devuelve solo fecha, motivo, versión de esquema y tamaño; el catálogo de mundos devuelve datos normalizados e incidencias sin rutas absolutas, trazas ni mensajes internos. Los contratos compartidos son tipados, el idioma se valida tanto en preload como en main y no existen primitivas generales de archivos, SQL ni acceso a la conexión SQLite.
+**Implementado:** el preload ya no expone `@electron-toolkit/preload` ni `ipcRenderer`. Ofrece únicamente operaciones fijas de diagnóstico, exportación, selección/confirmación/cancelación de restauración, preferencia de idioma, consulta del catálogo e incorporación de un paquete de mundo. Ninguna acepta una ruta desde el renderer: main conserva los destinos, selecciones y la bandeja `worlds/`. La vista previa de restauración devuelve solo fecha, motivo, versión de esquema y tamaño; los contratos de mundos devuelven datos normalizados y resultados sin rutas absolutas, trazas ni mensajes internos. Los contratos compartidos son tipados, el idioma se valida tanto en preload como en main y no existen primitivas generales de archivos, SQL ni acceso a la conexión SQLite.
 
 ### 3.3 Main — aplicación
 
@@ -118,7 +118,7 @@ Las rutas centrales actuales son:
 
 ```text
 <directorio-del-ejecutable-portable>/
-  worlds/              paquetes .fateworld disponibles, solo lectura
+  worlds/              paquetes .fateworld disponibles, detectados o incorporados
   data/
     fatebound.sqlite   base creada o abierta durante el arranque
     preferences.json   idioma de aplicación portable
@@ -262,11 +262,21 @@ Los artefactos públicos y privados tendrán nombres y procesos de salida inequ�
 
 ### 5.2 Recursos de mundos adicionales
 
-**Detección y validación implementadas, instalación pendiente:** `src/main/worlds/fateworld-validator.ts` abre un `.fateworld` como ZIP no confiable, impone límites antes y durante la lectura, valida rutas portables y colisiones Windows, rechaza enlaces y tipos especiales, verifica CRC-32 y analiza el subconjunto YAML seguro. `fateworld-contract.ts` valida manifiesto, idiomas, archivos declarados, firmas de imagen, tablas, identificadores y referencias. `world-package-catalog.ts` consulta únicamente archivos `.fateworld` directos de la bandeja externa y reutiliza ese validador sin extraer contenido.
+**Detección, validación e incorporación a la bandeja implementadas; instalación pendiente:** `src/main/worlds/fateworld-validator.ts` abre un `.fateworld` como ZIP no confiable, impone límites antes y durante la lectura, valida rutas portables y colisiones Windows, rechaza enlaces y tipos especiales, verifica CRC-32 y analiza el subconjunto YAML seguro. `fateworld-contract.ts` valida manifiesto, idiomas, archivos declarados, firmas de imagen, tablas, identificadores y referencias. `world-package-catalog.ts` combina archivos `.fateworld` directos de la bandeja externa con publicaciones gestionadas y reutiliza ese validador sin extraer contenido.
 
-La consulta admite como máximo 256 entradas de directorio y 32 candidatos por actualización, rechaza la propia bandeja si es un enlace, vuelve a comprobar cada fuente antes y después de validarla y omite enlaces, archivos no regulares, escapes y paquetes que cambien durante la lectura. La ausencia de la carpeta produce un catálogo vacío. Un archivo incompleto o aún en copia se convierte en una incidencia reintentable y no bloquea los demás. Los resultados separan válidos, incompatibles, inválidos y duplicados exactos de `world.id + world.version`; versiones distintas del mismo mundo permanecen diferenciadas.
+La consulta admite como máximo 256 entradas de directorio y 32 candidatos por actualización, contando conjuntamente ambas procedencias. Rechaza la bandeja, el almacén y los slots si son enlaces o escapan mediante su ruta real; vuelve a comprobar cada fuente antes y después de validarla y omite archivos no regulares y paquetes que cambien durante la lectura. La ausencia de la carpeta produce un catálogo vacío. Un archivo manual incompleto se convierte en una incidencia reintentable y no bloquea los demás. Los resultados separan válidos, incompatibles, inválidos y duplicados exactos de `world.id + world.version`; versiones distintas del mismo mundo permanecen diferenciadas.
 
-El canal `fatebound:worlds:get-package-catalog` no acepta argumentos. Main resuelve la ruta, el preload expone solo la consulta específica y el renderer recibe nombres base, nunca rutas absolutas. Los códigos internos del validador no se muestran como texto sin localizar. El validador y el catálogo no extraen, copian, modifican ni instalan archivos y no escriben en SQLite. **Propuesta no implementada:** el futuro importador copiará paquetes válidos a un espacio administrado bajo `data/worlds/`, aislado por identificador de mundo y versión. La base de datos guardará referencias relativas, nunca rutas absolutas del equipo de origen, y la publicación congelará las referencias de esa versión.
+Los canales `fatebound:worlds:get-package-catalog` y `fatebound:worlds:add-package` no aceptan argumentos. En el segundo, main abre `dialog.showOpenDialog` para un único `.fateworld`; la ruta elegida no cruza preload. `world-package-add.ts` rechaza enlaces y fuentes no regulares, detecta cambios durante la operación, conserva el original y compara identidad desde el manifiesto. Una coincidencia de `world.id` + `world.version` y SHA-256 se considera ya disponible; bytes distintos con la misma identidad producen conflicto, y versiones diferentes pueden coexistir.
+
+Las incorporaciones de la aplicación se guardan exactamente en `worlds/.fatebound-managed-v1/<uuid-v4>/`. Cada slot válido contiene `owner`, con las líneas canónicas `fatebound-managed-world-v1`, `slot=<uuid-del-directorio>` y `owner=<uuid-de-operación>`; un único `managed-<uuid-del-directorio>.fateworld`; y el marcador vacío `ready`. No se aceptan otros nombres. El segundo UUID permite atribuir la limpieza conservadora al valor que conserva la operación actual, pero los restos de ejecuciones anteriores y cualquier estructura desconocida se mantienen.
+
+El importador crea el slot mediante `mkdir` exclusivo, publica `owner` de forma exclusiva, copia el paquete con `COPYFILE_EXCL`, sincroniza los archivos cuando el sistema lo permite, comprueba que el origen no cambió y vuelve a validar identidad, versión y SHA-256. Después repite la detección de duplicados y conflictos entre fuentes manuales y gestionadas. Solo entonces crea `ready` con `open('wx')`; este marcador es el punto atómico de publicación lógica para el catálogo. No usa enlaces físicos, no copia a un nombre explorado antes de terminar y no presupone que `rename()` evite reemplazos.
+
+Un slot sin `ready` es invisible para el catálogo, incluso si conserva una copia completa. Un slot con `ready` no se confía: directorio, `owner`, marcador, nombre del paquete, ausencia de entradas adicionales, contención real y paquete v1 completo vuelven a comprobarse. Las rutas reales asociadas a candidatos permanecen en una inspección interna de main; el DTO compartido conserva solo nombres y metadatos sanitizados, y el importador no reconstruye rutas gestionadas desde `fileName`. Si falla antes de `ready`, solo se limpia el slot creado por la operación cuando su marcador de propiedad, contención y estructura siguen siendo inequívocos. Si `ready` existe, no se borra automáticamente: una nueva consulta decide si la publicación es válida, coincidente o conflictiva. Una segunda incorporación se rechaza mientras la primera sigue activa y cancelar no crea ni modifica archivos.
+
+El protocolo emplea directorios, copia exclusiva y creación exclusiva de archivos, disponibles en NTFS, FAT32 y exFAT. Ofrece ausencia de sobrescritura y evita que una copia en curso sea candidata, pero separa atomicidad lógica de durabilidad: ni `sync()` ni el marcador garantizan sobrevivir a extracción física o corte de alimentación en todos esos sistemas. Tras reiniciar, el catálogo rechaza cualquier paquete o metadato dañado; los ensayos reales de interrupción y recuperación en FAT32/exFAT siguen pendientes.
+
+El renderer recibe únicamente estados sanitizados y actualiza el catálogo tras éxito o paquete ya disponible. Ninguna de estas operaciones extrae paquetes, modifica SQLite ni escribe en `data/worlds/`. **Propuesta no implementada:** el futuro instalador publicará versiones validadas en un espacio administrado bajo `data/worlds/`, aislado por identificador de mundo y versión. La base de datos guardará referencias relativas, nunca rutas absolutas del equipo de origen, y la publicación congelará las referencias de esa versión.
 
 La asociación con las ocho tarjetas integradas usa únicamente una allowlist exacta en `src/shared/world-package-catalog.ts`: `com.fatebound.worlds.<id-del-tema>`. Nunca se infiere por nombre de archivo, título, sufijo o posición. Un ID distinto sigue siendo válido, pero recibe presentación neutral. Esta asociación de presentación no cambia el contrato normativo general de `world.id` ni acredita procedencia o licencia del contenido.
 
@@ -300,19 +310,19 @@ Actualmente solo existen los recursos gráficos indicados; no se ha importado el
 
 ## 7. Paquetes de mundos, importador y editor
 
-**Formato y validador v1 implementados y validados:** los mundos usan paquetes ZIP declarativos con extensión `.fateworld`. El v1 contiene un manifiesto, Markdown por idioma, un YAML de tablas enlazadas e imágenes opcionales. Su contrato es cerrado, distingue versión de formato, identidad/versión del mundo y capacidades, y exige traducciones reales para cada idioma declarado. Las comprobaciones superaron 99/99 tests generales y 19/19 pruebas específicas del validador tras corregir la comprobación de caracteres de control.
+**Formato y validador v1 implementados y validados:** los mundos usan paquetes ZIP declarativos con extensión `.fateworld`. El v1 contiene un manifiesto, Markdown por idioma, un YAML de tablas enlazadas e imágenes opcionales. Su contrato es cerrado, distingue versión de formato, identidad/versión del mundo y capacidades, y exige traducciones reales para cada idioma declarado. Las comprobaciones del hito superaron 99/99 tests generales y 19/19 pruebas específicas del validador tras corregir la comprobación de caracteres de control. Antes de introducir el almacén gestionado, el equipo comunicó además 112 pruebas correctas con una omitida y un ensayo manual satisfactorio del selector, copia, SHA-256 y duplicados en NTFS; esos resultados no validan todavía el protocolo `ready` ni FAT32/exFAT.
 
-La muestra original **Ecos de la marea** entrega fuentes y paquete reproducible bajo `examples/fateworld/`. No contiene reglas de Ronin, capacidades mecánicas ni estado de juego y no se instala. El repositorio no la copia automáticamente a la bandeja; si el usuario lo hace expresamente, aparece como paquete disponible con presentación neutral.
+La muestra original **Ecos de la marea** entrega fuentes y paquete reproducible bajo `examples/fateworld/`. No contiene reglas de Ronin, capacidades mecánicas ni estado de juego y no se instala. El repositorio no la copia automáticamente a la bandeja; si el usuario la incorpora mediante **Añadir mundo** o la copia expresamente, aparece como paquete disponible con presentación neutral.
 
-El servicio usa `yauzl` para lectura ZIP limitada y `yaml` con esquema `failsafe`; ambas son dependencias directas de producción. El generador determinista de la muestra utiliza solo API estándar de Node. El contrato compartido del catálogo y su única operación IPC no exponen un selector ni una primitiva general de archivos.
+El servicio usa `yauzl` para lectura ZIP limitada y `yaml` con esquema `failsafe`; ambas son dependencias directas de producción. El generador determinista de la muestra utiliza solo API estándar de Node. Los contratos compartidos del catálogo y la incorporación exponen dos operaciones IPC sin argumentos; el selector permanece en main y no existe una primitiva general de archivos.
 
 **Pendiente:** el mismo modelo deberá poder importarse, instalarse, editarse y exportarse sin pérdida de información. Varias versiones podrán coexistir y los personajes y Crónicas conservarán su vínculo exacto. El v1 no define todavía temas de mundo, reglas mecánicas, procedencia, firmas, dependencias entre paquetes ni datos SQLite.
 
 El flujo parte ahora de dos etapas reutilizables disponibles:
 
 1. **Implementado:** validar el ZIP en origen, sin extracción ni efectos secundarios, y devolver información estructurada o errores sanitizados.
-2. **Implementado:** detectar paquetes directos de la bandeja portable, agrupar identidad y versión, rechazar conflictos y mostrarlos como disponibles o problemáticos sin instalar.
-3. **Pendiente:** seleccionar otro paquete mediante un diálogo nativo de main y preparar una copia en un área temporal controlada usando el mismo catálogo y validador.
+2. **Implementado, pendiente de validar tras el cambio:** detectar conjuntamente paquetes manuales directos y publicaciones gestionadas con `ready`, agrupar identidad y versión, rechazar conflictos y mostrarlos como disponibles o problemáticos sin instalar.
+3. **Implementado, pendiente de validar tras el cambio:** seleccionar otro paquete mediante un diálogo nativo de main, copiarlo y revalidarlo dentro de un slot gestionado, publicarlo mediante creación exclusiva de `ready` y actualizar el catálogo.
 4. **Pendiente:** mostrar una vista previa previa a confirmación e instalar una versión inmutable de forma transaccional bajo `data/worlds/`.
 5. **Pendiente:** crear borradores editables y exportar versiones nuevas.
 
@@ -365,7 +375,7 @@ La implementación mantiene y deberá seguir manteniendo:
 - conservar copias recuperables antes de migraciones y operaciones destructivas;
 - registrar errores técnicos sin exponer datos privados en la interfaz.
 
-La API genérica del scaffold y el canal de demostración `ping` se han retirado. La superficie nativa actual queda limitada al diagnóstico tipado, la exportación manual, las tres fases explícitas de restauración, la lectura/escritura validada del idioma y la consulta sin argumentos del catálogo `.fateworld`. El validador permanece en main; solo su resultado reducido cruza el IPC específico y no existe selector. Los contratos de almacenamiento y mundos no aceptan rutas desde el renderer; incorporar otra capacidad exigirá un IPC específico y pruebas equivalentes.
+La API genérica del scaffold y el canal de demostración `ping` se han retirado. La superficie nativa actual queda limitada al diagnóstico tipado, la exportación manual, las tres fases explícitas de restauración, la lectura/escritura validada del idioma, la consulta del catálogo `.fateworld` y su selector de incorporación. Las dos operaciones de mundos carecen de argumentos; el validador, la ruta seleccionada y la copia permanecen en main, y solo resultados reducidos cruzan el IPC específico. Los contratos de almacenamiento y mundos no aceptan rutas desde el renderer; incorporar otra capacidad exigirá un IPC específico y pruebas equivalentes.
 
 La migración controlada actualizó Electron de 39.8.10 a la versión exacta 44.7.0, `@types/node` a la versión exacta 24.19.2 y regeneró `package-lock.json` mediante npm. Electron Toolkit, electron-vite y electron-builder mantienen sus versiones anteriores; no se introdujeron overrides ni parches de dependencias.
 
@@ -383,10 +393,11 @@ Estas ocho advertencias continúan pendientes de resolución controlada. La mejo
 6. **Implementado y validado:** exportación manual de copias SQLite a una carpeta elegida en main, sin rutas en el renderer ni sobrescritura silenciosa.
 7. **Implementado y validado en flujo normal y rechazos:** restauración manual SQLite con confirmación, copia protegida y recuperación guiada por journal. Las interrupciones reales y la recuperación conjunta de paquetes siguen pendientes.
 8. **Implementado y validado:** contrato `.fateworld` v1, validador seguro sin extracción y muestra original reproducible.
-9. **Implementado, pendiente de validación:** detección limitada y de solo lectura de paquetes en `worlds/`, IPC específico y catálogo localizado que conserva las ocho tarjetas.
-10. Incorporar selector nativo, vista previa, importación e instalación inmutable bajo `data/worlds/` reutilizando el mismo validador; edición, exportación y publicación quedan para fases posteriores.
-11. Implementar progresivamente el motor compatible, las Crónicas, los eventos y la exportación.
-12. Configurar y verificar el perfil privado separado cuando exista autorización para su contenido.
-13. Añadir las fases mecánicas extendida y avanzada y, solo después, la integración opcional de IA.
+9. **Implementado, pendiente de revalidación:** detección limitada y combinada de paquetes manuales y gestionados en `worlds/`, IPC específico y catálogo localizado que conserva las ocho tarjetas.
+10. **Implementado, pendiente de revalidación:** selector nativo e incorporación segura al almacén gestionado, con copia exclusiva, sincronización posible, revalidación, publicación mediante `ready` y actualización automática sin instalar.
+11. Incorporar vista previa e instalación inmutable bajo `data/worlds/` reutilizando el mismo validador; edición, exportación y publicación de paquetes quedan para fases posteriores.
+12. Implementar progresivamente el motor compatible, las Crónicas, los eventos y la exportación.
+13. Configurar y verificar el perfil privado separado cuando exista autorización para su contenido.
+14. Añadir las fases mecánicas extendida y avanzada y, solo después, la integración opcional de IA.
 
 `STATUS.md` es la fuente para la prioridad inmediata y el resultado real de cada fase.

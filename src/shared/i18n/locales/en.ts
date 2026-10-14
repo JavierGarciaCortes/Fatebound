@@ -43,6 +43,26 @@ export const en = {
   'worlds.title': 'Choose the tone of your adventure',
   'worlds.intro':
     'Explore the eight settings and review packages detected beside Fatebound. An available package is not installed or playable yet.',
+  'worlds.add.action': 'Add world',
+  'worlds.add.processing': 'Selecting, validating, and copying…',
+  'worlds.add.success':
+    'Package {worldId} v{worldVersion} was added to worlds/. It is not installed yet.',
+  'worlds.add.cancelled': 'Selection cancelled. Nothing was copied or installed.',
+  'worlds.add.alreadyAvailable':
+    'Package {worldId} v{worldVersion} is already available in worlds/. It was not duplicated.',
+  'worlds.add.invalid':
+    'The file is not a valid .fateworld v1 package, is too large, or is not a regular file.',
+  'worlds.add.incompatible':
+    'The package format or capabilities are incompatible with this version of Fatebound.',
+  'worlds.add.changed':
+    'The file changed during the operation. No partial copy was published.',
+  'worlds.add.versionConflict':
+    'A different package already declares the same world and version. Change the package version before adding it.',
+  'worlds.add.destinationUnavailable':
+    'The worlds/ folder could not be checked or prepared safely.',
+  'worlds.add.copyFailed':
+    'The package could not be copied. Check permissions and free space; other packages were not changed.',
+  'worlds.add.inProgress': 'A world package is already being added.',
   'worlds.catalog.refresh': 'Refresh catalogue',
   'worlds.catalog.refreshing': 'Refreshing…',
   'worlds.catalog.summary': '{packages} packages available · {issues} issues',
@@ -244,6 +264,9 @@ export const en = {
   'native.export.chooseButton': 'Export here',
   'native.restore.chooseTitle': 'Choose a Fatebound backup',
   'native.restore.chooseButton': 'Verify this backup',
+  'native.worlds.add.chooseTitle': 'Choose a Fatebound world package',
+  'native.worlds.add.chooseButton': 'Add this package',
+  'native.worlds.add.fileType': 'Fatebound world package',
   'native.common.accept': 'Understood',
   'native.database.title': 'Fatebound cannot open your data',
   'native.database.detail':

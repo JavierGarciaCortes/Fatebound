@@ -27,6 +27,10 @@ import {
   WORLD_PACKAGE_CATALOG_CHANNEL,
   type WorldPackageCatalogResult
 } from '../shared/world-package-catalog.ts'
+import {
+  WORLD_PACKAGE_ADD_CHANNEL,
+  type WorldPackageAddResult
+} from '../shared/world-package-add.ts'
 
 export type IpcInvoke = (channel: string, ...args: readonly unknown[]) => Promise<unknown>
 
@@ -66,6 +70,9 @@ export function createFateboundApi(invoke: IpcInvoke): FateboundApi {
     worlds: Object.freeze({
       async getPackageCatalog(): Promise<WorldPackageCatalogResult> {
         return (await invoke(WORLD_PACKAGE_CATALOG_CHANNEL)) as WorldPackageCatalogResult
+      },
+      async addPackage(): Promise<WorldPackageAddResult> {
+        return (await invoke(WORLD_PACKAGE_ADD_CHANNEL)) as WorldPackageAddResult
       }
     })
   })

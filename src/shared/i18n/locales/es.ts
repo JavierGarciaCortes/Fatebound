@@ -41,6 +41,26 @@ export const es = {
   'worlds.title': 'Elige el tono de tu aventura',
   'worlds.intro':
     'Explora las ocho ambientaciones y consulta los paquetes detectados junto a Fatebound. Un paquete disponible todavía no está instalado ni es jugable.',
+  'worlds.add.action': 'Añadir mundo',
+  'worlds.add.processing': 'Seleccionando, validando y copiando…',
+  'worlds.add.success':
+    'Paquete {worldId} v{worldVersion} incorporado a worlds/. Aún no está instalado.',
+  'worlds.add.cancelled': 'Selección cancelada. No se ha copiado ni instalado nada.',
+  'worlds.add.alreadyAvailable':
+    'El paquete {worldId} v{worldVersion} ya está disponible en worlds/. No se ha duplicado.',
+  'worlds.add.invalid':
+    'El archivo no es un paquete .fateworld v1 válido, es demasiado grande o no es un archivo regular.',
+  'worlds.add.incompatible':
+    'El formato o las capacidades del paquete no son compatibles con esta versión de Fatebound.',
+  'worlds.add.changed':
+    'El archivo cambió durante la operación. No se ha publicado ninguna copia parcial.',
+  'worlds.add.versionConflict':
+    'Ya existe un paquete distinto con el mismo mundo y versión. Cambia la versión del paquete antes de añadirlo.',
+  'worlds.add.destinationUnavailable':
+    'No se pudo comprobar o preparar la carpeta worlds/ de forma segura.',
+  'worlds.add.copyFailed':
+    'No se pudo copiar el paquete. Comprueba los permisos y el espacio disponible; los demás paquetes no se han modificado.',
+  'worlds.add.inProgress': 'Ya hay una incorporación de mundo en curso.',
   'worlds.catalog.refresh': 'Actualizar catálogo',
   'worlds.catalog.refreshing': 'Actualizando…',
   'worlds.catalog.summary': '{packages} paquetes disponibles · {issues} incidencias',
@@ -243,6 +263,9 @@ export const es = {
   'native.export.chooseButton': 'Exportar aquí',
   'native.restore.chooseTitle': 'Elegir copia de seguridad de Fatebound',
   'native.restore.chooseButton': 'Verificar esta copia',
+  'native.worlds.add.chooseTitle': 'Elegir paquete de mundo de Fatebound',
+  'native.worlds.add.chooseButton': 'Añadir este paquete',
+  'native.worlds.add.fileType': 'Paquete de mundo Fatebound',
   'native.common.accept': 'Entendido',
   'native.database.title': 'Fatebound no puede abrir sus datos',
   'native.database.detail':

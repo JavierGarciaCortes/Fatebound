@@ -6,6 +6,13 @@ import { test } from 'node:test'
 import { createWorldPackageCatalogHandler } from './world-package-catalog-ipc.ts'
 import { createStoredTestZip, type TestZipEntry } from './fateworld-test-zip.ts'
 import { validateFateworldPackage } from './fateworld-validator.ts'
+import {
+  MANAGED_WORLD_OWNER_FILE_NAME,
+  MANAGED_WORLD_READY_FILE_NAME,
+  MANAGED_WORLD_STORE_DIRECTORY_NAME,
+  managedWorldOwnerContents,
+  managedWorldPackageFileName
+} from './world-package-managed-store.ts'
 import { readWorldPackageCatalog } from './world-package-catalog.ts'
 
 const VALID_TABLES = `tables:
@@ -61,6 +68,25 @@ async function writePackage(
     packagePath,
     createStoredTestZip(packageEntries(worldId, worldVersion, formatVersion))
   )
+}
+
+async function writeManagedSlot(
+  inbox: string,
+  slotId: string,
+  worldId: string,
+  worldVersion: string,
+  ready: boolean
+): Promise<string> {
+  const slotPath = join(inbox, MANAGED_WORLD_STORE_DIRECTORY_NAME, slotId)
+  await mkdir(slotPath, { recursive: true })
+  await writeFile(
+    join(slotPath, MANAGED_WORLD_OWNER_FILE_NAME),
+    managedWorldOwnerContents(slotId, '00000000-0000-4000-8000-000000000900')
+  )
+  const packagePath = join(slotPath, managedWorldPackageFileName(slotId))
+  await writePackage(packagePath, worldId, worldVersion)
+  if (ready) await writeFile(join(slotPath, MANAGED_WORLD_READY_FILE_NAME), '')
+  return slotPath
 }
 
 test('a missing world package inbox is an empty read-only catalog', async () => {
@@ -126,6 +152,71 @@ test('the catalog validates direct packages, separates incompatibilities, and re
   }
 })
 
+test('managed packages stay invisible until ready and remain subject to structure and package validation', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'fatebound-world-catalog-managed-'))
+  const inbox = join(root, 'worlds')
+  const pendingId = '00000000-0000-4000-8000-000000000101'
+  const readyId = '00000000-0000-4000-8000-000000000102'
+  const damagedId = '00000000-0000-4000-8000-000000000103'
+  const unsafeId = '00000000-0000-4000-8000-000000000104'
+
+  try {
+    await writeManagedSlot(inbox, pendingId, 'com.example.pending', '1.0.0', false)
+    await writeManagedSlot(inbox, readyId, 'com.example.ready', '1.0.0', true)
+    const damagedSlot = await writeManagedSlot(
+      inbox,
+      damagedId,
+      'com.example.damaged',
+      '1.0.0',
+      true
+    )
+    await writeFile(join(damagedSlot, managedWorldPackageFileName(damagedId)), 'damaged')
+    const unsafeSlot = await writeManagedSlot(
+      inbox,
+      unsafeId,
+      'com.example.unsafe',
+      '1.0.0',
+      true
+    )
+    await writeFile(join(unsafeSlot, 'unexpected.txt'), 'not part of a managed slot')
+
+    const result = await readWorldPackageCatalog(inbox)
+
+    assert.deepEqual(
+      result.packages.map((candidate) => candidate.worldId),
+      ['com.example.ready']
+    )
+    assert.equal(
+      result.packages.some((candidate) => candidate.worldId === 'com.example.pending'),
+      false
+    )
+    assert.equal(
+      result.issues.some((issue) =>
+        issue.fileNames.includes(managedWorldPackageFileName(pendingId))
+      ),
+      false
+    )
+    assert.equal(
+      result.issues.some(
+        (issue) =>
+          issue.fileNames.includes(managedWorldPackageFileName(damagedId)) &&
+          issue.validationCode === 'INVALID_ZIP'
+      ),
+      true
+    )
+    assert.equal(
+      result.issues.some(
+        (issue) =>
+          issue.fileNames.includes(managedWorldPackageFileName(unsafeId)) &&
+          issue.validationCode === 'MANAGED_SLOT_UNEXPECTED_STRUCTURE'
+      ),
+      true
+    )
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
 test('a package changed while validation is running is rejected as retryable', async () => {
   const root = await mkdtemp(join(tmpdir(), 'fatebound-world-catalog-changing-'))
   const inbox = join(root, 'worlds')
@@ -155,12 +246,21 @@ test('symbolic-link package candidates are never followed', async (context) => {
   const root = await mkdtemp(join(tmpdir(), 'fatebound-world-catalog-link-'))
   const inbox = join(root, 'worlds')
   const outsidePackage = join(root, 'outside.fateworld')
+  const outsideSlot = join(root, 'outside-slot')
+  const linkedSlotId = '00000000-0000-4000-8000-000000000105'
 
   try {
     await mkdir(inbox)
+    await mkdir(outsideSlot)
     await writePackage(outsidePackage, 'com.example.outside', '1.0.0')
     try {
       await symlink(outsidePackage, join(inbox, 'linked.fateworld'), 'file')
+      await mkdir(join(inbox, MANAGED_WORLD_STORE_DIRECTORY_NAME))
+      await symlink(
+        outsideSlot,
+        join(inbox, MANAGED_WORLD_STORE_DIRECTORY_NAME, linkedSlotId),
+        'junction'
+      )
     } catch (error) {
       if (
         error instanceof Error &&
@@ -175,7 +275,10 @@ test('symbolic-link package candidates are never followed', async (context) => {
 
     const result = await readWorldPackageCatalog(inbox)
     assert.deepEqual(result.packages, [])
-    assert.equal(result.issues[0]?.validationCode, 'SOURCE_NOT_REGULAR')
+    assert.deepEqual(
+      result.issues.map((issue) => issue.validationCode).sort(),
+      ['MANAGED_SLOT_NOT_REGULAR', 'SOURCE_NOT_REGULAR']
+    )
   } finally {
     await rm(root, { recursive: true, force: true })
   }
