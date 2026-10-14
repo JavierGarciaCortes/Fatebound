@@ -23,6 +23,10 @@ import {
   type BuiltinThemeId,
   type ThemeArtworkRole
 } from './builtin-theme-schema.ts'
+import {
+  KNOWN_WORLD_PACKAGE_IDS,
+  resolveKnownWorldPresentationId
+} from '../../shared/world-package-catalog.ts'
 
 const themesDirectory = fileURLToPath(
   new URL('../../../resources/builtin-themes/', import.meta.url)
@@ -125,6 +129,16 @@ test('the world catalog contains eight upcoming worlds and excludes neutral Fate
 
   assert.match(appSource, /v-for="theme in BUILTIN_WORLD_THEMES"/)
   assert.match(appSource, /common\.upcoming/)
+})
+
+test('detected packages map to built-in cards only through explicit stable world IDs', () => {
+  assert.deepEqual(Object.keys(KNOWN_WORLD_PACKAGE_IDS), [...BUILTIN_WORLD_THEME_IDS])
+  assert.equal(resolveKnownWorldPresentationId('com.fatebound.worlds.ronin'), 'ronin')
+  assert.equal(resolveKnownWorldPresentationId('other.publisher.ronin'), undefined)
+  assert.match(appSource, /window\.api\.worlds\.getPackageCatalog\(\)/)
+  assert.match(appSource, /common\.packageAvailable/)
+  assert.doesNotMatch(appSource, /type="file"/)
+  assert.doesNotMatch(appSource, />\s*(?:Instalar|Install|설치)\s*</)
 })
 
 test('the integrated catalog loads only allowlisted resources from builtin-themes', () => {

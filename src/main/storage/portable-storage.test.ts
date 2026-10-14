@@ -7,6 +7,7 @@ import {
   createStoragePaths,
   probeStorageWriteAccess,
   resolveDefaultStoragePaths,
+  resolveWorldPackageInboxDirectory,
   type WriteProbeOperations,
   type WriteProbeResult
 } from './portable-storage.ts'
@@ -31,6 +32,14 @@ test('resolves an isolated local data directory in development', () => {
   assert.equal(paths.backupsDirectory, join(paths.dataDirectory, 'backups'))
   assert.equal(paths.exportsDirectory, join(paths.dataDirectory, 'exports'))
   assert.equal(paths.databaseFile, join(paths.dataDirectory, 'fatebound.sqlite'))
+  assert.equal(
+    resolveWorldPackageInboxDirectory({
+      isPackaged: false,
+      appPath,
+      executablePath: resolve('ignored', 'Fatebound.exe')
+    }),
+    join(appPath, '.fatebound-dev', 'worlds')
+  )
 })
 
 test('uses PORTABLE_EXECUTABLE_DIR instead of the temporary extraction path', () => {
@@ -43,6 +52,15 @@ test('uses PORTABLE_EXECUTABLE_DIR instead of the temporary extraction path', ()
   })
 
   assert.equal(paths.dataDirectory, join(portableExecutableDirectory, 'data'))
+  assert.equal(
+    resolveWorldPackageInboxDirectory({
+      isPackaged: true,
+      appPath: resolve('ignored', 'app'),
+      executablePath: join(portableExecutableDirectory, 'temporary', 'Fatebound.exe'),
+      portableExecutableDirectory
+    }),
+    join(portableExecutableDirectory, 'worlds')
+  )
 })
 
 test('falls back to the executable directory for a packaged application', () => {
@@ -54,6 +72,14 @@ test('falls back to the executable directory for a packaged application', () => 
   })
 
   assert.equal(paths.dataDirectory, join(dirname(executablePath), 'data'))
+  assert.equal(
+    resolveWorldPackageInboxDirectory({
+      isPackaged: true,
+      appPath: resolve('ignored', 'app'),
+      executablePath
+    }),
+    join(dirname(executablePath), 'worlds')
+  )
 })
 
 test('accepts a writable directory without leaving probe files', async () => {

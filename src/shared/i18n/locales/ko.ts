@@ -5,7 +5,7 @@ export const ko = {
   'a11y.primaryNavigation': '주 탐색',
   'a11y.goHome': 'Fatebound: 홈으로 이동',
   'a11y.activeVisualTheme': '활성 비주얼 테마',
-  'a11y.futureWorlds': '공개 예정 세계',
+  'a11y.futureWorlds': '사용 가능한 세계와 패키지',
   'navigation.home.label': '홈',
   'navigation.home.description': '모험으로 향하는 관문',
   'navigation.worlds.label': '세계',
@@ -19,6 +19,8 @@ export const ko = {
   'navigation.settings.open': '설정 열기',
   'navigation.settings.opened': '설정 열림',
   'common.upcoming': '출시 예정',
+  'common.packageAvailable': '패키지 사용 가능',
+  'common.installed': '설치됨',
   'common.baseIdentity': '기본 정체성',
   'common.noActiveWorld': '활성 세계 없음',
   'sidebar.activeAtmosphere': '현재 분위기',
@@ -35,16 +37,38 @@ export const ko = {
   'home.library.eyebrow': '로컬 라이브러리',
   'home.library.title': '설치된 세계 없음',
   'home.library.body':
-    '여덟 개의 미래 세계에서 비주얼 분위기를 살펴볼 수 있습니다. 아직 패키지, 규칙, 캐릭터 또는 플레이 콘텐츠는 포함되어 있지 않습니다.',
-  'home.library.action': '여덟 세계 모두 보기',
+    '설치된 세계가 없습니다. 세계 화면에서 여덟 가지 배경과 앱 옆에 있는 유효한 패키지를 확인할 수 있습니다.',
+  'home.library.action': '세계와 패키지 보기',
   'worlds.eyebrow': '비주얼 라이브러리',
   'worlds.title': '모험의 분위기를 선택하세요',
   'worlds.intro':
-    '분위기를 살펴볼 수 있는 여덟 개의 미래 세계입니다. 아직 규칙이나 플레이 콘텐츠는 없습니다.',
+    '여덟 가지 배경을 살펴보고 Fatebound 옆에서 감지된 패키지를 확인하세요. 사용 가능한 패키지는 아직 설치되거나 플레이 가능하지 않습니다.',
+  'worlds.catalog.refresh': '카탈로그 새로고침',
+  'worlds.catalog.refreshing': '새로고침 중…',
+  'worlds.catalog.summary': '사용 가능한 패키지 {packages}개 · 문제 {issues}개',
+  'worlds.catalog.error':
+    '패키지 폴더를 확인할 수 없습니다. 설치된 세계와 데이터는 변경되지 않았습니다.',
+  'worlds.catalog.additionalEyebrow': '감지된 패키지',
+  'worlds.catalog.additionalTitle': '사용 가능한 다른 세계',
+  'worlds.catalog.additionalIntro':
+    '이 항목들은 중립적인 모습으로 표시되며 설치되지 않은 상태입니다.',
+  'worlds.catalog.issuesEyebrow': '검토 필요',
+  'worlds.catalog.issuesTitle': '사용할 수 없는 패키지',
+  'worlds.catalog.issue.invalid': '유효하지 않은 패키지를 제외했습니다.',
+  'worlds.catalog.issue.incompatible':
+    '형식 또는 기능이 이 Fatebound 버전과 호환되지 않습니다.',
+  'worlds.catalog.issue.temporary':
+    '파일이 불완전하거나 변경되었거나 지금 읽을 수 없습니다. 복사가 끝난 뒤 다시 새로고침하세요.',
+  'worlds.catalog.issue.duplicate':
+    '여러 파일이 같은 세계와 버전을 선언하여 해당 릴리스를 제외했습니다.',
+  'worlds.catalog.scanLimited':
+    '안전 탐색 한도에 도달했습니다. 불필요한 파일을 제거하고 다시 새로고침하세요.',
   'worlds.atmosphere': '분위기',
   'worlds.availability': '이용 가능 여부',
   'worlds.note':
     '이 세계에는 아직 규칙이나 플레이 콘텐츠가 없습니다. 현재는 선택한 세계의 비주얼 분위기만 이번 세션에 적용됩니다.',
+  'worlds.packageAvailableNote':
+    '감지된 버전: {versions}. 패키지는 설치되지 않았으며 v1 형식에는 플레이에 필요한 기계적 기능이 아직 없습니다.',
   'worlds.empty.eyebrow': '선택한 세계 없음',
   'worlds.empty.title': '미래의 분위기를 탐험하세요',
   'worlds.empty.body':

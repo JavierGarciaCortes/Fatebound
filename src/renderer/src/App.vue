@@ -14,6 +14,12 @@ import type {
   SqliteRestoreSelectionResult
 } from '../../shared/sqlite-safe-restore'
 import type { MessageKey } from '../../shared/i18n'
+import {
+  resolveKnownWorldPresentationId,
+  type AvailableWorldPackage,
+  type WorldPackageCatalogIssue,
+  type WorldPackageCatalogResult
+} from '../../shared/world-package-catalog'
 import brandLogoHorizontal from '../../../resources/branding/fatebound/fatebound-logo-horizontal.png'
 import brandSymbol from '../../../resources/branding/fatebound/fatebound-symbol.png'
 import AppIcon from './components/AppIcon.vue'
@@ -50,10 +56,23 @@ const backupRestoreAction = ref<
 const backupRestoreSelecting = ref(false)
 const backupRestoring = ref(false)
 const failedArtwork = ref<readonly string[]>([])
+const worldPackageCatalog = ref<WorldPackageCatalogResult | null>(null)
+const worldPackageCatalogLoading = ref(false)
 
 const activeTheme = computed(() => resolveBuiltinTheme(activeThemeId.value))
 const activeWorldTheme = computed(() =>
   activeTheme.value.role === 'future-world' ? activeTheme.value : null
+)
+const availableWorldPackages = computed(() =>
+  worldPackageCatalog.value?.status === 'ready' ? worldPackageCatalog.value.packages : []
+)
+const additionalWorldPackages = computed(() =>
+  availableWorldPackages.value.filter(
+    (packageInfo) => resolveKnownWorldPresentationId(packageInfo.worldId) === undefined
+  )
+)
+const selectedThemePackages = computed(() =>
+  activeWorldTheme.value === null ? [] : packagesForTheme(activeWorldTheme.value.id)
 )
 const visibleNavigationSections = computed(() =>
   getContextualNavigationSections(activeInstalledWorld.value)
@@ -126,6 +145,18 @@ const backupRestoreFailed = computed(
     backupRestoreSelection.value?.status === 'error' ||
     backupRestoreAction.value?.status === 'error'
 )
+const worldPackageCatalogStatus = computed(() => {
+  if (worldPackageCatalogLoading.value) return t('worlds.catalog.refreshing')
+  const catalog = worldPackageCatalog.value
+  if (catalog === null) return null
+  if (catalog.status === 'error') return t('worlds.catalog.error')
+  return t('worlds.catalog.summary', {
+    packages: catalog.packages.length,
+    issues: catalog.issues.length
+  })
+})
+
+type WorldLibraryAvailability = 'upcoming' | 'package-available' | 'installed'
 
 function navigationLabel(sectionId: AppSectionId): string {
   return t(`navigation.${sectionId}.label` as MessageKey)
@@ -150,6 +181,60 @@ function themeText(
   field: 'name' | 'tagline' | 'category' | 'description' | 'atmosphere'
 ): string {
   return t(`theme.${themeId}.${field}` as MessageKey)
+}
+
+function packagesForTheme(themeId: BuiltinThemeId): readonly AvailableWorldPackage[] {
+  return availableWorldPackages.value.filter(
+    (packageInfo) => resolveKnownWorldPresentationId(packageInfo.worldId) === themeId
+  )
+}
+
+function worldThemeAvailability(themeId: BuiltinThemeId): WorldLibraryAvailability {
+  const installedWorld = activeInstalledWorld.value
+  if (
+    installedWorld !== null &&
+    resolveKnownWorldPresentationId(installedWorld.worldId) === themeId
+  ) {
+    return 'installed'
+  }
+  return packagesForTheme(themeId).length > 0 ? 'package-available' : 'upcoming'
+}
+
+function availabilityLabel(availability: WorldLibraryAvailability): string {
+  const keys: Readonly<Record<WorldLibraryAvailability, MessageKey>> = {
+    upcoming: 'common.upcoming',
+    'package-available': 'common.packageAvailable',
+    installed: 'common.installed'
+  }
+  return t(keys[availability])
+}
+
+function packageTitle(packageInfo: AvailableWorldPackage): string {
+  return (
+    packageInfo.titles[language.value] ??
+    packageInfo.titles[packageInfo.defaultLanguage] ??
+    packageInfo.worldId
+  )
+}
+
+function packageLanguages(packageInfo: AvailableWorldPackage): string {
+  return packageInfo.languages.join(', ')
+}
+
+function packageVersions(packages: readonly AvailableWorldPackage[]): string {
+  return packages.map((packageInfo) => packageInfo.worldVersion).join(', ')
+}
+
+function catalogIssueFiles(issue: WorldPackageCatalogIssue): string {
+  return issue.fileNames.join(', ')
+}
+
+function catalogIssueMessage(issue: WorldPackageCatalogIssue): string {
+  if (issue.kind === 'duplicate') return t('worlds.catalog.issue.duplicate')
+  if (issue.kind === 'incompatible') return t('worlds.catalog.issue.incompatible')
+  return issue.retryable
+    ? t('worlds.catalog.issue.temporary')
+    : t('worlds.catalog.issue.invalid')
 }
 
 function hexToRgb(value: string): string {
@@ -183,10 +268,27 @@ async function navigateTo(sectionId: AppSectionId): Promise<void> {
   if (activeSection.value === 'settings' && diagnostics.value === null) {
     void loadDiagnostics()
   }
+  if (activeSection.value === 'worlds' && worldPackageCatalog.value === null) {
+    void loadWorldPackageCatalog()
+  }
 
   await nextTick()
   mainContent.value?.scrollTo({ top: 0, left: 0 })
   mainContent.value?.focus()
+}
+
+async function loadWorldPackageCatalog(): Promise<void> {
+  if (worldPackageCatalogLoading.value) return
+
+  worldPackageCatalogLoading.value = true
+
+  try {
+    worldPackageCatalog.value = await window.api.worlds.getPackageCatalog()
+  } catch {
+    worldPackageCatalog.value = { status: 'error', code: 'catalog-unavailable' }
+  } finally {
+    worldPackageCatalogLoading.value = false
+  }
 }
 
 async function loadDiagnostics(): Promise<void> {
@@ -380,7 +482,9 @@ async function cancelSqliteBackupRestore(): Promise<void> {
           <div>
             <strong>{{ themeText(activeTheme.id, 'name') }}</strong>
             <small>{{
-              activeTheme.isNeutral ? t('common.noActiveWorld') : t('common.upcoming')
+              activeTheme.isNeutral
+                ? t('common.noActiveWorld')
+                : availabilityLabel(worldThemeAvailability(activeTheme.id))
             }}</small>
           </div>
         </div>
@@ -402,7 +506,9 @@ async function cancelSqliteBackupRestore(): Promise<void> {
           <div class="topbar-world" :aria-label="t('a11y.activeVisualTheme')">
             <span>{{ themeText(activeTheme.id, 'name') }}</span>
             <strong>{{
-              activeTheme.isNeutral ? t('common.baseIdentity') : t('common.upcoming')
+              activeTheme.isNeutral
+                ? t('common.baseIdentity')
+                : availabilityLabel(worldThemeAvailability(activeTheme.id))
             }}</strong>
           </div>
           <button
@@ -451,7 +557,11 @@ async function cancelSqliteBackupRestore(): Promise<void> {
             <div class="hero-content">
               <div class="preview-badge">
                 <span aria-hidden="true"></span>
-                {{ activeTheme.isNeutral ? t('home.neutralBadge') : t('home.futureBadge') }}
+                {{
+                  activeTheme.isNeutral
+                    ? t('home.neutralBadge')
+                    : availabilityLabel(worldThemeAvailability(activeTheme.id))
+                }}
               </div>
               <p class="hero-overline">{{ themeText(activeTheme.id, 'category') }}</p>
               <h2 id="home-title">{{ themeText(activeTheme.id, 'tagline') }}</h2>
@@ -522,15 +632,40 @@ async function cancelSqliteBackupRestore(): Promise<void> {
               <span class="eyebrow">{{ t('worlds.eyebrow') }}</span>
               <h2 id="worlds-title">{{ t('worlds.title') }}</h2>
             </div>
-            <p>{{ t('worlds.intro') }}</p>
+            <div class="world-catalog-actions">
+              <p>{{ t('worlds.intro') }}</p>
+              <button
+                class="button button--secondary button--compact"
+                type="button"
+                :disabled="worldPackageCatalogLoading"
+                @click="loadWorldPackageCatalog"
+              >
+                <AppIcon
+                  name="refresh"
+                  :class="{ 'icon--spinning': worldPackageCatalogLoading }"
+                />
+                {{
+                  worldPackageCatalogLoading
+                    ? t('worlds.catalog.refreshing')
+                    : t('worlds.catalog.refresh')
+                }}
+              </button>
+            </div>
           </div>
+
+          <p v-if="worldPackageCatalogStatus" class="world-catalog-status" aria-live="polite">
+            {{ worldPackageCatalogStatus }}
+          </p>
 
           <div class="world-card-grid" :aria-label="t('a11y.futureWorlds')">
             <button
               v-for="theme in BUILTIN_WORLD_THEMES"
               :key="theme.id"
               class="world-card"
-              :class="{ 'world-card--active': activeTheme.id === theme.id }"
+              :class="{
+                'world-card--active': activeTheme.id === theme.id,
+                'world-card--available': worldThemeAvailability(theme.id) === 'package-available'
+              }"
               :style="{ '--card-accent': theme.visual.colors.primary }"
               type="button"
               :aria-pressed="activeTheme.id === theme.id"
@@ -555,7 +690,7 @@ async function cancelSqliteBackupRestore(): Promise<void> {
                 />
               </span>
               <span class="world-card__body">
-                <small>{{ t('common.upcoming') }}</small>
+                <small>{{ availabilityLabel(worldThemeAvailability(theme.id)) }}</small>
                 <strong>{{ themeText(theme.id, 'name') }}</strong>
                 <span>{{ themeText(theme.id, 'category') }}</span>
               </span>
@@ -577,7 +712,9 @@ async function cancelSqliteBackupRestore(): Promise<void> {
               </div>
             </div>
             <div class="world-detail__content">
-              <span class="preview-badge preview-badge--inline">{{ t('common.upcoming') }}</span>
+              <span class="preview-badge preview-badge--inline">
+                {{ availabilityLabel(worldThemeAvailability(activeWorldTheme.id)) }}
+              </span>
               <h3>{{ themeText(activeWorldTheme.id, 'tagline') }}</h3>
               <p>{{ themeText(activeWorldTheme.id, 'description') }}</p>
               <div class="world-detail__meta">
@@ -587,10 +724,17 @@ async function cancelSqliteBackupRestore(): Promise<void> {
                 </div>
                 <div>
                   <span>{{ t('worlds.availability') }}</span>
-                  <strong>{{ t('common.upcoming') }}</strong>
+                  <strong>{{ availabilityLabel(worldThemeAvailability(activeWorldTheme.id)) }}</strong>
                 </div>
               </div>
-              <p class="world-note">{{ t('worlds.note') }}</p>
+              <p v-if="selectedThemePackages.length > 0" class="world-note">
+                {{
+                  t('worlds.packageAvailableNote', {
+                    versions: packageVersions(selectedThemePackages)
+                  })
+                }}
+              </p>
+              <p v-else class="world-note">{{ t('worlds.note') }}</p>
             </div>
           </article>
 
@@ -602,6 +746,59 @@ async function cancelSqliteBackupRestore(): Promise<void> {
               <p>{{ t('worlds.empty.body') }}</p>
             </div>
           </article>
+
+          <section
+            v-if="additionalWorldPackages.length > 0"
+            class="additional-worlds"
+            aria-labelledby="additional-worlds-title"
+          >
+            <div class="additional-worlds__heading">
+              <span class="eyebrow">{{ t('worlds.catalog.additionalEyebrow') }}</span>
+              <h3 id="additional-worlds-title">{{ t('worlds.catalog.additionalTitle') }}</h3>
+              <p>{{ t('worlds.catalog.additionalIntro') }}</p>
+            </div>
+            <div class="world-card-grid">
+              <article
+                v-for="packageInfo in additionalWorldPackages"
+                :key="`${packageInfo.worldId}@${packageInfo.worldVersion}`"
+                class="world-card world-card--neutral"
+                :style="{ '--card-accent': activeTheme.visual.colors.primary }"
+              >
+                <span class="world-card__art world-card__art--neutral" aria-hidden="true">
+                  <span class="artwork-fallback"><AppIcon name="worlds" /></span>
+                </span>
+                <span class="world-card__body">
+                  <small>{{ t('common.packageAvailable') }}</small>
+                  <strong>{{ packageTitle(packageInfo) }}</strong>
+                  <span>v{{ packageInfo.worldVersion }} · {{ packageLanguages(packageInfo) }}</span>
+                </span>
+              </article>
+            </div>
+          </section>
+
+          <aside
+            v-if="
+              worldPackageCatalog?.status === 'ready' &&
+              (worldPackageCatalog.issues.length > 0 || worldPackageCatalog.scanLimitReached)
+            "
+            class="world-catalog-issues panel"
+            aria-labelledby="world-catalog-issues-title"
+          >
+            <div>
+              <span class="eyebrow">{{ t('worlds.catalog.issuesEyebrow') }}</span>
+              <h3 id="world-catalog-issues-title">{{ t('worlds.catalog.issuesTitle') }}</h3>
+            </div>
+            <ul>
+              <li v-for="issue in worldPackageCatalog.issues" :key="catalogIssueFiles(issue)">
+                <strong>{{ catalogIssueFiles(issue) }}</strong>
+                <span>{{ catalogIssueMessage(issue) }}</span>
+              </li>
+            </ul>
+            <p v-if="worldPackageCatalog.scanLimitReached">
+              {{ t('worlds.catalog.scanLimited') }}
+            </p>
+          </aside>
+
         </section>
 
         <section

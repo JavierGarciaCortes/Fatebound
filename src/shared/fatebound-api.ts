@@ -10,6 +10,7 @@ import type {
   SqliteRestoreConfirmationResult,
   SqliteRestoreSelectionResult
 } from './sqlite-safe-restore.ts'
+import type { WorldPackageCatalogResult } from './world-package-catalog.ts'
 
 export interface FateboundApi {
   readonly storage: {
@@ -22,5 +23,8 @@ export interface FateboundApi {
   readonly preferences: {
     getLanguage(): Promise<ApplicationLanguageReadResult>
     setLanguage(language: ApplicationLanguage): Promise<ApplicationLanguageWriteResult>
+  }
+  readonly worlds: {
+    getPackageCatalog(): Promise<WorldPackageCatalogResult>
   }
 }

@@ -14,7 +14,7 @@ La exportación quedó validada con 74/74 tests, lint, typecheck, builds y porta
 
 Fatebound 2.0 dispone ya de una primera interfaz visual funcional sobre Electron 44.7.0 y Vue. La shell carga nueve temas visuales y está traducida al español, inglés y coreano, con cambio inmediato y preferencia portable. Sin un mundo activo comienza en Fatebound neutral, el menú muestra solo Mundos y Ajustes reúne idioma, diagnóstico SQLite, exportación y restauración manual de backups.
 
-El producto continúa en fase de fundamentos: el contrato y el validador `.fateworld` v1 ya están implementados y validados técnicamente, pero no existen todavía esquema del juego, mundos instalados, personajes, campañas, reglas ni importación persistente. Ronin, Templario, Ninja, Shaolin, Robot, Soldado, Naves y Mundoplato figuran como **Próximamente** y solo permiten explorar su ambientación; ninguno representa contenido jugable disponible o instalado.
+El producto continúa en fase de fundamentos: el contrato y el validador `.fateworld` v1 están implementados y cuentan con la validación histórica indicada más abajo. La nueva detección de paquetes disponibles ya está implementada en código, pero no se ha ejecutado en esta tarea. Todavía no existen esquema del juego, mundos instalados, personajes, campañas, reglas ni importación persistente. Ronin, Templario, Ninja, Shaolin, Robot, Soldado, Naves y Mundoplato conservan sus tarjetas; muestran **Próximamente** o **Paquete disponible** según la consulta, sin representar contenido jugable o instalado.
 
 ## Implementado
 
@@ -30,7 +30,7 @@ El producto continúa en fase de fundamentos: el contrato y el validador `.fatew
 - [x] Validación tipada de esquema, identificador, estado no jugable, paletas, opciones y rutas relativas seguras.
 - [x] Nueve `hero`, nueve `card` y nueve `emblem` integrados; fallbacks por recurso ausente o fallido sin bloquear la interfaz.
 - [x] Tarjetas ilustradas verticales 3:4 en Mundos y panel de detalle protagonizado por el emblema, sin hero de fondo.
-- [x] Ocho tarjetas de mundo en estado inequívoco **Próximamente**, seleccionables para ambientación pero sin acciones de juego, instalación o apertura.
+- [x] Ocho tarjetas ilustradas conservadas, con **Próximamente** o **Paquete disponible** según el ID estable detectado, seleccionables para ambientación pero sin acciones de juego, instalación o apertura.
 - [x] Vistas estructurales honestas de Personajes y Crónicas, fuera de la navegación actual y sin botones inertes ni datos ficticios persistidos.
 - [x] Foco visible, enlace para saltar al contenido, controles de teclado, estados hover y `prefers-reduced-motion`.
 - [x] Seis recursos de marca organizados en `resources/branding/fatebound/`; el logo sigue siendo un botón accesible de Inicio y el PNG de aplicación alimenta el icono del portable de Windows.
@@ -67,7 +67,7 @@ El producto continúa en fase de fundamentos: el contrato y el validador `.fatew
 
 - [x] Especificación normativa cerrada con versión de formato separada de la identidad y versión semántica del mundo.
 - [x] Manifiesto con idiomas reales, predeterminado, títulos localizados, Markdown, YAML de tablas, imágenes opcionales y lista de capacidades mecánicas obligatoriamente vacía en v1.
-- [x] Servicio interno tipado en main, independiente de UI e instalador, que no extrae archivos, no modifica SQLite y no añade IPC.
+- [x] Servicio tipado en main, reutilizado por el catálogo de disponibilidad, que no extrae archivos, no modifica SQLite y permanece separado del futuro instalador.
 - [x] Inspección ZIP real con CRC-32, límites de archivo/entrada/expansión/ratio/profundidad, métodos Stored o Deflate y rechazo de cifrado, enlaces, tipos especiales y reparse points.
 - [x] Rutas relativas NFC, sin escapes, duplicados, nombres reservados ni colisiones relevantes en Windows.
 - [x] Subconjunto YAML 1.2 `failsafe`, sin alias, anclas, etiquetas, merge, documentos múltiples, claves duplicadas ni campos desconocidos.
@@ -75,6 +75,18 @@ El producto continúa en fase de fundamentos: el contrato y el validador `.fatew
 - [x] Resultados estructurados con errores sanitizados que no exponen la ruta absoluta de origen.
 - [x] Fuentes originales y paquete reproducible **Ecos de la marea** bajo `examples/fateworld/`, sin capacidades mecánicas ni condición jugable.
 - [x] Pruebas focalizadas para aceptación, incompatibilidades, rutas/límites, tipos peligrosos, IDs/referencias y YAML peligroso; las 19 pruebas específicas del validador quedaron correctas tras reforzar la comprobación de caracteres de control.
+
+### Catálogo de paquetes disponibles
+
+- [x] Resolución de `worlds/` junto al ejecutable portable mediante `PORTABLE_EXECUTABLE_DIR` o `process.execPath`, y `.fatebound-dev/worlds/` aislado durante desarrollo, sin depender de `process.cwd()`.
+- [x] Carpeta ausente tratada como catálogo vacío; consulta estrictamente de solo lectura, no recursiva y limitada a 256 entradas y 32 candidatos `.fateworld` directos.
+- [x] Rechazo de bandeja enlazada, enlaces candidatos, fuentes no regulares o fuera del directorio y paquetes que cambian durante la validación; los fallos individuales no bloquean el resto.
+- [x] Reutilización del validador v1 y separación explícita entre paquetes válidos, incompatibles, inválidos/reintentables y duplicados exactos de `world.id + world.version`.
+- [x] Versiones distintas del mismo mundo conservadas por separado; la identidad siempre procede del manifiesto, nunca del nombre del archivo.
+- [x] Canal sin argumentos `fatebound:worlds:get-package-catalog`, preload tipado y respuesta sin rutas absolutas, trazas ni mensajes internos sin localizar.
+- [x] Asociación exacta de las ocho tarjetas mediante `com.fatebound.worlds.<id-del-tema>`; otros IDs válidos aparecen con presentación neutral sin perder ni sustituir ilustraciones integradas.
+- [x] Actualización manual localizada desde Mundos y estados separados **Próximamente**, **Paquete disponible** e **Instalado**; esta etapa nunca produce el último.
+- [x] Pruebas focalizadas añadidas para carpeta ausente, filtrado directo, versiones, incompatibilidad, duplicados, cambio durante lectura, enlaces cuando el sistema permite crearlos, error IPC sanitizado y preload sin argumentos. No se han ejecutado en esta tarea.
 
 ### Exportación manual SQLite
 
@@ -99,17 +111,17 @@ El producto continúa en fase de fundamentos: el contrato y el validador `.fatew
 
 ## Funciones demostrativas o pendientes
 
-- Los ocho mundos son un catálogo interno de presentación; no son paquetes `.fateworld`, no aparecen en SQLite y no contienen reglas. Fatebound neutral es la identidad base y no forma parte de esas ocho tarjetas.
-- **Próximamente** significa que el paquete jugable aún no existe; **No instalado** se reservará para un paquete futuro ya disponible pero ausente de la biblioteca local.
+- Los ocho mundos siguen siendo un catálogo interno de presentación; las tarjetas no son paquetes `.fateworld`, no aparecen en SQLite y no contienen reglas. Fatebound neutral es la identidad base y no forma parte de esas ocho tarjetas.
+- **Próximamente** indica que no se ha detectado un paquete correspondiente; **Paquete disponible** indica solo una publicación v1 válida en la bandeja. **Instalado** se reserva para una futura versión administrada bajo `data/worlds/`.
 - La selección temática dura solo durante la sesión y comienza de nuevo en Fatebound neutral al abrir la aplicación.
 - Personajes y Crónicas no aparecen en el menú sin un mundo jugable activo; sus vistas estructurales no crean, editan ni persisten datos.
 - Ajustes ofrece idioma, diagnóstico, exportación y restauración manual de backups SQLite; no ofrece exploración general de archivos ni cambio de la raíz activa.
-- La muestra **Ecos de la marea** está destinada a verificar el contrato como artefacto técnico; no está instalada ni aparece en la interfaz.
-- No existe todavía selector/importador, instalación persistente, editor de mundos, motor de reglas, campañas jugables o IA.
+- La muestra **Ecos de la marea** está destinada a verificar el contrato como artefacto técnico; no está instalada ni se copia automáticamente a la bandeja. Si el usuario la deposita allí, aparece como entrada neutral disponible.
+- No existe todavía selector nativo «Añadir mundo», importación, instalación persistente, editor de mundos, motor de reglas, campañas jugables o IA.
 
 ## Siguiente tarea prioritaria
 
-**Revisar y resolver de forma controlada las ocho vulnerabilidades moderadas restantes de la cadena de empaquetado, sin aplicar correcciones forzadas ni cambios mayores no evaluados.**
+**Implementar el selector nativo «Añadir mundo», la vista previa y la instalación inmutable bajo `data/worlds/`, reutilizando exactamente el catálogo y el validador existentes sin aceptar rutas desde el renderer.**
 
 ## Pendientes por fases
 
@@ -129,7 +141,7 @@ El producto continúa en fase de fundamentos: el contrato y el validador `.fatew
 
 - Mantener pendiente la recuperación conjunta con paquetes, sin sobrescritura silenciosa.
 - Implementar repositorios sobre la transacción central SQLite.
-- Implementar selección, vista previa, importación segura e instalación inmutable reutilizando el validador v1.
+- Implementar selector nativo, vista previa, importación segura e instalación inmutable reutilizando el catálogo y el validador v1.
 - Definir los vínculos exactos de personajes y crónicas con identidad y versión de mundo.
 - Implementar la ficha base permanente y el progreso independiente por Crónica, impidiendo que una ficha participe en dos Crónicas en curso.
 - Conservar la ocupación tras cerrar la aplicación; liberar la ficha solo al finalizar o abandonar definitivamente, con abandono irreversible e historial consultable.
@@ -159,7 +171,7 @@ El producto continúa en fase de fundamentos: el contrato y el validador `.fatew
 - La recuperación ante fallos está cubierta parcialmente por pruebas automatizadas, pero no se considera infalible ni equivale a haber provocado y verificado manualmente una interrupción real.
 - Retirar una unidad durante una escritura sigue siendo inseguro incluso con la configuración conservadora de SQLite.
 - `node:sqlite` permanece ligado al runtime de Node incluido en Electron 44.7.0. Las pruebas automatizadas se ejecutaron con Node 22.23.2 del equipo, por lo que la comprobación del runtime integrado depende de los ensayos realizados con el portable real.
-- La especificación normativa y el validador `.fateworld` v1 han superado sus comprobaciones técnicas, pero todavía no existen importador, instalación desde la interfaz, esquema del juego ni motor mecánico.
+- La especificación normativa y el validador `.fateworld` v1 han superado sus comprobaciones técnicas históricas. El catálogo nuevo todavía no ha sido ejecutado ni revisado visualmente; tampoco existen selector/importador, instalación desde la interfaz, esquema del juego ni motor mecánico.
 - Antes de la migración, la auditoría completa informaba 10 vulnerabilidades npm —8 moderadas y 2 altas— y la auditoría con `--omit=dev`, 6 —4 moderadas y 2 altas—. Tras actualizar Electron, `npm audit --omit=dev` informa 0 vulnerabilidades y la auditoría completa, 8 moderadas y ninguna alta.
 - Las ocho advertencias restantes pertenecen a la cadena de herramientas de empaquetado: `electron-builder`, `app-builder-lib`, `@electron/get` 3.x y `global-agent` → `roarr` → `sprintf-js`. Su resolución controlada continúa pendiente; estos resultados no garantizan que todo el ecosistema de dependencias esté libre de riesgos.
 
@@ -199,6 +211,12 @@ Resultados reales comunicados por el usuario:
 - SHA-256 del paquete de ejemplo antes y después de regenerarlo: idéntico, `7B87AC86C2681AE79A1D8490D3FF697CFE1368A31318BB89A8C3364F658A5B31`.
 
 No se ha probado la importación ni la instalación desde la interfaz porque esas funciones todavía no están implementadas.
+
+## Verificación pendiente del catálogo de paquetes
+
+En esta tarea se añadieron las pruebas focalizadas y se revisaron de forma estática los contratos main/preload/renderer y la documentación. Por restricción expresa no se ejecutaron `npm test`, lint, typecheck, build, build de Windows, comprobaciones visuales automatizadas ni comandos de Git. Por tanto, la detección, el IPC, las traducciones y la composición visual permanecen implementados pero pendientes de validación manual y automatizada por el equipo.
+
+La comprobación manual debe cubrir carpeta ausente, paquete válido conocido, paquete válido desconocido, varias versiones, duplicado exacto, ZIP inválido o incompleto, formato incompatible, enlace simbólico o junction, actualización durante una copia activa, límites de exploración, cambio de idioma, tamaños 760×620 y 1180×780, reinicio portable y confirmación de que ni la bandeja ni `data/worlds/` se modifican.
 
 ## Migración controlada a Electron 44.7.0
 
@@ -324,3 +342,6 @@ Los recursos gráficos de Ronin presentes en el repositorio no autorizan su dist
 - Validado en un portable aislado el arranque, la interfaz, la persistencia del idioma, el diagnóstico SQLite, la exportación, la restauración, la copia protegida y la reapertura.
 - Reducida la auditoría de producción a 0 vulnerabilidades y la completa a 8 moderadas sin vulnerabilidades altas; la cadena de empaquetado restante continúa pendiente de resolución controlada.
 - Conservadas como pendientes las pruebas con estados de datos diferentes, interrupciones físicas o de alimentación, falta real de espacio y restauración tras una interrupción real.
+- Implementada, sin ejecutar validaciones por restricción de la tarea, la detección limitada y de solo lectura de paquetes `.fateworld` depositados en `worlds/` junto al portable y en `.fatebound-dev/worlds/` durante desarrollo.
+- Añadido el catálogo mediante IPC sin argumentos, estados localizados en Mundos, asociación exacta de IDs conocidos, entradas neutrales para otros mundos y actualización manual sin selector ni instalación.
+- Añadidas pruebas focalizadas del catálogo y actualizada la documentación; tests, lint, typecheck, builds y revisión visual quedan pendientes de ejecución por el equipo.

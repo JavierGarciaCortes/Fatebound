@@ -71,6 +71,17 @@ export function resolveDefaultStoragePaths(runtime: StorageRuntime): StoragePath
   return createStoragePaths(join(portableDirectory, 'data'))
 }
 
+export function resolveWorldPackageInboxDirectory(runtime: StorageRuntime): string {
+  if (!runtime.isPackaged) {
+    return resolve(runtime.appPath, DEVELOPMENT_STORAGE_DIRECTORY, 'worlds')
+  }
+
+  const portableExecutableDirectory = runtime.portableExecutableDirectory?.trim()
+  const portableDirectory = portableExecutableDirectory || dirname(runtime.executablePath)
+
+  return resolve(portableDirectory, 'worlds')
+}
+
 export async function probeStorageWriteAccess(
   directory: string,
   options: WriteProbeOptions = {}

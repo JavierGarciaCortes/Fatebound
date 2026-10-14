@@ -12,6 +12,7 @@ import {
   SQLITE_RESTORE_CONFIRM_CHANNEL,
   SQLITE_RESTORE_SELECT_CHANNEL
 } from '../shared/sqlite-safe-restore.ts'
+import { WORLD_PACKAGE_CATALOG_CHANNEL } from '../shared/world-package-catalog.ts'
 
 test('the preload API exposes only restricted storage and language operations', async () => {
   const invocations: Array<{ channel: string; args: readonly unknown[] }> = []
@@ -43,10 +44,13 @@ test('the preload API exposes only restricted storage and language operations', 
     }
     if (channel === SQLITE_RESTORE_CONFIRM_CHANNEL) return { status: 'success' }
     if (channel === SQLITE_RESTORE_CANCEL_CHANNEL) return { status: 'cancelled' }
+    if (channel === WORLD_PACKAGE_CATALOG_CHANNEL) {
+      return { status: 'ready', packages: [], issues: [], scanLimitReached: false }
+    }
     return expectedResult
   })
 
-  assert.deepEqual(Object.keys(api), ['storage', 'preferences'])
+  assert.deepEqual(Object.keys(api), ['storage', 'preferences', 'worlds'])
   assert.deepEqual(Object.keys(api.storage), [
     'getDiagnostics',
     'exportSqliteBackup',
@@ -55,6 +59,7 @@ test('the preload API exposes only restricted storage and language operations', 
     'cancelSqliteBackupRestore'
   ])
   assert.deepEqual(Object.keys(api.preferences), ['getLanguage', 'setLanguage'])
+  assert.deepEqual(Object.keys(api.worlds), ['getPackageCatalog'])
   assert.equal(await api.storage.getDiagnostics(), expectedResult)
   assert.deepEqual(await api.preferences.getLanguage(), {
     status: 'ready',
@@ -69,6 +74,12 @@ test('the preload API exposes only restricted storage and language operations', 
   assert.equal((await api.storage.selectSqliteBackupForRestore()).status, 'ready')
   assert.deepEqual(await api.storage.confirmSqliteBackupRestore(), { status: 'success' })
   assert.deepEqual(await api.storage.cancelSqliteBackupRestore(), { status: 'cancelled' })
+  assert.deepEqual(await api.worlds.getPackageCatalog(), {
+    status: 'ready',
+    packages: [],
+    issues: [],
+    scanLimitReached: false
+  })
   assert.deepEqual(invocations, [
     { channel: STORAGE_DIAGNOSTICS_CHANNEL, args: [] },
     { channel: GET_APPLICATION_LANGUAGE_CHANNEL, args: [] },
@@ -76,6 +87,7 @@ test('the preload API exposes only restricted storage and language operations', 
     { channel: SQLITE_MANUAL_EXPORT_CHANNEL, args: [] },
     { channel: SQLITE_RESTORE_SELECT_CHANNEL, args: [] },
     { channel: SQLITE_RESTORE_CONFIRM_CHANNEL, args: [] },
-    { channel: SQLITE_RESTORE_CANCEL_CHANNEL, args: [] }
+    { channel: SQLITE_RESTORE_CANCEL_CHANNEL, args: [] },
+    { channel: WORLD_PACKAGE_CATALOG_CHANNEL, args: [] }
   ])
 })

@@ -3,7 +3,11 @@ import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/branding/fatebound/fatebound-app-icon.png?asset'
 import { initializePortableStorage } from './storage/electron-storage-startup.ts'
-import { activateStoragePaths, hasActiveStoragePaths } from './storage/portable-storage.ts'
+import {
+  activateStoragePaths,
+  hasActiveStoragePaths,
+  resolveWorldPackageInboxDirectory
+} from './storage/portable-storage.ts'
 import {
   closeActiveSqliteDatabase,
   hasOpenActiveSqliteDatabase,
@@ -27,6 +31,8 @@ import {
   type ApplicationLanguage
 } from '../shared/application-language.ts'
 import { translate, type MessageKey } from '../shared/i18n/index.ts'
+import { readWorldPackageCatalog } from './worlds/world-package-catalog.ts'
+import { registerWorldPackageCatalogIpc } from './worlds/world-package-catalog-ipc.ts'
 
 let mainWindow: BrowserWindow | null = null
 let shutdownStarted = false
@@ -37,6 +43,15 @@ const PORTABLE_SQLITE_VERIFICATION_ARGUMENT = '--verify-portable-sqlite'
 
 function mainT(key: MessageKey): string {
   return translate(mainApplicationLanguage, key)
+}
+
+function getWorldPackageInboxDirectory(): string {
+  return resolveWorldPackageInboxDirectory({
+    isPackaged: app.isPackaged,
+    appPath: app.getAppPath(),
+    executablePath: process.execPath,
+    portableExecutableDirectory: process.env['PORTABLE_EXECUTABLE_DIR']
+  })
 }
 
 async function selectManualSqliteExportDestination(): Promise<string | undefined> {
@@ -196,6 +211,12 @@ function registerApplicationLifecycle(): void {
     inspectRestorableSqliteBackup,
     restoreActiveSqliteBackup,
     (error) => console.error('Unable to restore a Fatebound SQLite backup safely', error)
+  )
+
+  registerWorldPackageCatalogIpc(
+    (channel, handler) => ipcMain.handle(channel, () => handler()),
+    () => readWorldPackageCatalog(getWorldPackageInboxDirectory()),
+    (error) => console.error('Unable to read the Fatebound world package catalog', error)
   )
 
   // This method will be called when Electron has finished

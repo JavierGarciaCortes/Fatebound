@@ -23,6 +23,10 @@ import {
   type SqliteRestoreConfirmationResult,
   type SqliteRestoreSelectionResult
 } from '../shared/sqlite-safe-restore.ts'
+import {
+  WORLD_PACKAGE_CATALOG_CHANNEL,
+  type WorldPackageCatalogResult
+} from '../shared/world-package-catalog.ts'
 
 export type IpcInvoke = (channel: string, ...args: readonly unknown[]) => Promise<unknown>
 
@@ -57,6 +61,11 @@ export function createFateboundApi(invoke: IpcInvoke): FateboundApi {
           SET_APPLICATION_LANGUAGE_CHANNEL,
           language
         )) as ApplicationLanguageWriteResult
+      }
+    }),
+    worlds: Object.freeze({
+      async getPackageCatalog(): Promise<WorldPackageCatalogResult> {
+        return (await invoke(WORLD_PACKAGE_CATALOG_CHANNEL)) as WorldPackageCatalogResult
       }
     })
   })

@@ -5,7 +5,7 @@ export const en = {
   'a11y.primaryNavigation': 'Primary navigation',
   'a11y.goHome': 'Fatebound: go to Home',
   'a11y.activeVisualTheme': 'Active visual theme',
-  'a11y.futureWorlds': 'Available future worlds',
+  'a11y.futureWorlds': 'Available worlds and packages',
   'navigation.home.label': 'Home',
   'navigation.home.description': 'Your gateway to adventure',
   'navigation.worlds.label': 'Worlds',
@@ -19,6 +19,8 @@ export const en = {
   'navigation.settings.open': 'Open Settings',
   'navigation.settings.opened': 'Settings open',
   'common.upcoming': 'Coming soon',
+  'common.packageAvailable': 'Package available',
+  'common.installed': 'Installed',
   'common.baseIdentity': 'Base identity',
   'common.noActiveWorld': 'No active world',
   'sidebar.activeAtmosphere': 'Active atmosphere',
@@ -35,16 +37,38 @@ export const en = {
   'home.library.eyebrow': 'Local library',
   'home.library.title': 'No worlds installed',
   'home.library.body':
-    'Eight future worlds let you explore their visual atmosphere. They do not yet contain packages, rules, characters, or playable content.',
-  'home.library.action': 'View all eight worlds',
+    'No world is installed. The Worlds screen shows the eight settings and any valid packages available beside the application.',
+  'home.library.action': 'View worlds and packages',
   'worlds.eyebrow': 'Visual library',
   'worlds.title': 'Choose the tone of your adventure',
   'worlds.intro':
-    'Eight future worlds whose atmosphere you can explore. None contains rules or playable content yet.',
+    'Explore the eight settings and review packages detected beside Fatebound. An available package is not installed or playable yet.',
+  'worlds.catalog.refresh': 'Refresh catalogue',
+  'worlds.catalog.refreshing': 'Refreshing…',
+  'worlds.catalog.summary': '{packages} packages available · {issues} issues',
+  'worlds.catalog.error':
+    'The package folder could not be read. Installed worlds and data have not been changed.',
+  'worlds.catalog.additionalEyebrow': 'Detected packages',
+  'worlds.catalog.additionalTitle': 'Other available worlds',
+  'worlds.catalog.additionalIntro':
+    'These entries use a neutral presentation and remain uninstalled.',
+  'worlds.catalog.issuesEyebrow': 'Review required',
+  'worlds.catalog.issuesTitle': 'Unavailable packages',
+  'worlds.catalog.issue.invalid': 'The package is invalid and has been omitted.',
+  'worlds.catalog.issue.incompatible':
+    'Its format or capabilities are incompatible with this version of Fatebound.',
+  'worlds.catalog.issue.temporary':
+    'The file is incomplete, changed, or cannot be read now. Refresh again after copying finishes.',
+  'worlds.catalog.issue.duplicate':
+    'Several files declare the same world and version; that release has been omitted.',
+  'worlds.catalog.scanLimited':
+    'The scan reached its safety limit. Remove unnecessary files and refresh again.',
   'worlds.atmosphere': 'Atmosphere',
   'worlds.availability': 'Availability',
   'worlds.note':
     'This world does not contain rules or playable content yet. For now, selecting it only changes the visual atmosphere for this session.',
+  'worlds.packageAvailableNote':
+    'Detected versions: {versions}. The package is not installed, and format v1 does not yet provide the mechanical capabilities required to play.',
   'worlds.empty.eyebrow': 'No world selected',
   'worlds.empty.title': 'Explore a future atmosphere',
   'worlds.empty.body':
