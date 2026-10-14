@@ -1,6 +1,6 @@
 # Estado de desarrollo
 
-Última actualización: 2026-10-12
+Última actualización: 2026-10-14
 
 Base histórica de esta línea de trabajo: `feature/app-shell` ya estaba integrada en `main` en el commit `67350b7`. En ese punto se habían superado 67 pruebas, lint, typecheck y los builds, y la interfaz multilingüe se había verificado manualmente.
 
@@ -12,7 +12,7 @@ La exportación quedó validada con 74/74 tests, lint, typecheck, builds y porta
 
 ## Estado general
 
-Fatebound 2.0 dispone ya de una primera interfaz visual funcional sobre Electron y Vue. La shell carga nueve temas visuales y está traducida al español, inglés y coreano, con cambio inmediato y preferencia portable. Sin un mundo activo comienza en Fatebound neutral, el menú muestra solo Mundos y Ajustes reúne idioma, diagnóstico SQLite, exportación y restauración manual de backups.
+Fatebound 2.0 dispone ya de una primera interfaz visual funcional sobre Electron 44.7.0 y Vue. La shell carga nueve temas visuales y está traducida al español, inglés y coreano, con cambio inmediato y preferencia portable. Sin un mundo activo comienza en Fatebound neutral, el menú muestra solo Mundos y Ajustes reúne idioma, diagnóstico SQLite, exportación y restauración manual de backups.
 
 El producto continúa en fase de fundamentos: el contrato y el validador `.fateworld` v1 ya están implementados y validados técnicamente, pero no existen todavía esquema del juego, mundos instalados, personajes, campañas, reglas ni importación persistente. Ronin, Templario, Ninja, Shaolin, Robot, Soldado, Naves y Mundoplato figuran como **Próximamente** y solo permiten explorar su ambientación; ninguno representa contenido jugable disponible o instalado.
 
@@ -109,13 +109,13 @@ El producto continúa en fase de fundamentos: el contrato y el validador `.fatew
 
 ## Siguiente tarea prioritaria
 
-**Revisar y actualizar de forma controlada Electron y su cadena de dependencias, evaluando la migración mayor antes de iniciar el importador.**
+**Revisar y resolver de forma controlada las ocho vulnerabilidades moderadas restantes de la cadena de empaquetado, sin aplicar correcciones forzadas ni cambios mayores no evaluados.**
 
 ## Pendientes por fases
 
 ### Seguridad y recuperación
 
-- Revisar y actualizar de forma controlada Electron y su cadena de dependencias. La solución forzada propuesta por npm elevaría Electron a 44.7.0 e introduciría cambios mayores, por lo que no debe aplicarse automáticamente.
+- Resolver de forma controlada las ocho advertencias moderadas restantes relacionadas con `electron-builder`, `app-builder-lib`, `@electron/get` 3.x y la cadena `global-agent` → `roarr` → `sprintf-js`, sin aplicar `npm audit fix --force`, overrides ni parches manuales.
 - Diseñar la recuperación conjunta de SQLite y las versiones instaladas de paquetes que necesiten sus datos.
 - Diseñar la cuarentena y recuperación asistida de una base activa dañada fuera de una restauración registrada.
 - Validar la aplicación desde un pendrive físico y otro ordenador.
@@ -158,11 +158,10 @@ El producto continúa en fase de fundamentos: el contrato y el validador `.fatew
 - La sustitución de archivos requiere varios pasos y no es atómica; la seguridad depende del journal persistente, `previous.sqlite` y la copia `protected`, y no elimina el riesgo físico de retirar o perder la unidad durante la operación.
 - La recuperación ante fallos está cubierta parcialmente por pruebas automatizadas, pero no se considera infalible ni equivale a haber provocado y verificado manualmente una interrupción real.
 - Retirar una unidad durante una escritura sigue siendo inseguro incluso con la configuración conservadora de SQLite.
-- `node:sqlite` permanece ligado a la versión de Node incluida en Electron 39.
+- `node:sqlite` permanece ligado al runtime de Node incluido en Electron 44.7.0. Las pruebas automatizadas se ejecutaron con Node 22.23.2 del equipo, por lo que la comprobación del runtime integrado depende de los ensayos realizados con el portable real.
 - La especificación normativa y el validador `.fateworld` v1 han superado sus comprobaciones técnicas, pero todavía no existen importador, instalación desde la interfaz, esquema del juego ni motor mecánico.
-- La auditoría completa ejecutada por el usuario informó 10 vulnerabilidades npm —8 moderadas y 2 altas—; con `--omit=dev` permanecen 6 —4 moderadas y 2 altas—.
-- Los informes señalan Electron 39 y dependencias relacionadas, entre ellas `extract-zip`, `@electron/get`, `sprintf-js` y herramientas de empaquetado. `yauzl` y `yaml` no aparecen como vulnerables en esos informes, lo que no garantiza que estén libres de vulnerabilidades.
-- La corrección forzada propuesta por npm actualizaría Electron a 44.7.0 con cambios mayores. No se ha ejecutado `npm audit fix` ni se han alterado dependencias; queda pendiente una revisión y actualización controlada de toda la cadena.
+- Antes de la migración, la auditoría completa informaba 10 vulnerabilidades npm —8 moderadas y 2 altas— y la auditoría con `--omit=dev`, 6 —4 moderadas y 2 altas—. Tras actualizar Electron, `npm audit --omit=dev` informa 0 vulnerabilidades y la auditoría completa, 8 moderadas y ninguna alta.
+- Las ocho advertencias restantes pertenecen a la cadena de herramientas de empaquetado: `electron-builder`, `app-builder-lib`, `@electron/get` 3.x y `global-agent` → `roarr` → `sprintf-js`. Su resolución controlada continúa pendiente; estos resultados no garantizan que todo el ecosistema de dependencias esté libre de riesgos.
 
 ## Decisiones pendientes
 
@@ -200,6 +199,35 @@ Resultados reales comunicados por el usuario:
 - SHA-256 del paquete de ejemplo antes y después de regenerarlo: idéntico, `7B87AC86C2681AE79A1D8490D3FF697CFE1368A31318BB89A8C3364F658A5B31`.
 
 No se ha probado la importación ni la instalación desde la interfaz porque esas funciones todavía no están implementadas.
+
+## Migración controlada a Electron 44.7.0
+
+Cambios registrados:
+
+- Electron actualizado de 39.8.10 a la versión exacta 44.7.0.
+- `@types/node` actualizado a la versión exacta 24.19.2.
+- `package-lock.json` regenerado mediante npm.
+- Electron Toolkit, electron-vite y electron-builder conservan sus versiones anteriores.
+- No se han introducido overrides ni parches de dependencias.
+
+Verificaciones realizadas y comunicadas por el usuario:
+
+- `npm run typecheck`: correcto.
+- `npm test`: 99/99 pruebas correctas.
+- `npm run lint -- --quiet`: correcto.
+- `npm run build`: correcto.
+- `npm run build:win`: portable Windows x64 generado.
+- Portable aislado: arranque e interfaz correctos.
+- Cambio de idioma y persistencia después de cerrar y reabrir: correctos.
+- Diagnóstico SQLite: disponible, integridad y claves foráneas correctas, esquema 1.
+- Exportación manual SQLite: correcta, con manifiesto y SHA-256 verificados.
+- Restauración manual: correcta; la base restaurada coincide byte por byte con la copia seleccionada.
+- Copia protegida previa a la restauración: creada y verificada mediante SHA-256.
+- Reapertura posterior: correcta; SQLite permanece íntegro y reconoce una copia administrada válida.
+
+La auditoría posterior informa 0 vulnerabilidades con `npm audit --omit=dev` y 8 vulnerabilidades moderadas, ninguna alta, en el árbol completo. Las ocho advertencias de la cadena de empaquetado continúan pendientes de resolución controlada.
+
+Las pruebas automatizadas se ejecutaron con Node 22.23.2 del equipo, no con el Node integrado en Electron 44. La ejecución real del portable sí cubrió arranque, SQLite, exportación, restauración y reapertura. La base anterior y la restaurada contenían datos idénticos, por lo que queda pendiente probar la restauración entre estados de datos diferentes. Tampoco se han probado interrupciones físicas, fallos de alimentación, falta real de espacio ni la restauración posterior a una interrupción real.
 
 ## Verificación histórica del hito de exportación
 
@@ -288,3 +316,11 @@ Los recursos gráficos de Ronin presentes en el repositorio no autorizan su dist
 - Añadidas las fuentes y el paquete reproducible original **Ecos de la marea** como muestra técnica no jugable.
 - Confirmada la reproducción determinista de **Ecos de la marea** mediante un SHA-256 idéntico antes y después de regenerar el paquete.
 - Registradas las vulnerabilidades comunicadas por `npm audit` y aplazada cualquier actualización mayor de Electron a una revisión controlada de dependencias.
+
+### 2026-10-14
+
+- Actualizados Electron de 39.8.10 a 44.7.0 y `@types/node` a 24.19.2, ambos con versión exacta, y regenerado `package-lock.json` mediante npm; Electron Toolkit, electron-vite y electron-builder permanecen sin cambios, sin overrides ni parches.
+- Comunicadas como correctas 99/99 pruebas, lint, typecheck, build y generación del portable Windows x64.
+- Validado en un portable aislado el arranque, la interfaz, la persistencia del idioma, el diagnóstico SQLite, la exportación, la restauración, la copia protegida y la reapertura.
+- Reducida la auditoría de producción a 0 vulnerabilidades y la completa a 8 moderadas sin vulnerabilidades altas; la cadena de empaquetado restante continúa pendiente de resolución controlada.
+- Conservadas como pendientes las pruebas con estados de datos diferentes, interrupciones físicas o de alimentación, falta real de espacio y restauración tras una interrupción real.

@@ -1,8 +1,8 @@
 # Arquitectura de Fatebound 2.0
 
-Estado del documento: arquitectura aprobada con almacenamiento SQLite, shell visual, empaquetado portable y contrato/validador `.fateworld` v1 implementados; la instalación de mundos, el dominio jugable y el motor continúan pendientes.
+Estado del documento: arquitectura aprobada con Electron 44.7.0, almacenamiento SQLite, shell visual, empaquetado portable y contrato/validador `.fateworld` v1 implementados; la instalación de mundos, el dominio jugable y el motor continúan pendientes.
 
-Última actualización: 2026-10-12.
+Última actualización: 2026-10-14.
 
 Este documento describe la dirección aprobada para Fatebound y marca expresamente lo que todavía no existe. La única tabla actual controla migraciones; no se ha definido el esquema SQL del juego ni se consideran implementados los demás subsistemas propuestos. La especificación normativa de paquetes v1 se mantiene en [WORLD_FORMAT.md](WORLD_FORMAT.md) y la dirección de interfaz en [DESIGN_SYSTEM.md](DESIGN_SYSTEM.md).
 
@@ -13,7 +13,7 @@ El repositorio contiene actualmente:
 - un proceso main que crea una ventana, gestiona el ciclo de vida y atiende diagnóstico, exportación y restauración SQLite;
 - un preload restringido que expone únicamente contratos específicos de diagnóstico, exportación, restauración y preferencias;
 - un renderer Vue con shell de Fatebound, identidad base y nueve temas YAML integrados con ilustraciones empaquetadas;
-- TypeScript estricto, ESLint, Prettier, electron-vite y electron-builder;
+- Electron 44.7.0 y `@types/node` 24.19.2 fijados en versiones exactas, junto con TypeScript estricto, ESLint, Prettier, electron-vite y electron-builder;
 - recursos de marca y 36 imágenes de combinaciones de dados para los clanes de Ronin;
 - un target `portable` x64 de electron-builder que genera `dist/Fatebound.exe` sin instalador obligatorio;
 - un empaquetado público con lista explícita de recursos propios; la variante privada todavía no está configurada;
@@ -160,7 +160,7 @@ La prueba automatizada usa directorios temporales controlados y confirma que `PO
 
 ### 4.4 SQLite
 
-**Implementado en su nivel inicial:** Fatebound usa `DatabaseSync` de `node:sqlite`, integrado en el Node 22 que distribuye Electron 39. Se ha preferido frente a un addon externo como `better-sqlite3` porque evita binarios `.node`, reconstrucciones ABI y configuración especial de `asar`, lo que reduce los puntos de fallo del portable. La contrapartida conocida es que Node 22 clasifica todavía esta API como desarrollo activo; por eso `package.json` exige Node 22.18 o posterior y la compatibilidad se valida también ejecutando el portable, no solo bajo Node de desarrollo.
+**Implementado en su nivel inicial:** Fatebound usa `DatabaseSync` de `node:sqlite`, integrado en el runtime de Node que distribuye Electron 44.7.0. Se ha preferido frente a un addon externo como `better-sqlite3` porque evita binarios `.node`, reconstrucciones ABI y configuración especial de `asar`, lo que reduce los puntos de fallo del portable. `package.json` exige Node 22.18 o posterior para el entorno de desarrollo y la compatibilidad se valida también ejecutando el portable, no solo bajo el Node local.
 
 `src/main/storage/sqlite-storage.ts` es el único propietario de la conexión activa. Recibe `getActiveStoragePaths().databaseFile` y `getActiveStoragePaths().backupsDirectory`, resuelve ambas rutas sin sustituirlas por ubicaciones fijas y orquesta fases separadas de apertura, configuración, validación, protección y migración. Ni preload ni renderer exponen SQLite, y la apertura activa ya no devuelve la conexión a otros consumidores. Si alguna fase falla, la conexión parcial se cierra, se muestra un error nativo y la ventana principal no se crea. Durante `before-quit` se dejan de aceptar operaciones nuevas, se espera una copia ya iniciada y después se cierra la conexión antes de permitir la salida.
 
@@ -203,7 +203,7 @@ Las copias locales permanecen en el mismo dispositivo que `data/fatebound.sqlite
 
 **Dirección aprobada, todavía no implementada:** la recuperación completa no podrá limitarse a SQLite. También deberá identificar y recuperar las versiones exactas de los paquetes `.fateworld` instalados que necesiten personajes y Crónicas. Esta decisión no define todavía un formato conjunto de recuperación ni un procedimiento de restauración de paquetes.
 
-Referencias técnicas de la decisión: [API `node:sqlite` de Node 22.23](https://nodejs.org/download/release/latest-jod/docs/api/sqlite.html), [información de sistema de archivos de Node 22](https://nodejs.org/download/release/latest-jod/docs/api/fs.html), [Online Backup API de SQLite](https://www.sqlite.org/backup.html), [PRAGMA de SQLite](https://www.sqlite.org/pragma.html) y [archivos temporales y journals](https://www.sqlite.org/tempfiles.html).
+Referencias técnicas de la decisión: [API `node:sqlite` de Node 24](https://nodejs.org/docs/latest-v24.x/api/sqlite.html), [información de sistema de archivos de Node 24](https://nodejs.org/docs/latest-v24.x/api/fs.html), [Online Backup API de SQLite](https://www.sqlite.org/backup.html), [PRAGMA de SQLite](https://www.sqlite.org/pragma.html) y [archivos temporales y journals](https://www.sqlite.org/tempfiles.html).
 
 ### 4.6 Exportación manual de backups
 
@@ -227,9 +227,9 @@ El arranque ejecuta `recoverInterruptedSqliteRestore()` antes de abrir SQLite. S
 
 Este flujo restaura exclusivamente SQLite. No recupera `worlds/`, versiones `.fateworld`, preferencias ni otros archivos portables; la recuperación conjunta continúa como decisión aprobada pendiente.
 
-La validación manual en una instalación portable aislada confirmó la restauración normal, la coincidencia SHA-256 de la base restaurada con el backup seleccionado, la conservación exacta de la base anterior en la copia `protected`, la reapertura y el diagnóstico SQLite. También confirmó que cancelar después de verificar y rechazar un manifiesto con SHA-256 manipulado no modifican la base ni crean backups adicionales. Estas comprobaciones se realizaron con bases técnicas, todavía sin personajes ni Crónicas.
+La validación manual en una instalación portable aislada con Electron 44.7.0 confirmó el arranque y la interfaz, la persistencia del idioma tras cerrar y reabrir, el diagnóstico SQLite disponible con integridad y claves foráneas correctas en el esquema 1, la exportación con manifiesto y SHA-256 verificados, y la restauración normal. La base restaurada coincidió byte por byte con el backup seleccionado, la copia `protected` conservó la base anterior verificada mediante SHA-256 y, tras reabrir, SQLite seguía íntegro y reconocía una copia administrada válida. Las comprobaciones anteriores también confirmaron que cancelar después de verificar y rechazar un manifiesto con SHA-256 manipulado no modifican la base ni crean backups adicionales. Estas pruebas se realizaron con bases técnicas, todavía sin personajes ni Crónicas.
 
-Las pruebas automatizadas cubren parte del rollback y del fallback a la copia protegida, pero siguen pendientes las interrupciones reales en las distintas fases y su recuperación al siguiente arranque, los fallos de permisos o espacio, la revisión exhaustiva en inglés y coreano, las confirmaciones repetidas y los ensayos en un pendrive físico y otro ordenador. La sustitución continúa siendo una secuencia de varios pasos, no una operación atómica, y la recuperación no se considera infalible.
+Las pruebas automatizadas se ejecutaron con Node 22.23.2 del equipo, no con el Node integrado en Electron 44; la comprobación real del portable sí cubrió arranque, SQLite, exportación, restauración y reapertura. Como la base anterior y la restaurada contenían datos idénticos, queda pendiente probar estados de datos diferentes. Las pruebas automatizadas cubren parte del rollback y del fallback a la copia protegida, pero siguen pendientes las interrupciones físicas y los fallos de alimentación, la falta real de espacio, las interrupciones reales en las distintas fases y su recuperación al siguiente arranque, los fallos de permisos, la revisión exhaustiva en inglés y coreano, las confirmaciones repetidas y los ensayos en un pendrive físico y otro ordenador. La sustitución continúa siendo una secuencia de varios pasos, no una operación atómica, y la recuperación no se considera infalible.
 
 ### 4.8 Diagnóstico de almacenamiento
 
@@ -361,17 +361,19 @@ La implementación mantiene y deberá seguir manteniendo:
 
 La API genérica del scaffold y el canal de demostración `ping` se han retirado. La superficie nativa actual queda limitada al diagnóstico tipado, la exportación manual, las tres fases explícitas de restauración y la lectura/escritura validada del idioma. El validador `.fateworld` permanece como servicio interno de main y no añade IPC ni selector. Los contratos de almacenamiento no aceptan rutas desde el renderer; incorporar otra capacidad exigirá un IPC específico y pruebas equivalentes.
 
-La auditoría de dependencias ejecutada por el usuario informó 10 vulnerabilidades en el árbol completo —8 moderadas y 2 altas— y 6 al omitir dependencias de desarrollo —4 moderadas y 2 altas—. Los informes señalan Electron 39 y dependencias relacionadas, incluidas `extract-zip`, `@electron/get`, `sprintf-js` y herramientas de empaquetado. `yauzl` y `yaml` no aparecen como vulnerables en esos informes, pero esa ausencia no garantiza que estén libres de vulnerabilidades.
+La migración controlada actualizó Electron de 39.8.10 a la versión exacta 44.7.0, `@types/node` a la versión exacta 24.19.2 y regeneró `package-lock.json` mediante npm. Electron Toolkit, electron-vite y electron-builder mantienen sus versiones anteriores; no se introdujeron overrides ni parches de dependencias.
 
-Queda pendiente una revisión y actualización controlada de Electron y toda su cadena de dependencias. La solución forzada propuesta por npm migraría a Electron 44.7.0 e introduciría cambios mayores, por lo que no se aplicará automáticamente. Este cierre documental no ejecuta `npm audit fix` ni modifica dependencias.
+Antes de la migración, la auditoría ejecutada por el usuario informaba 10 vulnerabilidades en el árbol completo —8 moderadas y 2 altas— y 6 al omitir dependencias de desarrollo —4 moderadas y 2 altas—. Después, `npm audit --omit=dev` informa 0 vulnerabilidades y `npm audit`, 8 vulnerabilidades moderadas y ninguna alta. Las advertencias restantes están relacionadas con `electron-builder`, `app-builder-lib`, `@electron/get` 3.x y la cadena `global-agent` → `roarr` → `sprintf-js`.
+
+Estas ocho advertencias continúan pendientes de resolución controlada. La mejora de la auditoría no permite afirmar que todo el ecosistema de dependencias esté libre de riesgos ni justifica aplicar `npm audit fix --force`, overrides o parches transitivos manuales.
 
 ## 13. Orden de implementación recomendado
 
 1. **Implementado:** resolver y probar la raíz de datos portable y el flujo ante falta de escritura.
-2. **Implementado y validado:** generar el portable de Windows y validar su comportamiento en ejecución.
+2. **Implementado y validado con Electron 44.7.0:** generar el portable de Windows x64 y validar su comportamiento en ejecución aislada.
 3. **Implementado:** primera interfaz funcional, navegación, temas integrados, ocho mundos futuros con estado honesto, nueva marca y diagnóstico SQLite de solo lectura.
 4. **Implementado:** retirada de las API genéricas del preload, canales IPC específicos y activación de aislamiento, ausencia de Node en renderer y sandbox.
-5. **Implementado, pendiente de verificación manual:** internacionalización de la interfaz en español, inglés y coreano con preferencia portable, manteniendo separados los futuros idiomas de contenido.
+5. **Implementado y validado en el portable:** internacionalización de la interfaz en español, inglés y coreano con preferencia portable; el cambio de idioma y su persistencia tras cerrar y reabrir son correctos, manteniendo separados los futuros idiomas de contenido.
 6. **Implementado y validado:** exportación manual de copias SQLite a una carpeta elegida en main, sin rutas en el renderer ni sobrescritura silenciosa.
 7. **Implementado y validado en flujo normal y rechazos:** restauración manual SQLite con confirmación, copia protegida y recuperación guiada por journal. Las interrupciones reales y la recuperación conjunta de paquetes siguen pendientes.
 8. **Implementado y validado:** contrato `.fateworld` v1, validador seguro sin extracción y muestra original reproducible.
