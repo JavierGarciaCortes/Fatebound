@@ -1,6 +1,6 @@
 # Formato técnico `.fateworld` v1
 
-Estado del documento: especificación normativa de la v1 en desarrollo y del validador estructural implementado; instalación y ejecución del motor pendientes.
+Estado del documento: especificación normativa de la v1 en desarrollo y del validador estructural y mecánico estático implementado; instalación y ejecución del motor pendientes.
 
 Última actualización: 2026-10-16.
 
@@ -15,7 +15,7 @@ La v1 de desarrollo mantiene dos perfiles explícitos:
 
 La presencia de nombres de archivo, IDs o rutas concretas nunca decide el perfil. Si aparece `engine` o `engineVersion`, el paquete se trata como candidato Basic y debe completar exactamente ese contrato; no puede caer silenciosamente al perfil narrativo. Motores, versiones, capacidades, campos y combinaciones no admitidos se rechazan.
 
-Las palabras **DEBE**, **NO DEBE**, **PUEDE** y **SE RECHAZA** expresan requisitos del formato. Que un paquete Basic supere este validador significa solo que su estructura declarativa es coherente. Fatebound todavía no valida estrictamente cada operación y sus parámetros, no ejecuta el motor y no considera instalado ni jugable un paquete disponible.
+Las palabras **DEBE**, **NO DEBE**, **PUEDE** y **SE RECHAZA** expresan requisitos del formato. Que un paquete Basic supere este validador significa que su estructura declarativa y sus operaciones cumplen el contrato estático Basic 1.0.0. Fatebound no ejecuta el motor y no considera instalado ni jugable un paquete disponible.
 
 ## 2. Contenedor y archivos
 
@@ -150,11 +150,34 @@ Se reconocen cuatro selectores:
 - `value_range`: `type: value_range` y un `valueSource` estable; `when.range` declara `min` y puede declarar `max`, ambos como cadenas enteras.
 - `matrix`: `type: matrix`, listas únicas y no vacías `roles` y `actions`; `when.npcRole` y `when.action` deben pertenecer a esas listas.
 
-`outcome` contiene exactamente `kind`, `data`, `steps` y `triggers`. `kind` es un identificador estable, `data` es un mapa declarativo, `steps` es una lista de mapas con un `op` identificable y cada disparador contiene `event` y `steps`. Los valores solo pueden ser escalares de texto, listas y mapas dentro de límites de profundidad y cantidad. `optionalEnding`, cuando existe, contiene exactamente `id`, `availability`, `numericThreshold`, `confirmationRequired`, `effect` y `note`; `effect` es un mapa declarativo con `type` y no se ejecuta durante la validación.
+`outcome` contiene exactamente `kind`, `data`, `steps` y `triggers`. `kind` es un identificador estable, `data` es un mapa declarativo, `steps` es una lista de operaciones Basic válidas y cada disparador contiene un evento reconocido y sus pasos. Los valores solo pueden ser escalares de texto, listas y mapas dentro de límites de profundidad y cantidad. `optionalEnding`, cuando existe, contiene exactamente `id`, `availability`, `numericThreshold`, `confirmationRequired`, `effect` y `note`; `effect` es un mapa declarativo con `type` y no se ejecuta durante la validación.
 
-Esta etapa valida esas formas generales. No dispone todavía de un catálogo normativo de operaciones, condiciones, eventos ni parámetros; por tanto no demuestra que un `op`, sus argumentos o sus referencias mecánicas sean ejecutables o semánticamente correctos. Esa validación estricta pertenece a la etapa siguiente.
+### 6.2 Contrato mecánico estático
 
-### 6.2 `gameplay.yaml`
+Basic 1.0.0 reconoce exactamente estas 35 operaciones:
+
+- atributos y estado: `attribute.adjust`, `status.apply`, `status.clear`;
+- decisiones y comprobaciones: `choice.offer`, `condition.check`, `dice.roll`, `dice.repeat_independent`, `narrative.prompt`;
+- tablas, clanes y Crónica: `table.resolve`, `table.repeat`, `clan.ensure`, `chronicle.fact`;
+- NPC y relaciones: `npc.create`, `npc.reuse`, `npc.reuse_or_create`, `npc.select`, `npc.transition`, `relationship.link`;
+- combate y equipo: `combat.start`, `combat.modifier`, `combat.defeat_exception`, `equipment.change`;
+- eventos e interacciones: `event.schedule`, `interaction.offer`, `contract.offer`;
+- villanos: `villain.encounter`, `villain.reveal`;
+- aliados: `ally.attribute_adjust`, `ally.combat_bonus`, `ally.combat_defeat_death_prevention`, `ally.fight_before_player`, `ally.item_delivery`, `ally.learn_ally_technique`, `ally.npc_dies`, `ally.villain_encounter_risk`.
+
+Cada identificador tiene campos obligatorios y opcionales cerrados, tipos escalares, enumeraciones y variantes de objetos propias. Se rechazan operaciones desconocidas, campos adicionales, combinaciones no admitidas, ramas d6 inválidas o solapadas y parámetros con forma incorrecta. `condition.check` solo admite las condiciones `attribute_compare`, `chronicle_has_fact` y `npc_count` con los campos de su variante.
+
+Se recorren únicamente posiciones ejecutables definidas por el contrato: `outcome.steps`, pasos de `outcome.triggers`, alternativas de `choice.offer`, ramas de condiciones y dados, consecuencias `victory`/`defeat` de combate, pasos diferidos de `event.schedule`, `onSelected` de selección de NPC, fallos de interacción, riesgo de aliado y el efecto operativo de equipo. Un mapa declarativo situado en otra posición no se interpreta como operación. La profundidad y el número total de operaciones usan los límites declarativos existentes.
+
+Los eventos de `outcome.triggers` forman un dominio separado y cerrado: `ally.recruited`, `combat.block_spent`, `combat.first_player_attack`, `combat.player_surrender`, `combat.successful_block`, `combat.tie`, `interaction.failure`, `interaction.success`, `npc.death_by_player`, `villain.before_final_combat` y `villain.encounter`. Los campos `trigger` de operaciones como `event.schedule`, `contract.offer`, `ally.item_delivery`, `ally.fight_before_player`, `ally.villain_encounter_risk` o `combat.modifier` tienen enumeraciones propias y no aceptan automáticamente esos eventos.
+
+Las operaciones que usan `tableId` o `tableIds` deben resolver tablas declaradas. Los IDs de opción de `choice.offer` y los `promptId` de `narrative.prompt` deben resolver respectivamente `choices.<id>` y `prompts.<id>` en la entrada localizada para todos los idiomas del mundo. Los IDs de NPC, objetos, estados, hechos o eventos que dependen del estado de una futura Crónica validan únicamente su forma declarativa; su resolución pertenece al motor y no se simula durante la importación.
+
+`npc.select.onEmpty` admite dos modos cerrados. `notify_and_skip_without_reroll` exige `role: enemy`, `filter: spared_recently`, `choice: player` y `onSelected`; avisa y omite el encuentro sin repetir la tirada. `needs_player_resolution` exige `requireExisting: 'true'`, `onEmpty: needs_player_resolution` y la combinación de `role` y `order` definida para `allied_living`, `potential_ally_at_first_encounter`, `potential_ally_not_recruited` o `villain`; no admite `filter` ni `choice` y nunca autoriza a crear automáticamente un NPC sustituto.
+
+Superar esta comprobación significa que el documento cumple el contrato mecánico estático de Basic 1.0.0. No tira dados, no aplica atributos o estados, no inicia combates, no agenda eventos y no convierte el paquete en instalado o jugable.
+
+### 6.3 `gameplay.yaml`
 
 El documento contiene exactamente `characterCreation` y `tableBindings`.
 
@@ -165,7 +188,7 @@ El documento contiene exactamente `characterCreation` y `tableBindings`.
 
 El validador comprueba enlaces y forma; no ejecuta creación de personaje ni interpreta el significado mecánico de un binding.
 
-### 6.3 Catálogos localizados
+### 6.4 Catálogos localizados
 
 Cada archivo declarado se analiza con el mismo subconjunto YAML seguro.
 
@@ -205,9 +228,9 @@ Se rechazan enlaces simbólicos, dispositivos, sockets, tipos Unix especiales y 
 - éxito: perfil, identidad, versión, títulos, idiomas, compatibilidad, rutas declaradas, tablas normalizadas y resumen del archivo;
 - fallo: uno o más errores con código estable, mensaje comprensible y, cuando corresponde, ruta interna.
 
-El resultado no incluye la ruta absoluta del usuario, trazas, cabeceras ZIP crudas ni excepciones internas. Los códigos distinguen ZIP inválido, rutas inseguras, colisiones, límites, YAML no admitido, manifiesto o motor incompatibles, recursos ausentes, IDs duplicados, referencias rotas, gameplay, localización e imágenes inválidas.
+El resultado no incluye la ruta absoluta del usuario, trazas, cabeceras ZIP crudas ni excepciones internas. Los códigos distinguen ZIP inválido, rutas inseguras, colisiones, límites, YAML no admitido, manifiesto o motor incompatibles, recursos ausentes, IDs duplicados, referencias rotas, operaciones o eventos inválidos, gameplay, localización e imágenes inválidas.
 
-El catálogo reutiliza este resultado. Un paquete Basic estructuralmente válido puede aparecer como **Paquete disponible**, pero continúa sin estar instalado: no activa Ronin, no sustituye imágenes integradas y no habilita Personajes, Crónicas ni ninguna acción de juego. Los slots gestionados mantienen los requisitos existentes de `owner`, paquete único y `ready` vacío.
+El catálogo reutiliza este resultado. Un paquete Basic válido estática y mecánicamente puede aparecer como **Paquete disponible**, pero continúa sin estar instalado: no activa Ronin, no sustituye imágenes integradas y no habilita Personajes, Crónicas ni ninguna acción de juego. Los slots gestionados mantienen los requisitos existentes de `owner`, paquete único y `ready` vacío.
 
 ## 10. Compatibilidad y evolución
 
@@ -219,13 +242,12 @@ Una ampliación compatible puede añadir en una tarea aprobada nuevos valores ve
 
 Las fuentes de **Ecos de la marea** están en `examples/fateworld/echoes-of-the-tide/` y su paquete reproducible en `examples/fateworld/echoes-of-the-tide-1.0.0.fateworld`. Sigue siendo una muestra narrativa original, válida y no jugable.
 
-`.fatebound-dev/ronin-source/ronin-fuentes.zip` es una fuente de trabajo de solo lectura, no un `.fateworld` instalable ni un fixture del repositorio. Declara Basic 1.0.0, 26 tablas, un gameplay, 27 catálogos españoles y 39 imágenes. Sus recursos protegidos no se copian al repositorio público ni se incorporan a un artefacto distribuible por el hecho de superar una validación estructural.
+`.fatebound-dev/ronin-source/ronin-fuentes.zip` es una fuente de trabajo de solo lectura, no un `.fateworld` instalable ni un fixture del repositorio. Declara Basic 1.0.0, 26 tablas, un gameplay, 27 catálogos españoles, 39 imágenes, 35 operaciones distintas con 334 apariciones y 11 eventos de disparador. Sus recursos protegidos no se copian al repositorio público ni se incorporan a un artefacto distribuible por superar la validación estática.
 
 ## 12. Trabajo pendiente
 
 Permanecen fuera de esta etapa:
 
-- validación estricta de cada operación, condición, evento, parámetro y referencia mecánica Basic;
 - ejecución del motor, dados, combate, generación de personajes y progreso;
 - vista previa e instalación inmutable bajo `data/worlds/`;
 - esquema SQLite de mundos, personajes y Crónicas;

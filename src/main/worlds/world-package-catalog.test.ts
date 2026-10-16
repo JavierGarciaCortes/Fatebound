@@ -189,7 +189,7 @@ test('a missing world package inbox is an empty read-only catalog', async () => 
   }
 })
 
-test('the catalog exposes a structurally valid Basic package as available but not installed', async () => {
+test('the catalog exposes a statically valid Basic package as available but not installed', async () => {
   const root = await mkdtemp(join(tmpdir(), 'fatebound-world-catalog-basic-'))
   const inbox = join(root, 'worlds')
 

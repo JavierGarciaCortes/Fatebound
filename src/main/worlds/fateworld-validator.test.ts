@@ -123,9 +123,7 @@ entries:
         - op: table.repeat
           tableId: character.names
           count: '1'
-      triggers:
-        - event: character.created
-          steps: []
+      triggers: []
 `,
   'data/tables/appearance.yaml': `id: character.appearance
 selector:
@@ -181,6 +179,100 @@ entries:
       triggers: []
 `
 } as const
+
+const REPRESENTATIVE_BASIC_NAMES_TABLE = `id: character.names
+selector:
+  type: d6
+entries:
+  - id: akira
+    when:
+      faces:
+        - '1'
+    outcome:
+      kind: proper_name
+      data:
+        value: Akira
+      steps:
+        - op: choice.offer
+          choices:
+            - id: keep
+              steps:
+                - op: condition.check
+                  condition:
+                    type: attribute_compare
+                    attribute: reputation
+                    operator: gte
+                    value: '1'
+                  onTrue:
+                    - op: narrative.prompt
+                      promptId: accepted
+                  onFalse:
+                    - op: table.resolve
+                      tableId: character.appearance
+            - id: reroll
+              steps:
+                - op: dice.roll
+                  die: d6
+                  branches:
+                    - faces:
+                        - '1'
+                        - '2'
+                        - '3'
+                        - '4'
+                        - '5'
+                        - '6'
+                      steps:
+                        - op: table.repeat
+                          tableId: character.names
+                          count: '1'
+      triggers: []
+`
+
+const REPRESENTATIVE_BASIC_NAMES_CATALOG = `tableId: character.names
+title: Nombres
+entries:
+  akira:
+    choices:
+      keep: Conservar
+      reroll: Repetir
+    prompts:
+      accepted: Nombre aceptado
+`
+
+const NPC_SELECT_ON_EMPTY_TABLE = `id: character.names
+selector:
+  type: d6
+entries:
+  - id: spared-enemy
+    when:
+      faces:
+        - '1'
+    outcome:
+      kind: scene
+      data: {}
+      steps:
+        - op: npc.select
+          role: enemy
+          filter: spared_recently
+          choice: player
+          onEmpty: notify_and_skip_without_reroll
+          onSelected: []
+      triggers: []
+  - id: required-history
+    when:
+      faces:
+        - '2'
+    outcome:
+      kind: scene
+      data: {}
+      steps:
+        - op: npc.select
+          role: villain
+          order: first_encountered
+          requireExisting: 'true'
+          onEmpty: needs_player_resolution
+      triggers: []
+`
 
 const PNG_SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])
 
@@ -255,16 +347,76 @@ test('accepts the original reproducible Fateworld v1 sample', async () => {
   assert.equal(result.package.profile, 'narrative')
 })
 
-test('accepts the four Basic 1.0.0 selector forms as structural-only data', async () => {
-  const result = await validateTemporaryPackage(createStoredTestZip(validBasicEntries()))
+test('accepts representative known Basic 1.0.0 operations and the four selector forms', async () => {
+  const result = await validateTemporaryPackage(
+    createStoredTestZip(
+      validBasicEntries({
+        'data/tables/names.yaml': REPRESENTATIVE_BASIC_NAMES_TABLE,
+        'locales/es/names.yaml': REPRESENTATIVE_BASIC_NAMES_CATALOG
+      })
+    )
+  )
 
   assert.equal(result.valid, true)
   if (!result.valid || result.package.profile !== 'basic') return
-  assert.equal(result.package.mechanicalValidation, 'structural-only')
+  assert.equal(result.package.mechanicalValidation, 'strict-static')
   assert.equal(result.package.compatibility.engine, 'basic')
   assert.deepEqual(
     result.package.tables.map((table) => table.selector.type),
     ['d6', 'yin_yang', 'value_range', 'matrix']
+  )
+})
+
+test('rejects an unknown Basic operation nested inside a known operation', async () => {
+  const table = REPRESENTATIVE_BASIC_NAMES_TABLE.replace(
+    'op: narrative.prompt',
+    'op: future.execute'
+  )
+  assertRejected(
+    await validateTemporaryPackage(
+      createStoredTestZip(
+        validBasicEntries({
+          'data/tables/names.yaml': table,
+          'locales/es/names.yaml': REPRESENTATIVE_BASIC_NAMES_CATALOG
+        })
+      )
+    ),
+    'INVALID_OPERATION'
+  )
+})
+
+test('rejects invalid parameters from a known Basic operation', async () => {
+  const table = REPRESENTATIVE_BASIC_NAMES_TABLE.replace('operator: gte', 'operator: equals')
+  assertRejected(
+    await validateTemporaryPackage(
+      createStoredTestZip(
+        validBasicEntries({
+          'data/tables/names.yaml': table,
+          'locales/es/names.yaml': REPRESENTATIVE_BASIC_NAMES_CATALOG
+        })
+      )
+    ),
+    'INVALID_OPERATION'
+  )
+})
+
+test('accepts both npc.select onEmpty modes and rejects an incoherent omission', async () => {
+  const accepted = await validateTemporaryPackage(
+    createStoredTestZip(
+      validBasicEntries({ 'data/tables/names.yaml': NPC_SELECT_ON_EMPTY_TABLE })
+    )
+  )
+  assert.equal(accepted.valid, true)
+
+  const incoherent = NPC_SELECT_ON_EMPTY_TABLE.replace(
+    'filter: spared_recently',
+    'filter: spared'
+  )
+  assertRejected(
+    await validateTemporaryPackage(
+      createStoredTestZip(validBasicEntries({ 'data/tables/names.yaml': incoherent }))
+    ),
+    'INVALID_OPERATION'
   )
 })
 

@@ -1,5 +1,6 @@
 import { TextDecoder } from 'node:util'
 import { parseAllDocuments, visit } from 'yaml'
+import { validateBasicMechanics } from './fateworld-basic-mechanics.ts'
 import type {
   FateworldValidationError,
   FateworldValidationErrorCode,
@@ -88,7 +89,7 @@ export interface FateworldBasicGameplay {
 
 export interface FateworldBasicPackageInfo {
   readonly profile: 'basic'
-  readonly mechanicalValidation: 'structural-only'
+  readonly mechanicalValidation: 'strict-static'
   readonly formatVersion: '1'
   readonly world: {
     readonly id: string
@@ -168,6 +169,10 @@ interface DeclarativeBudget {
 
 interface ParsedLocalizations {
   readonly generalKeysByLanguage: ReadonlyMap<string, ReadonlySet<string>>
+  readonly tableEntryKeysByLanguage: ReadonlyMap<
+    string,
+    ReadonlyMap<string, ReadonlyMap<string, ReadonlySet<string>>>
+  >
 }
 
 const WORLD_ID_PATTERN = /^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)+$/
@@ -1132,7 +1137,8 @@ function validateTableCatalog(
   value: Record<string, unknown>,
   entry: string,
   table: FateworldBasicTable,
-  dependencies: BasicContractDependencies
+  dependencies: BasicContractDependencies,
+  entryKeys: Map<string, ReadonlySet<string>>
 ): FateworldValidationError | undefined {
   const keys = validateExactKeys(
     value,
@@ -1176,6 +1182,7 @@ function validateTableCatalog(
         budget
       )
       if (error) return error
+      entryKeys.set(entryId, new Set(leaves))
     }
   }
 
@@ -1214,10 +1221,15 @@ function parseLocalizations(
 ): ParseResult<ParsedLocalizations> {
   const tablesById = new Map(tables.map((table) => [table.id, table]))
   const generalKeysByLanguage = new Map<string, ReadonlySet<string>>()
+  const tableEntryKeysByLanguage = new Map<
+    string,
+    ReadonlyMap<string, ReadonlyMap<string, ReadonlySet<string>>>
+  >()
 
   for (const language of manifest.world.languages) {
     const tableCatalogs = new Set<string>()
     const generalLeaves = new Set<string>()
+    const tableEntryKeys = new Map<string, ReadonlyMap<string, ReadonlySet<string>>>()
     for (const path of manifest.localization.catalogs[language]) {
       const yaml = parseYaml(contents.files.get(path) as Buffer, path)
       if (!yaml.success) return yaml
@@ -1235,9 +1247,11 @@ function parseLocalizations(
         if (tableCatalogs.has(table.id)) {
           return failure(issue('DUPLICATE_ID', `El idioma ${language} declara dos catálogos para "${table.id}".`, path))
         }
-        const error = validateTableCatalog(yaml.value, path, table, dependencies)
+        const entryKeys = new Map<string, ReadonlySet<string>>()
+        const error = validateTableCatalog(yaml.value, path, table, dependencies, entryKeys)
         if (error) return failure(error)
         tableCatalogs.add(table.id)
+        tableEntryKeys.set(table.id, entryKeys)
       } else {
         const error = collectLocalizationLeaves(
           yaml.value,
@@ -1262,8 +1276,9 @@ function parseLocalizations(
       )
     }
     generalKeysByLanguage.set(language, generalLeaves)
+    tableEntryKeysByLanguage.set(language, tableEntryKeys)
   }
-  return success({ generalKeysByLanguage })
+  return success({ generalKeysByLanguage, tableEntryKeysByLanguage })
 }
 
 function parseGameplay(
@@ -1479,6 +1494,22 @@ export function validateBasicFateworldContract(
   if (!tables.success) return { valid: false, errors: [tables.error] }
   const localizations = parseLocalizations(contents, manifest.value, tables.value, dependencies)
   if (!localizations.success) return { valid: false, errors: [localizations.error] }
+  const mechanicsError = validateBasicMechanics(tables.value, {
+    tablePaths: manifest.value.data.tables,
+    maximumDepth: dependencies.limits.maximumDeclarativeDepth,
+    maximumOperations: dependencies.limits.maximumDeclarativeNodes,
+    findMissingLocalizationLanguage(tableId, tableEntryId, key) {
+      return manifest.value.world.languages.find(
+        (language) =>
+          !localizations.value.tableEntryKeysByLanguage
+            .get(language)
+            ?.get(tableId)
+            ?.get(tableEntryId)
+            ?.has(key)
+      )
+    }
+  })
+  if (mechanicsError) return { valid: false, errors: [mechanicsError] }
   const gameplay = parseGameplay(contents, manifest.value, tables.value, localizations.value)
   if (!gameplay.success) return { valid: false, errors: [gameplay.error] }
 
@@ -1486,7 +1517,7 @@ export function validateBasicFateworldContract(
     valid: true,
     package: {
       profile: 'basic',
-      mechanicalValidation: 'structural-only',
+      mechanicalValidation: 'strict-static',
       formatVersion: '1',
       world: {
         id: manifest.value.world.id,
