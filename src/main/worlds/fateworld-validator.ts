@@ -201,6 +201,7 @@ function isSupportedFilePath(path: string): boolean {
   if (path === 'manifest.yaml') return true
   if (path.startsWith('content/') && path.endsWith('.md')) return true
   if (path.startsWith('data/') && path.endsWith('.yaml')) return true
+  if (path.startsWith('locales/') && path.endsWith('.yaml')) return true
   if (path.startsWith('assets/images/')) {
     return ['.png', '.jpg', '.jpeg', '.webp'].includes(extname(path))
   }
@@ -394,6 +395,8 @@ export async function validateFateworldPackage(packagePath: string): Promise<Fat
 
 export type {
   FateworldPackageInfo,
+  FateworldBasicPackageInfo,
+  FateworldBasicTable,
   FateworldTable,
   FateworldTableEntry,
   FateworldTableReference,

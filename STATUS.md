@@ -1,6 +1,6 @@
 # Estado de desarrollo
 
-Última actualización: 2026-10-14
+Última actualización: 2026-10-16
 
 Base histórica de esta línea de trabajo: `feature/app-shell` ya estaba integrada en `main` en el commit `67350b7`. En ese punto se habían superado 67 pruebas, lint, typecheck y los builds, y la interfaz multilingüe se había verificado manualmente.
 
@@ -14,7 +14,7 @@ La exportación quedó validada con 74/74 tests, lint, typecheck, builds y porta
 
 Fatebound 2.0 dispone ya de una primera interfaz visual funcional sobre Electron 44.7.0 y Vue. La shell carga nueve temas visuales y está traducida al español, inglés y coreano, con cambio inmediato y preferencia portable. Sin un mundo activo comienza en Fatebound neutral, el menú muestra solo Mundos y Ajustes reúne idioma, diagnóstico SQLite, exportación y restauración manual de backups.
 
-El producto continúa en fase de fundamentos: el contrato y el validador `.fateworld` v1 están implementados y cuentan con la validación histórica indicada más abajo. El equipo comunicó 112 pruebas correctas con una omitida y una comprobación manual satisfactoria del selector, la copia, el SHA-256 y los duplicados para la implementación anterior en NTFS. La nueva publicación gestionada compatible con FAT32/exFAT está implementada en código, pero no se ha ejecutado en esta tarea. Todavía no existen esquema del juego, mundos instalados, personajes, campañas, reglas ni instalación persistente. Ronin, Templario, Ninja, Shaolin, Robot, Soldado, Naves y Mundoplato conservan sus tarjetas; muestran **Próximamente** o **Paquete disponible** según la consulta, sin representar contenido jugable o instalado.
+El producto continúa en fase de fundamentos: el contrato y el validador `.fateworld` v1 conservan el perfil narrativo validado históricamente y reconocen además el perfil estructural Basic 1.0.0. El equipo comunicó 112 pruebas correctas con una omitida y una comprobación manual satisfactoria del selector, la copia, el SHA-256 y los duplicados para la implementación anterior en NTFS; esas cifras no validan la ampliación actual. La publicación gestionada compatible con FAT32/exFAT está implementada en código, pero tampoco se ha ejecutado en esta tarea. Todavía no existen esquema del juego, mundos instalados, personajes, campañas, ejecución de reglas ni instalación persistente. Ronin, Templario, Ninja, Shaolin, Robot, Soldado, Naves y Mundoplato conservan sus tarjetas; muestran **Próximamente** o **Paquete disponible** según la consulta, sin representar contenido instalado o ejecutable.
 
 ## Implementado
 
@@ -65,16 +65,20 @@ El producto continúa en fase de fundamentos: el contrato y el validador `.fatew
 
 ### Formato `.fateworld` v1
 
-- [x] Especificación normativa cerrada con versión de formato separada de la identidad y versión semántica del mundo.
-- [x] Manifiesto con idiomas reales, predeterminado, títulos localizados, Markdown, YAML de tablas, imágenes opcionales y lista de capacidades mecánicas obligatoriamente vacía en v1.
+- [x] Especificación normativa cerrada con versión de formato separada de la identidad y versión semántica del mundo, y dos perfiles explícitos dentro de la v1 de desarrollo.
+- [x] Perfil narrativo original conservado sin reinterpretaciones ni cambios de esquema.
+- [x] Perfil Basic reconocido únicamente mediante `compatibility.engine: basic` y `engineVersion: 1.0.0`, con capacidades adicionales vacías; combinaciones ambiguas o motores no admitidos se rechazan.
+- [x] Manifiesto Basic con varios archivos de tablas, gameplay, catálogos por idioma, imágenes declaradas y asociaciones `hero`, `card` y `emblem`.
 - [x] Servicio tipado en main, reutilizado por el catálogo de disponibilidad, que no extrae archivos, no modifica SQLite y permanece separado del futuro instalador.
 - [x] Inspección ZIP real con CRC-32, límites de archivo/entrada/expansión/ratio/profundidad, métodos Stored o Deflate y rechazo de cifrado, enlaces, tipos especiales y reparse points.
 - [x] Rutas relativas NFC, sin escapes, duplicados, nombres reservados ni colisiones relevantes en Windows.
 - [x] Subconjunto YAML 1.2 `failsafe`, sin alias, anclas, etiquetas, merge, documentos múltiples, claves duplicadas ni campos desconocidos.
-- [x] Tablas y entradas con identificadores estables, traducciones completas, referencias únicas y resolución de destinos.
+- [x] Tablas narrativas con identificadores estables, traducciones completas, referencias únicas y resolución de destinos.
+- [x] Tablas Basic con IDs únicos, selectores `d6`, `yin_yang`, `value_range` y `matrix`, y forma general limitada para `outcome`, `steps` y `triggers`; no se valida todavía el catálogo mecánico de operaciones ni sus parámetros.
+- [x] `gameplay.tableBindings`, selección de nombres, catálogos localizados y presentación enlazados con las tablas, claves e imágenes declaradas.
 - [x] Resultados estructurados con errores sanitizados que no exponen la ruta absoluta de origen.
 - [x] Fuentes originales y paquete reproducible **Ecos de la marea** bajo `examples/fateworld/`, sin capacidades mecánicas ni condición jugable.
-- [x] Pruebas focalizadas para aceptación, incompatibilidades, rutas/límites, tipos peligrosos, IDs/referencias y YAML peligroso; las 19 pruebas específicas del validador quedaron correctas tras reforzar la comprobación de caracteres de control.
+- [x] Pruebas focalizadas para compatibilidad narrativa, reconocimiento Basic, referencias incorrectas y esquemas inseguros. Las 19 pruebas específicas anteriores corresponden al perfil narrativo y la ampliación actual no se ha ejecutado por restricción expresa.
 
 ### Catálogo de paquetes disponibles
 
@@ -136,7 +140,7 @@ El producto continúa en fase de fundamentos: el contrato y el validador `.fatew
 
 ## Siguiente tarea prioritaria
 
-**Implementar la etapa 3: vista previa, confirmación e instalación inmutable bajo `data/worlds/`, reutilizando exactamente la bandeja, el catálogo y el validador existentes sin aceptar rutas desde el renderer ni registrar una versión antes de publicarla.**
+**Completar la etapa 3B: validación mecánica estricta del motor Basic 1.0.0, definiendo cada operación y sus parámetros sin ejecutar todavía el motor ni instalar paquetes.**
 
 ## Pendientes por fases
 
@@ -187,7 +191,7 @@ El producto continúa en fase de fundamentos: el contrato y el validador `.fatew
 - La recuperación ante fallos está cubierta parcialmente por pruebas automatizadas, pero no se considera infalible ni equivale a haber provocado y verificado manualmente una interrupción real.
 - Retirar una unidad durante una escritura sigue siendo inseguro incluso con la configuración conservadora de SQLite.
 - `node:sqlite` permanece ligado al runtime de Node incluido en Electron 44.7.0. Las pruebas automatizadas se ejecutaron con Node 22.23.2 del equipo, por lo que la comprobación del runtime integrado depende de los ensayos realizados con el portable real.
-- La especificación normativa y el validador `.fateworld` v1 han superado sus comprobaciones técnicas históricas. El equipo comunicó 112 pruebas correctas con una omitida y validación manual satisfactoria del flujo anterior en NTFS; el almacén gestionado, su catálogo combinado y FAT32/exFAT todavía no se han ejecutado ni revisado visualmente. Tampoco existen instalación bajo `data/worlds/`, esquema del juego ni motor mecánico.
+- El perfil narrativo de la especificación y el validador `.fateworld` v1 superó sus comprobaciones técnicas históricas. El equipo comunicó 112 pruebas correctas con una omitida y validación manual satisfactoria del flujo anterior en NTFS; esas cifras son anteriores al perfil Basic. La ampliación Basic, el almacén gestionado, su catálogo combinado y FAT32/exFAT todavía no se han ejecutado ni revisado visualmente. Tampoco existen instalación bajo `data/worlds/`, esquema del juego ni motor mecánico.
 - Antes de la migración, la auditoría completa informaba 10 vulnerabilidades npm —8 moderadas y 2 altas— y la auditoría con `--omit=dev`, 6 —4 moderadas y 2 altas—. Tras actualizar Electron, `npm audit --omit=dev` informa 0 vulnerabilidades y la auditoría completa, 8 moderadas y ninguna alta.
 - Las ocho advertencias restantes pertenecen a la cadena de herramientas de empaquetado: `electron-builder`, `app-builder-lib`, `@electron/get` 3.x y `global-agent` → `roarr` → `sprintf-js`. Su resolución controlada continúa pendiente; estos resultados no garantizan que todo el ecosistema de dependencias esté libre de riesgos.
 
@@ -196,7 +200,7 @@ El producto continúa en fase de fundamentos: el contrato y el validador `.fatew
 - Confirmar tras revisión visual si la composición, los recortes, el contraste y la densidad de los nueve temas y las ocho tarjetas son la dirección adecuada.
 - Decidir si la preferencia de tema se persistirá como ajuste de aplicación cuando existan mundos reales.
 - Definir los tokens y recursos admitidos por los temas `.fateworld` sin convertir el catálogo interno actual en una especificación prematura.
-- Definir el futuro catálogo de capacidades mecánicas y su primera versión compatible; el v1 actual rechaza cualquier capacidad.
+- Definir las capacidades adicionales posteriores a Basic 1.0.0; la v1 actual rechaza cualquier valor en `requiredCapabilities`.
 - Concretar la recuperación conjunta de SQLite y paquetes instalados, además de la cuarentena asistida de bases activas dañadas no vinculadas a un journal de restauración.
 - Definir firma de Windows, perfil privado y condiciones de licencia antes de distribuir contenido de terceros.
 
@@ -206,11 +210,11 @@ El producto continúa en fase de fundamentos: el contrato y el validador `.fatew
 - Finalizar o abandonar definitivamente una Crónica liberará la ficha. El abandono será irreversible y conservará el historial consultable. Morir en una Crónica no impedirá reutilizar la ficha base en otra nueva.
 - El primer motor será fiel a las mecánicas originales de Ronin. Los primeros mundos compartirán motor y variarán principalmente en ambientación, contenido y organización declarativa.
 - Las tablas tendrán identificadores estables independientes de sus posiciones visibles. Cada mundo podrá reorganizar, sustituir u omitir tablas o reglas si sus referencias siguen siendo válidas.
-- El paquete `.fateworld` v1 contiene identidad, contenido narrativo y tablas enlazadas; futuras versiones incorporarán definiciones mecánicas versionadas. SQLite almacenará fichas base, progreso y estado por Crónica, secundarios, clanes, relaciones, tiradas, combates, decisiones, efectos pendientes y eventos.
+- El paquete `.fateworld` v1 conserva un perfil narrativo y un perfil Basic 1.0.0 con definiciones mecánicas declarativas. La validación estricta de cada operación y la ejecución del motor siguen pendientes. SQLite almacenará fichas base, progreso y estado por Crónica, secundarios, clanes, relaciones, tiradas, combates, decisiones, efectos pendientes y eventos.
 - El motor evolucionará de Ronin-compatible a ampliado y después especializado, preservando los mundos y partidas anteriores.
 - La futura recuperación completa tendrá en cuenta SQLite y las versiones instaladas de los paquetes.
 
-Estas decisiones no constituyen un esquema SQL, un importador ni un motor implementado. El manifiesto y las tablas narrativas v1 sí están definidos, pero no expresan todavía esas mecánicas ni el estado de juego.
+Estas decisiones no constituyen un esquema SQL, un instalador ni un motor implementado. El manifiesto Basic y sus tablas expresan datos mecánicos declarativos, pero su aceptación estructural no demuestra que las operaciones sean ejecutables o correctas ni representa estado de juego.
 
 ## Verificación del hito `.fateworld` v1
 
@@ -233,6 +237,18 @@ El equipo comunicó una prueba manual satisfactoria de la incorporación anterio
 En esta tarea se sustituyó la publicación mediante enlace físico por el almacén gestionado y se ajustaron las pruebas focalizadas y la documentación. Por restricción expresa no se ejecutaron `npm test`, lint, typecheck, build, build de Windows, comprobaciones visuales automatizadas ni comandos de Git. Los 112 tests correctos con uno omitido y la prueba manual de selector, copia, SHA-256 y duplicados corresponden al estado anterior comunicado por el usuario; el protocolo `ready` y el catálogo combinado permanecen pendientes de validación por el equipo.
 
 La comprobación manual debe repetir cancelación, carpeta ausente, paquete válido conocido y desconocido, incorporación repetida, selección de un paquete manual o gestionado ya disponible, varias versiones, mismo ID+versión con bytes distintos, ZIP inválido o incompleto, formato incompatible, enlace simbólico o junction, archivo que cambia durante la operación, dos pulsaciones rápidas, permisos insuficientes, espacio agotado y colisión de UUID. Deben probarse una unidad NTFS y unidades FAT32/exFAT reales, observando que un slot sin `ready` no aparece, que uno publicado sí aparece tras reiniciar y que ningún fallo altera el original ni paquetes previos. Las interrupciones físicas antes, durante y después de crear `ready` requieren ensayos específicos; SQLite y `data/worlds/` deben permanecer intactos.
+
+## Verificación pendiente de la etapa 3A Basic
+
+Por restricción expresa no se han ejecutado las pruebas nuevas, lint, typecheck, builds, pruebas visuales ni comandos de Git. Deben comprobarse manualmente:
+
+- la aceptación continuada de **Ecos de la marea** como perfil narrativo;
+- la aceptación estructural de una copia `.fateworld` del ZIP fuente de Ronin, sin modificar ni instalar el ZIP de trabajo;
+- los 26 IDs de tabla, sus entradas, los cuatro selectores, `gameplay.tableBindings`, la selección de nombres, los 27 catálogos españoles y las 39 firmas de imagen;
+- el rechazo de motores/versiones no admitidos, perfiles ambiguos, campos extra, rutas o archivos no declarados, IDs duplicados, bindings o catálogos rotos y asociaciones de presentación ausentes;
+- que el catálogo muestre Ronin solo como **Paquete disponible**, conserve sus imágenes integradas y no habilite Personajes, Crónicas, instalación ni acciones de juego.
+
+La comprobación estructural no debe registrarse como validación mecánica: sigue pendiente definir y probar el catálogo estricto de operaciones y parámetros Basic 1.0.0.
 
 ## Migración controlada a Electron 44.7.0
 
@@ -366,3 +382,11 @@ Los recursos gráficos de Ronin presentes en el repositorio no autorizan su dist
 - Corregida la publicación para eliminar la copia directa al destino final: ahora solo se publica mediante enlace físico exclusivo y atómico; los sistemas que no lo admiten fallan de forma controlada. Añadidas pruebas no ejecutadas para esa limitación y para impedir la limpieza de una ruta final no atribuible a la operación.
 - Sustituido después el enlace físico por `worlds/.fatebound-managed-v1/<uuid>/`: la copia permanece invisible hasta crear `ready`, el catálogo combina paquetes manuales y gestionados y vuelve a validar ambos sin exponer rutas al renderer.
 - Añadidas pruebas focalizadas no ejecutadas para publicación gestionada, daños, estructuras inseguras, conflictos entre procedencias, colisiones y fallos alrededor de `ready`. El equipo había comunicado 112 pruebas correctas con una omitida y el flujo manual anterior correcto en NTFS; FAT32/exFAT y las interrupciones físicas continúan pendientes.
+
+### 2026-10-16
+
+- Conservado el perfil narrativo `.fateworld` v1 y añadido el perfil explícito Basic 1.0.0 sin crear una nueva `formatVersion`.
+- Ampliados el contrato y el validador estructural para varios archivos de tablas, gameplay, catálogos localizados, cuatro selectores, resultados declarativos e imágenes de presentación.
+- Mantenido el catálogo en estado de paquete disponible y no instalado; encontrar Ronin no activa navegación jugable ni sustituye recursos integrados.
+- Añadidas pruebas focalizadas de compatibilidad narrativa, reconocimiento Basic, referencias rotas, esquemas no admitidos y catálogo disponible. No se ejecutaron por restricción expresa de la tarea.
+- Documentada como etapa siguiente la validación mecánica estricta de operaciones y parámetros Basic 1.0.0.

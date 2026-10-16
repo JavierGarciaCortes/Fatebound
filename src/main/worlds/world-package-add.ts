@@ -111,7 +111,9 @@ function isIncompatible(validation: FateworldValidationResult): boolean {
   if (validation.valid) return false
   return validation.errors.some(
     (error) =>
-      error.code === 'UNSUPPORTED_FORMAT_VERSION' || error.code === 'UNSUPPORTED_CAPABILITY'
+      error.code === 'UNSUPPORTED_FORMAT_VERSION' ||
+      error.code === 'UNSUPPORTED_ENGINE' ||
+      error.code === 'UNSUPPORTED_CAPABILITY'
   )
 }
 

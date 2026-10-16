@@ -1,8 +1,8 @@
 # Arquitectura de Fatebound 2.0
 
-Estado del documento: arquitectura aprobada con Electron 44.7.0, almacenamiento SQLite, shell visual, empaquetado portable, contrato/validador `.fateworld` v1 y incorporación segura a la bandeja implementados; la instalación de mundos, el dominio jugable y el motor continúan pendientes.
+Estado del documento: arquitectura aprobada con Electron 44.7.0, almacenamiento SQLite, shell visual, empaquetado portable, contrato/validador `.fateworld` v1 con perfiles narrativo y Basic, e incorporación segura a la bandeja implementados; la instalación de mundos, el dominio jugable y la ejecución del motor continúan pendientes.
 
-Última actualización: 2026-10-14.
+Última actualización: 2026-10-16.
 
 Este documento describe la dirección aprobada para Fatebound y marca expresamente lo que todavía no existe. La única tabla actual controla migraciones; no se ha definido el esquema SQL del juego ni se consideran implementados los demás subsistemas propuestos. La especificación normativa de paquetes v1 se mantiene en [WORLD_FORMAT.md](WORLD_FORMAT.md) y la dirección de interfaz en [DESIGN_SYSTEM.md](DESIGN_SYSTEM.md).
 
@@ -245,7 +245,7 @@ Un mundo es una línea de contenido independiente. Cada versión contiene datos,
 
 Las reglas, el contenido del mundo y el estado de las partidas se almacenarán como responsabilidades diferentes:
 
-- **paquete `.fateworld`:** el v1 contiene identidad, contenido narrativo, tablas enlazadas, traducciones y recursos opcionales; futuras versiones podrán añadir definiciones mecánicas cuando exista su contrato;
+- **paquete `.fateworld`:** la v1 de desarrollo conserva un perfil narrativo y añade un perfil Basic 1.0.0 con identidad, contenido, tablas declarativas, gameplay, traducciones y recursos; superar su validación estructural no implica que exista un motor capaz de ejecutarlo;
 - **SQLite:** fichas base de personajes, progreso y estado por Crónica, secundarios, clanes, relaciones, tiradas, combates, decisiones, efectos pendientes y eventos.
 
 Personajes y Crónicas conservarán el identificador exacto de la versión del mundo con la que fueron creados. Una actualización del mundo no migrará una partida de forma implícita. Esta separación está aprobada pero todavía no existe en el esquema SQL. La estructura mínima implementada del paquete se define normativamente en `WORLD_FORMAT.md` y todavía no incluye esos vínculos persistentes.
@@ -262,7 +262,7 @@ Los artefactos públicos y privados tendrán nombres y procesos de salida inequ�
 
 ### 5.2 Recursos de mundos adicionales
 
-**Detección, validación e incorporación a la bandeja implementadas; instalación pendiente:** `src/main/worlds/fateworld-validator.ts` abre un `.fateworld` como ZIP no confiable, impone límites antes y durante la lectura, valida rutas portables y colisiones Windows, rechaza enlaces y tipos especiales, verifica CRC-32 y analiza el subconjunto YAML seguro. `fateworld-contract.ts` valida manifiesto, idiomas, archivos declarados, firmas de imagen, tablas, identificadores y referencias. `world-package-catalog.ts` combina archivos `.fateworld` directos de la bandeja externa con publicaciones gestionadas y reutiliza ese validador sin extraer contenido.
+**Detección, validación e incorporación a la bandeja implementadas; instalación pendiente:** `src/main/worlds/fateworld-validator.ts` abre un `.fateworld` como ZIP no confiable, impone límites antes y durante la lectura, valida rutas portables y colisiones Windows, rechaza enlaces y tipos especiales, verifica CRC-32 y analiza el subconjunto YAML seguro. `fateworld-contract.ts` conserva el contrato narrativo y reconoce explícitamente Basic 1.0.0 por los campos del manifiesto; valida archivos declarados, selectores, forma general de resultados/pasos/disparadores, bindings de gameplay, catálogos localizados, imágenes y presentación. No interpreta nombres de archivo para decidir el perfil ni ejecuta operaciones. `world-package-catalog.ts` combina archivos `.fateworld` directos de la bandeja externa con publicaciones gestionadas y reutiliza ese validador sin extraer contenido.
 
 La consulta admite como máximo 256 entradas de directorio y 32 candidatos por actualización, contando conjuntamente ambas procedencias. Rechaza la bandeja, el almacén y los slots si son enlaces o escapan mediante su ruta real; vuelve a comprobar cada fuente antes y después de validarla y omite archivos no regulares y paquetes que cambien durante la lectura. La ausencia de la carpeta produce un catálogo vacío. Un archivo manual incompleto se convierte en una incidencia reintentable y no bloquea los demás. Los resultados separan válidos, incompatibles, inválidos y duplicados exactos de `world.id + world.version`; versiones distintas del mismo mundo permanecen diferenciadas.
 
@@ -284,7 +284,7 @@ La asociación con las ocho tarjetas integradas usa únicamente una allowlist ex
 
 **Dirección aprobada, todavía no implementada:** el primer motor será fiel a las mecánicas originales de Ronin: dados Yin/Yang, tablas enlazadas, atributos, interacciones, técnicas, combate, bloqueos, efectos y consecuencias. Los primeros mundos compartirán ese motor y cambiarán principalmente la ambientación, el contenido y la organización declarativa de tablas y técnicas.
 
-**Implementado en el contrato de datos v1:** las tablas y sus entradas tienen identificadores estables independientes de su orden o posición visible. Cada mundo puede reorganizar, sustituir u omitir las tablas narrativas que no necesite; el validador rechaza identificadores duplicados, referencias repetidas y destinos ausentes. Esto no implementa resultados de dados ni reglas mecánicas.
+**Implementado en el contrato de datos v1:** las tablas y sus entradas tienen identificadores estables independientes de su orden o posición visible. El perfil narrativo conserva sus referencias entre tablas. Basic 1.0.0 admite selectores estructurados y comprueba que `gameplay.tableBindings` y la selección de nombres apunten a tablas declaradas, además de enlazar los catálogos por `tableId`. Las referencias internas de cada operación y la validez mecánica de sus parámetros siguen pendientes; ningún resultado se ejecuta durante la validación.
 
 El motor evolucionará en tres fases acumulativas:
 
@@ -292,7 +292,7 @@ El motor evolucionará en tres fases acumulativas:
 2. **Mundos Ronin ampliados:** añaden capacidades compatibles con el modelo anterior. Robot y Soldado son ejemplos de perfiles previstos. Los mundos de la fase 1 deben seguir funcionando sin modificaciones obligatorias.
 3. **Mundos avanzados:** incorporan subsistemas especializados, especialmente de combate. Naves espaciales es el ejemplo de referencia, con sistemas, escudos y armamento, sin invalidar los mundos o partidas anteriores.
 
-El formato del paquete, la versión del mundo y el conjunto de capacidades mecánicas están separados en el manifiesto v1. Como todavía no existe motor ni catálogo mecánico, `requiredCapabilities` debe estar vacío y cualquier valor se rechaza. Las futuras ampliaciones preferirán capacidades aditivas y valores por defecto compatibles. Cualquier cambio que necesite transformar mundos o partidas existentes exigirá detección explícita de versión, migración protegida, copias recuperables, pruebas con versiones anteriores y un resultado comprensible para el usuario. No se aceptará una ruptura implícita.
+El formato del paquete, la versión del mundo y la versión del motor están separados en el manifiesto v1. El perfil narrativo carece de motor; el perfil Basic exige exactamente `engine: basic`, `engineVersion: 1.0.0` y `requiredCapabilities: []`. Motores, versiones, capacidades y combinaciones ambiguas se rechazan en vez de reinterpretarse como contenido narrativo. Las futuras ampliaciones preferirán capacidades aditivas y valores por defecto compatibles. Cualquier cambio que necesite transformar mundos o partidas existentes exigirá detección explícita de versión, migración protegida, copias recuperables, pruebas con versiones anteriores y un resultado comprensible para el usuario. No se aceptará una ruptura implícita.
 
 ## 6. Ronin como mundo instalable
 
@@ -310,13 +310,13 @@ Actualmente solo existen los recursos gráficos indicados; no se ha importado el
 
 ## 7. Paquetes de mundos, importador y editor
 
-**Formato y validador v1 implementados y validados:** los mundos usan paquetes ZIP declarativos con extensión `.fateworld`. El v1 contiene un manifiesto, Markdown por idioma, un YAML de tablas enlazadas e imágenes opcionales. Su contrato es cerrado, distingue versión de formato, identidad/versión del mundo y capacidades, y exige traducciones reales para cada idioma declarado. Las comprobaciones del hito superaron 99/99 tests generales y 19/19 pruebas específicas del validador tras corregir la comprobación de caracteres de control. Antes de introducir el almacén gestionado, el equipo comunicó además 112 pruebas correctas con una omitida y un ensayo manual satisfactorio del selector, copia, SHA-256 y duplicados en NTFS; esos resultados no validan todavía el protocolo `ready` ni FAT32/exFAT.
+**Formato y validador v1 implementados; ampliación Basic pendiente de revalidación:** los mundos usan paquetes ZIP declarativos con extensión `.fateworld`. El contrato cerrado distingue versión de formato, identidad/versión del mundo y perfil de compatibilidad, exige traducciones reales para cada idioma y mantiene válida la muestra narrativa original. Basic 1.0.0 añade varios YAML de tablas, gameplay, catálogos e imágenes con presentación, siempre como datos no ejecutables. Las comprobaciones históricas del perfil narrativo superaron 99/99 tests generales y 19/19 pruebas específicas; la ampliación Basic y el paquete fuente de Ronin requieren la nueva validación manual indicada en `STATUS.md`. Antes de introducir el almacén gestionado, el equipo comunicó además 112 pruebas correctas con una omitida y un ensayo manual satisfactorio del selector, copia, SHA-256 y duplicados en NTFS; esos resultados no validan todavía el protocolo `ready` ni FAT32/exFAT.
 
 La muestra original **Ecos de la marea** entrega fuentes y paquete reproducible bajo `examples/fateworld/`. No contiene reglas de Ronin, capacidades mecánicas ni estado de juego y no se instala. El repositorio no la copia automáticamente a la bandeja; si el usuario la incorpora mediante **Añadir mundo** o la copia expresamente, aparece como paquete disponible con presentación neutral.
 
 El servicio usa `yauzl` para lectura ZIP limitada y `yaml` con esquema `failsafe`; ambas son dependencias directas de producción. El generador determinista de la muestra utiliza solo API estándar de Node. Los contratos compartidos del catálogo y la incorporación exponen dos operaciones IPC sin argumentos; el selector permanece en main y no existe una primitiva general de archivos.
 
-**Pendiente:** el mismo modelo deberá poder importarse, instalarse, editarse y exportarse sin pérdida de información. Varias versiones podrán coexistir y los personajes y Crónicas conservarán su vínculo exacto. El v1 no define todavía temas de mundo, reglas mecánicas, procedencia, firmas, dependencias entre paquetes ni datos SQLite.
+**Pendiente:** el mismo modelo deberá poder importarse, instalarse, editarse y exportarse sin pérdida de información. Varias versiones podrán coexistir y los personajes y Crónicas conservarán su vínculo exacto. La v1 Basic ya expresa operaciones mecánicas como datos estructurados, pero todavía no define su validación semántica exhaustiva ni las ejecuta; tampoco define un tema aplicable desde paquetes, procedencia, firmas, dependencias ni datos SQLite.
 
 El flujo parte ahora de dos etapas reutilizables disponibles:
 

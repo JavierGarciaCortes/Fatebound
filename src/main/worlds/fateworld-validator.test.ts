@@ -48,11 +48,169 @@ const VALID_TABLES = `tables:
         references: []
 `
 
+const VALID_BASIC_MANIFEST = `formatVersion: '1'
+world:
+  id: com.fatebound.worlds.ronin
+  version: 1.0.0
+  titles:
+    es: Mundo Basic de prueba
+  defaultLanguage: es
+  languages:
+    - es
+compatibility:
+  engine: basic
+  engineVersion: 1.0.0
+  requiredCapabilities: []
+content:
+  descriptions:
+    es: content/es/description.md
+data:
+  gameplay: data/gameplay.yaml
+  tables:
+    - data/tables/names.yaml
+    - data/tables/appearance.yaml
+    - data/tables/honor.yaml
+    - data/tables/interactions.yaml
+localization:
+  catalogs:
+    es:
+      - locales/es/ui.yaml
+      - locales/es/names.yaml
+      - locales/es/appearance.yaml
+      - locales/es/honor.yaml
+      - locales/es/interactions.yaml
+resources:
+  images:
+    - assets/images/hero.png
+    - assets/images/card.png
+    - assets/images/emblem.png
+  presentation:
+    hero: assets/images/hero.png
+    card: assets/images/card.png
+    emblem: assets/images/emblem.png
+`
+
+const VALID_BASIC_GAMEPLAY = `characterCreation:
+  nameSelection:
+    mode: choice
+    options:
+      - id: neutral
+        tableId: character.names
+        labelKey: character.nameOptions.neutral
+tableBindings:
+  character:
+    names: character.names
+    appearance: character.appearance
+  auxiliary:
+    honor: auxiliary.honor
+    interactions: auxiliary.interactions
+`
+
+const BASIC_TABLES = {
+  'data/tables/names.yaml': `id: character.names
+selector:
+  type: d6
+entries:
+  - id: akira
+    when:
+      faces:
+        - '1'
+    outcome:
+      kind: proper_name
+      data:
+        value: Akira
+      steps:
+        - op: table.repeat
+          tableId: character.names
+          count: '1'
+      triggers:
+        - event: character.created
+          steps: []
+`,
+  'data/tables/appearance.yaml': `id: character.appearance
+selector:
+  type: yin_yang
+entries:
+  - id: calm
+    when:
+      yin:
+        - '6'
+      yang:
+        - '1'
+    outcome:
+      kind: appearance_trait
+      data:
+        traitId: calm
+      steps: []
+      triggers: []
+`,
+  'data/tables/honor.yaml': `id: auxiliary.honor
+selector:
+  type: value_range
+  valueSource: basic.honor
+entries:
+  - id: low
+    when:
+      range:
+        min: '0'
+        max: '2'
+    outcome:
+      kind: honor_ending
+      data:
+        endingId: low
+      steps: []
+      triggers: []
+`,
+  'data/tables/interactions.yaml': `id: auxiliary.interactions
+selector:
+  type: matrix
+  roles:
+    - ally
+  actions:
+    - dialogue
+entries:
+  - id: ally-dialogue
+    when:
+      npcRole: ally
+      action: dialogue
+    outcome:
+      kind: interaction_permission
+      data:
+        permission: allowed
+      steps: []
+      triggers: []
+`
+} as const
+
+const PNG_SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])
+
 function validEntries(overrides: Partial<Record<string, Buffer | string>> = {}): TestZipEntry[] {
   const files: Record<string, Buffer | string> = {
     'manifest.yaml': VALID_MANIFEST,
     'content/es/description.md': '# Mundo de prueba\n\nContenido original.\n',
     'data/tables.yaml': VALID_TABLES,
+    ...overrides
+  }
+
+  return Object.entries(files).map(([name, contents]) => ({ name, contents }))
+}
+
+function validBasicEntries(
+  overrides: Partial<Record<string, Buffer | string>> = {}
+): TestZipEntry[] {
+  const files: Record<string, Buffer | string> = {
+    'manifest.yaml': VALID_BASIC_MANIFEST,
+    'content/es/description.md': '# Mundo Basic de prueba\n',
+    'data/gameplay.yaml': VALID_BASIC_GAMEPLAY,
+    ...BASIC_TABLES,
+    'locales/es/ui.yaml': 'character:\n  nameOptions:\n    neutral: Nombre neutral\n',
+    'locales/es/names.yaml': 'tableId: character.names\ntitle: Nombres\n',
+    'locales/es/appearance.yaml': 'tableId: character.appearance\ntitle: Apariencia\n',
+    'locales/es/honor.yaml': 'tableId: auxiliary.honor\ntitle: Honor\n',
+    'locales/es/interactions.yaml': 'tableId: auxiliary.interactions\ntitle: Interacciones\n',
+    'assets/images/hero.png': PNG_SIGNATURE,
+    'assets/images/card.png': PNG_SIGNATURE,
+    'assets/images/emblem.png': PNG_SIGNATURE,
     ...overrides
   }
 
@@ -94,6 +252,20 @@ test('accepts the original reproducible Fateworld v1 sample', async () => {
   assert.equal(result.package.world.version, '1.0.0')
   assert.deepEqual(result.package.languages, ['es'])
   assert.equal(result.package.tables.length, 2)
+  assert.equal(result.package.profile, 'narrative')
+})
+
+test('accepts the four Basic 1.0.0 selector forms as structural-only data', async () => {
+  const result = await validateTemporaryPackage(createStoredTestZip(validBasicEntries()))
+
+  assert.equal(result.valid, true)
+  if (!result.valid || result.package.profile !== 'basic') return
+  assert.equal(result.package.mechanicalValidation, 'structural-only')
+  assert.equal(result.package.compatibility.engine, 'basic')
+  assert.deepEqual(
+    result.package.tables.map((table) => table.selector.type),
+    ['d6', 'yin_yang', 'value_range', 'matrix']
+  )
 })
 
 test('rejects invalid ZIP data, extensions, format versions, and capabilities', async (context) => {
@@ -206,6 +378,81 @@ test('rejects duplicate identifiers and missing table references', async (contex
         createStoredTestZip(validEntries({ 'data/tables.yaml': brokenTables }))
       ),
       'BROKEN_REFERENCE'
+    )
+  })
+})
+
+test('rejects broken Basic gameplay, localization, and presentation references', async (context) => {
+  await context.test('gameplay binding to an undeclared table', async () => {
+    const gameplay = VALID_BASIC_GAMEPLAY.replace('honor: auxiliary.honor', 'honor: auxiliary.missing')
+    assertRejected(
+      await validateTemporaryPackage(
+        createStoredTestZip(validBasicEntries({ 'data/gameplay.yaml': gameplay }))
+      ),
+      'BROKEN_REFERENCE'
+    )
+  })
+
+  await context.test('catalog entry for an unknown table entry', async () => {
+    const catalog = `tableId: character.names
+title: Nombres
+entries:
+  absent:
+    label: Ausente
+`
+    assertRejected(
+      await validateTemporaryPackage(
+        createStoredTestZip(validBasicEntries({ 'locales/es/names.yaml': catalog }))
+      ),
+      'BROKEN_REFERENCE'
+    )
+  })
+
+  await context.test('presentation image not declared in resources.images', async () => {
+    const manifest = VALID_BASIC_MANIFEST.replace(
+      'hero: assets/images/hero.png',
+      'hero: assets/images/missing.png'
+    )
+    assertRejected(
+      await validateTemporaryPackage(
+        createStoredTestZip(validBasicEntries({ 'manifest.yaml': manifest }))
+      ),
+      'BROKEN_REFERENCE'
+    )
+  })
+})
+
+test('rejects unsupported or unsafe Basic schemas without narrative fallback', async (context) => {
+  await context.test('unsupported engine version', async () => {
+    const manifest = VALID_BASIC_MANIFEST.replace('engineVersion: 1.0.0', 'engineVersion: 2.0.0')
+    assertRejected(
+      await validateTemporaryPackage(
+        createStoredTestZip(validBasicEntries({ 'manifest.yaml': manifest }))
+      ),
+      'UNSUPPORTED_ENGINE'
+    )
+  })
+
+  await context.test('unknown manifest field', async () => {
+    const manifest = VALID_BASIC_MANIFEST.replace(
+      '  requiredCapabilities: []',
+      '  requiredCapabilities: []\n  scripts: forbidden'
+    )
+    assertRejected(
+      await validateTemporaryPackage(
+        createStoredTestZip(validBasicEntries({ 'manifest.yaml': manifest }))
+      ),
+      'INVALID_MANIFEST'
+    )
+  })
+
+  await context.test('unknown selector type', async () => {
+    const table = BASIC_TABLES['data/tables/names.yaml'].replace('type: d6', 'type: script')
+    assertRejected(
+      await validateTemporaryPackage(
+        createStoredTestZip(validBasicEntries({ 'data/tables/names.yaml': table }))
+      ),
+      'INVALID_TABLES'
     )
   })
 })

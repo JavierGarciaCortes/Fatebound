@@ -266,6 +266,7 @@ async function inspectCandidate(
     const firstError = validation.errors[0]
     const incompatible =
       firstError?.code === 'UNSUPPORTED_FORMAT_VERSION' ||
+      firstError?.code === 'UNSUPPORTED_ENGINE' ||
       firstError?.code === 'UNSUPPORTED_CAPABILITY'
     const retryable =
       firstError?.code === 'PACKAGE_UNREADABLE' ||

@@ -58,6 +58,91 @@ resources:
   ]
 }
 
+function basicPackageEntries(): TestZipEntry[] {
+  const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])
+  return [
+    {
+      name: 'manifest.yaml',
+      contents: `formatVersion: '1'
+world:
+  id: com.fatebound.worlds.ronin
+  version: 1.0.0
+  titles:
+    es: Ronin
+  defaultLanguage: es
+  languages:
+    - es
+compatibility:
+  engine: basic
+  engineVersion: 1.0.0
+  requiredCapabilities: []
+content:
+  descriptions:
+    es: content/es/description.md
+data:
+  gameplay: data/gameplay.yaml
+  tables:
+    - data/tables/names.yaml
+localization:
+  catalogs:
+    es:
+      - locales/es/ui.yaml
+      - locales/es/names.yaml
+resources:
+  images:
+    - assets/images/hero.png
+    - assets/images/card.png
+    - assets/images/emblem.png
+  presentation:
+    hero: assets/images/hero.png
+    card: assets/images/card.png
+    emblem: assets/images/emblem.png
+`
+    },
+    { name: 'content/es/description.md', contents: '# Ronin\n' },
+    {
+      name: 'data/gameplay.yaml',
+      contents: `characterCreation:
+  nameSelection:
+    mode: choice
+    options:
+      - id: neutral
+        tableId: character.names
+        labelKey: character.nameOptions.neutral
+tableBindings:
+  character:
+    names: character.names
+`
+    },
+    {
+      name: 'data/tables/names.yaml',
+      contents: `id: character.names
+selector:
+  type: d6
+entries:
+  - id: akira
+    when:
+      faces:
+        - '1'
+    outcome:
+      kind: proper_name
+      data:
+        value: Akira
+      steps: []
+      triggers: []
+`
+    },
+    {
+      name: 'locales/es/ui.yaml',
+      contents: 'character:\n  nameOptions:\n    neutral: Nombre neutral\n'
+    },
+    { name: 'locales/es/names.yaml', contents: 'tableId: character.names\ntitle: Nombres\n' },
+    { name: 'assets/images/hero.png', contents: png },
+    { name: 'assets/images/card.png', contents: png },
+    { name: 'assets/images/emblem.png', contents: png }
+  ]
+}
+
 async function writePackage(
   packagePath: string,
   worldId: string,
@@ -99,6 +184,25 @@ test('a missing world package inbox is an empty read-only catalog', async () => 
       issues: [],
       scanLimitReached: false
     })
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
+test('the catalog exposes a structurally valid Basic package as available but not installed', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'fatebound-world-catalog-basic-'))
+  const inbox = join(root, 'worlds')
+
+  try {
+    await mkdir(inbox)
+    await writeFile(join(inbox, 'ronin.fateworld'), createStoredTestZip(basicPackageEntries()))
+
+    const result = await readWorldPackageCatalog(inbox)
+
+    assert.equal(result.packages.length, 1)
+    assert.equal(result.packages[0]?.worldId, 'com.fatebound.worlds.ronin')
+    assert.equal(result.packages[0]?.playable, false)
+    assert.deepEqual(result.issues, [])
   } finally {
     await rm(root, { recursive: true, force: true })
   }

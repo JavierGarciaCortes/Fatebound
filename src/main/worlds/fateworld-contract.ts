@@ -1,5 +1,11 @@
 import { TextDecoder } from 'node:util'
 import { parseAllDocuments, visit } from 'yaml'
+import {
+  isBasicFateworldManifestCandidate,
+  validateBasicFateworldContract,
+  type FateworldBasicPackageInfo,
+  type FateworldBasicTable
+} from './fateworld-basic-contract.ts'
 
 export const FATEWORLD_FORMAT_VERSION = '1' as const
 
@@ -14,7 +20,10 @@ export const FATEWORLD_LIMITS = Object.freeze({
   maximumPathSegmentLength: 80,
   maximumTables: 128,
   maximumTableEntries: 4096,
-  maximumReferences: 8192
+  maximumReferences: 8192,
+  maximumDeclarativeDepth: 24,
+  maximumDeclarativeNodes: 50_000,
+  maximumDeclarativeTextLength: 16_384
 })
 
 export type FateworldValidationErrorCode =
@@ -40,8 +49,11 @@ export type FateworldValidationErrorCode =
   | 'INVALID_YAML'
   | 'INVALID_MANIFEST'
   | 'UNSUPPORTED_FORMAT_VERSION'
+  | 'UNSUPPORTED_ENGINE'
   | 'UNSUPPORTED_CAPABILITY'
   | 'INVALID_TABLES'
+  | 'INVALID_GAMEPLAY'
+  | 'INVALID_LOCALIZATION'
   | 'DUPLICATE_ID'
   | 'BROKEN_REFERENCE'
   | 'INVALID_MARKDOWN'
@@ -70,7 +82,8 @@ export interface FateworldTable {
   readonly entries: readonly FateworldTableEntry[]
 }
 
-export interface FateworldPackageInfo {
+export interface FateworldNarrativePackageInfo {
+  readonly profile: 'narrative'
   readonly formatVersion: typeof FATEWORLD_FORMAT_VERSION
   readonly world: {
     readonly id: string
@@ -97,6 +110,10 @@ export interface FateworldPackageInfo {
     readonly uncompressedBytes: number
   }
 }
+
+export type FateworldPackageInfo = FateworldNarrativePackageInfo | FateworldBasicPackageInfo
+
+export type { FateworldBasicPackageInfo, FateworldBasicTable }
 
 export type FateworldValidationResult =
   | { readonly valid: true; readonly package: FateworldPackageInfo }
@@ -962,6 +979,14 @@ export function validateFateworldContract(contents: ValidatedArchiveContents): F
 
   const parsedManifestYaml = parseYaml(manifestSource, 'manifest.yaml')
   if (!parsedManifestYaml.success) return { valid: false, errors: [parsedManifestYaml.error] }
+
+  if (isBasicFateworldManifestCandidate(parsedManifestYaml.value)) {
+    return validateBasicFateworldContract(parsedManifestYaml.value, contents, {
+      limits: FATEWORLD_LIMITS,
+      validateInternalPath: validateFateworldInternalPath
+    })
+  }
+
   const manifest = validateManifest(parsedManifestYaml.value)
   if (!manifest.success) return { valid: false, errors: [manifest.error] }
 
@@ -1009,6 +1034,7 @@ export function validateFateworldContract(contents: ValidatedArchiveContents): F
   return {
     valid: true,
     package: {
+      profile: 'narrative',
       formatVersion: manifest.value.formatVersion,
       world: {
         id: manifest.value.world.id,
