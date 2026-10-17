@@ -21,6 +21,7 @@ import {
   SafeSqliteRestoreError,
   type RestorableSqliteBackup
 } from './sqlite-safe-restore.ts'
+import { SQLITE_MIGRATIONS } from './sqlite-migrations.ts'
 import {
   closeActiveSqliteDatabase,
   openActiveSqliteDatabase,
@@ -28,6 +29,10 @@ import {
   openSqliteDatabase,
   restoreActiveSqliteBackup
 } from './sqlite-storage.ts'
+
+const CURRENT_SQLITE_SCHEMA_VERSION = Math.max(
+  ...SQLITE_MIGRATIONS.map((migration) => migration.version)
+)
 
 async function withRestoreFixture(
   run: (paths: StoragePaths, externalBackups: string) => Promise<void>
@@ -57,7 +62,7 @@ async function createRestorableProbe(
   `)
   const backup = await createSqliteBackup(database, externalBackups, {
     reason: 'manual',
-    schemaVersion: 1
+    schemaVersion: CURRENT_SQLITE_SCHEMA_VERSION
   })
   database.prepare('UPDATE restore_probe SET value = ?').run('current-data')
   database.close()
@@ -131,7 +136,7 @@ test('rolls back an interrupted replacement to the previous verified database', 
     try {
       protectedBackup = await createSqliteBackup(currentDatabase, paths.backupsDirectory, {
         reason: 'protected',
-        schemaVersion: 1
+        schemaVersion: CURRENT_SQLITE_SCHEMA_VERSION
       })
     } finally {
       currentDatabase.close()
@@ -157,7 +162,7 @@ test('recovers the protected database when an interrupted restore workspace is m
     try {
       protectedBackup = await createSqliteBackup(currentDatabase, paths.backupsDirectory, {
         reason: 'protected',
-        schemaVersion: 1
+        schemaVersion: CURRENT_SQLITE_SCHEMA_VERSION
       })
     } finally {
       currentDatabase.close()
@@ -183,7 +188,7 @@ test('binds confirmation to the main-held selection and registers three argument
     id: 'selected',
     createdAt: '2026-10-11T12:34:56.000Z',
     reason: 'manual' as const,
-    schemaVersion: 1,
+    schemaVersion: CURRENT_SQLITE_SCHEMA_VERSION,
     databaseFile: 'fatebound.sqlite' as const,
     sizeBytes: 4096,
     sha256: '0'.repeat(64)

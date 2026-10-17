@@ -31,6 +31,10 @@ import {
   WORLD_PACKAGE_ADD_CHANNEL,
   type WorldPackageAddResult
 } from '../shared/world-package-add.ts'
+import {
+  WORLD_PACKAGE_INSTALL_CHANNEL,
+  type WorldPackageInstallResult
+} from '../shared/world-package-install.ts'
 
 export type IpcInvoke = (channel: string, ...args: readonly unknown[]) => Promise<unknown>
 
@@ -73,6 +77,16 @@ export function createFateboundApi(invoke: IpcInvoke): FateboundApi {
       },
       async addPackage(): Promise<WorldPackageAddResult> {
         return (await invoke(WORLD_PACKAGE_ADD_CHANNEL)) as WorldPackageAddResult
+      },
+      async installPackage(
+        worldId: string,
+        worldVersion: string
+      ): Promise<WorldPackageInstallResult> {
+        return (await invoke(
+          WORLD_PACKAGE_INSTALL_CHANNEL,
+          worldId,
+          worldVersion
+        )) as WorldPackageInstallResult
       }
     })
   })

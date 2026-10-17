@@ -63,9 +63,40 @@ export const en = {
   'worlds.add.copyFailed':
     'The package could not be copied. Check permissions and free space; other packages were not changed.',
   'worlds.add.inProgress': 'A world package is already being added.',
+  'worlds.install.action': 'Install',
+  'worlds.install.processing': 'Installing and verifying…',
+  'worlds.install.previewEyebrow': 'Installation confirmation',
+  'worlds.install.previewTitle': 'Review this version before installing',
+  'worlds.install.previewBody':
+    'Fatebound will validate the package again and keep a managed copy in portable storage.',
+  'worlds.install.previewWorld': 'World',
+  'worlds.install.previewVersion': 'Version',
+  'worlds.install.previewLanguages': 'Included languages',
+  'worlds.install.previewWarning':
+    'Installing does not activate the world, enable Characters or Chronicles, or execute rules.',
+  'worlds.install.cancelAction': 'Cancel',
+  'worlds.install.confirmAction': 'Confirm installation',
+  'worlds.install.success':
+    '{worldId} v{worldVersion} was installed and verified. It is not playable yet.',
+  'worlds.install.alreadyInstalled':
+    '{worldId} v{worldVersion} was already installed with the same content.',
+  'worlds.install.unavailable':
+    'The selected version is no longer available in the validated catalogue.',
+  'worlds.install.changed': 'The package changed during installation and was not registered.',
+  'worlds.install.versionConflict':
+    'The same identity and version already exist with different content.',
+  'worlds.install.storageUnavailable': 'World storage is not safely available.',
+  'worlds.install.copyFailed':
+    'The managed copy could not be prepared. Check permissions and available space.',
+  'worlds.install.databaseUnavailable':
+    'The installation could not be registered in SQLite. The package will not appear as installed.',
+  'worlds.install.incomplete':
+    'The copy and registration for this version are inconsistent. It requires review and will not be used.',
+  'worlds.install.inProgress': 'A world installation is already in progress.',
   'worlds.catalog.refresh': 'Refresh catalogue',
   'worlds.catalog.refreshing': 'Refreshing…',
-  'worlds.catalog.summary': '{packages} packages available · {issues} issues',
+  'worlds.catalog.summary':
+    '{packages} versions available · {installed} installed · {issues} issues',
   'worlds.catalog.error':
     'The package folder could not be read. Installed worlds and data have not been changed.',
   'worlds.catalog.additionalEyebrow': 'Detected packages',
@@ -81,6 +112,8 @@ export const en = {
     'The file is incomplete, changed, or cannot be read now. Refresh again after copying finishes.',
   'worlds.catalog.issue.duplicate':
     'Several files declare the same world and version; that release has been omitted.',
+  'worlds.catalog.issue.installation':
+    'An installation is incomplete or does not match its record and will not be used.',
   'worlds.catalog.scanLimited':
     'The scan reached its safety limit. Remove unnecessary files and refresh again.',
   'worlds.atmosphere': 'Atmosphere',
@@ -89,6 +122,8 @@ export const en = {
     'This world does not contain rules or playable content yet. For now, selecting it only changes the visual atmosphere for this session.',
   'worlds.packageAvailableNote':
     'Detected versions: {versions}. The package is not installed, and format v1 does not yet provide the mechanical capabilities required to play.',
+  'worlds.installedNote':
+    'Recognised versions: {versions}. The installed copy is verified, but the world remains unplayable until its engine exists.',
   'worlds.empty.eyebrow': 'No world selected',
   'worlds.empty.title': 'Explore a future atmosphere',
   'worlds.empty.body':

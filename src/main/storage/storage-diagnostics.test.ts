@@ -27,7 +27,7 @@ test('reports real SQLite health, paths, schema, and verified managed backups', 
     const setupDatabase = await openSqliteDatabase(paths.databaseFile, paths.backupsDirectory)
     await createSqliteBackup(setupDatabase, paths.backupsDirectory, {
       reason: 'automatic',
-      schemaVersion: 1,
+      schemaVersion: 2,
       idFactory: () => 'diagnostics-backup',
       now: () => new Date('2026-10-10T09:00:00.000Z')
     })
@@ -42,7 +42,7 @@ test('reports real SQLite health, paths, schema, and verified managed backups', 
       dataDirectory: paths.dataDirectory,
       databaseFile: paths.databaseFile,
       sqliteStatus: 'available',
-      schemaVersion: 1,
+      schemaVersion: 2,
       integrityCheck: 'ok',
       foreignKeyCheck: 'ok',
       managedBackupCount: 1,

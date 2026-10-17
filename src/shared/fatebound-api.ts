@@ -12,6 +12,7 @@ import type {
 } from './sqlite-safe-restore.ts'
 import type { WorldPackageCatalogResult } from './world-package-catalog.ts'
 import type { WorldPackageAddResult } from './world-package-add.ts'
+import type { WorldPackageInstallResult } from './world-package-install.ts'
 
 export interface FateboundApi {
   readonly storage: {
@@ -28,5 +29,6 @@ export interface FateboundApi {
   readonly worlds: {
     getPackageCatalog(): Promise<WorldPackageCatalogResult>
     addPackage(): Promise<WorldPackageAddResult>
+    installPackage(worldId: string, worldVersion: string): Promise<WorldPackageInstallResult>
   }
 }

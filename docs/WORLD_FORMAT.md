@@ -1,8 +1,8 @@
 # Formato técnico `.fateworld` v1
 
-Estado del documento: especificación normativa de la v1 en desarrollo y del validador estructural y mecánico estático implementado; instalación y ejecución del motor pendientes.
+Estado del documento: especificación normativa de la v1 en desarrollo, validador estructural y mecánico estático, instalación persistente y resolución controlada de los tres recursos de presentación implementados; la ejecución del motor permanece pendiente.
 
-Última actualización: 2026-10-16.
+Última actualización: 2026-10-17.
 
 ## 1. Alcance y perfiles
 
@@ -15,7 +15,7 @@ La v1 de desarrollo mantiene dos perfiles explícitos:
 
 La presencia de nombres de archivo, IDs o rutas concretas nunca decide el perfil. Si aparece `engine` o `engineVersion`, el paquete se trata como candidato Basic y debe completar exactamente ese contrato; no puede caer silenciosamente al perfil narrativo. Motores, versiones, capacidades, campos y combinaciones no admitidos se rechazan.
 
-Las palabras **DEBE**, **NO DEBE**, **PUEDE** y **SE RECHAZA** expresan requisitos del formato. Que un paquete Basic supere este validador significa que su estructura declarativa y sus operaciones cumplen el contrato estático Basic 1.0.0. Fatebound no ejecuta el motor y no considera instalado ni jugable un paquete disponible.
+Las palabras **DEBE**, **NO DEBE**, **PUEDE** y **SE RECHAZA** expresan requisitos del formato. Que un paquete Basic supere este validador significa que su estructura declarativa y sus operaciones cumplen el contrato estático Basic 1.0.0. Fatebound no ejecuta el motor. La validación de un paquete disponible es un requisito previo separado de su instalación persistente y no lo convierte en jugable.
 
 ## 2. Contenedor y archivos
 
@@ -138,6 +138,7 @@ resources:
 - `data.gameplay` apunta a un YAML único bajo `data/`.
 - `localization.catalogs` contiene exactamente los idiomas del mundo. Cada ruta es única, está bajo `locales/<idioma>/` y existe.
 - `resources.presentation` contiene exactamente `hero`, `card` y `emblem`. Cada valor debe ser una imagen previamente declarada en `resources.images` y con firma binaria válida.
+- La integración visual de 4B usa estas mismas asociaciones, sin duplicarlas ni cambiar `formatVersion`, únicamente desde una copia instalada y verificada. Main resuelve el rol declarado sin aceptar rutas del renderer. Un recurso ausente, inaccesible o dañado activa el fallback integrado y nunca se presenta como válido.
 
 ### 6.1 Tablas Basic
 
@@ -230,7 +231,15 @@ Se rechazan enlaces simbólicos, dispositivos, sockets, tipos Unix especiales y 
 
 El resultado no incluye la ruta absoluta del usuario, trazas, cabeceras ZIP crudas ni excepciones internas. Los códigos distinguen ZIP inválido, rutas inseguras, colisiones, límites, YAML no admitido, manifiesto o motor incompatibles, recursos ausentes, IDs duplicados, referencias rotas, operaciones o eventos inválidos, gameplay, localización e imágenes inválidas.
 
-El catálogo reutiliza este resultado. Un paquete Basic válido estática y mecánicamente puede aparecer como **Paquete disponible**, pero continúa sin estar instalado: no activa Ronin, no sustituye imágenes integradas y no habilita Personajes, Crónicas ni ninguna acción de juego. Los slots gestionados mantienen los requisitos existentes de `owner`, paquete único y `ready` vacío.
+El catálogo reutiliza este resultado. Un paquete Basic válido estática y mecánicamente aparece como **Paquete disponible** hasta que el usuario confirma su instalación. La instalación vuelve a validar el mismo contrato v1, conserva una copia binaria completa bajo `data/worlds/` y registra su SHA-256; no extrae el ZIP ni cambia su formato. **Instalado** tampoco significa jugable: permite resolver de forma limitada los tres recursos de presentación de esa versión, pero no activa Ronin ni habilita Personajes, Crónicas o acciones de juego.
+
+### 9.1 Instalación persistente y presentación instalada
+
+La detección o incorporación de un paquete no lo instala. La instalación de 4A es una acción explícita sobre un `.fateworld` validado: crea una copia administrada e inmutable por versión, registra su estado en SQLite y conserva la integridad que vincula identidad, versión y huella. Repetir la misma instalación es idempotente; los conflictos, slots incompletos o inconsistencias entre registro, manifiesto y archivo se rechazan o se presentan como estados no utilizables, sin debilitar la validación del paquete.
+
+4B permite que una versión instalada aporte exclusivamente los roles cerrados `hero`, `card` y `emblem` declarados por el manifiesto. Main vuelve a verificar el registro y la copia administrada antes de servir cada recurso mediante el protocolo restringido `fatebound-world-artwork:`; el renderer no recibe rutas físicas. Las imágenes correctas se actualizan sin reiniciar, el recurso integrado permanece como fallback ante un fallo real y la consulta inicial reserva el estado visual hasta conocer la instalación, sin presentar transitoriamente otro estado o ilustración.
+
+Las guías de [`docs/art-direction/`](art-direction/README.md) son referencias creativas externas al contrato `.fateworld` v1. No alteran `formatVersion: '1'`, no sustituyen `theme.yaml`, no incorporan mecánicas y no se leen automáticamente durante la validación o instalación.
 
 ## 10. Compatibilidad y evolución
 
@@ -246,12 +255,13 @@ Las fuentes de **Ecos de la marea** están en `examples/fateworld/echoes-of-the-
 
 ## 12. Trabajo pendiente
 
+La instalación persistente de versiones (4A) y la presentación segura de `hero`, `card` y `emblem` instalados (4B) están implementadas y verificadas; ya no forman parte del trabajo pendiente. Continúan fuera de alcance el motor jugable, Personajes, Crónicas y cualquier integración de IA.
+
 Permanecen fuera de esta etapa:
 
 - ejecución del motor, dados, combate, generación de personajes y progreso;
-- vista previa e instalación inmutable bajo `data/worlds/`;
-- esquema SQLite de mundos, personajes y Crónicas;
-- extracción, renderizado de imágenes externas y asociación de emblemas a clanes;
+- esquema SQLite de personajes y Crónicas;
+- extracción general del paquete y asociación de emblemas a clanes;
 - firmas, procedencia, dependencias entre paquetes, actualización y desinstalación;
 - editor y exportación de mundos;
 - recuperación conjunta de SQLite y versiones instaladas.

@@ -861,6 +861,7 @@ a:focus-visible,
 }
 
 .world-package-add-status,
+.world-package-install-status,
 .world-catalog-status {
   min-height: 1.2em;
   margin: -4px 0 14px;
@@ -872,8 +873,104 @@ a:focus-visible,
   color: var(--success);
 }
 
+.world-package-install-status {
+  color: var(--success);
+}
+
+.world-package-install-status:focus {
+  outline: 2px solid color-mix(in srgb, currentColor 42%, transparent);
+  outline-offset: 3px;
+}
+
 .world-package-add-status--error {
   color: var(--danger);
+}
+
+.world-package-install-status--error {
+  color: var(--danger);
+}
+
+.world-install-preview {
+  position: relative;
+  z-index: 2;
+  display: grid;
+  gap: 18px;
+  padding: 24px 27px;
+  color: var(--text-primary);
+  background: color-mix(in srgb, var(--theme-background-raised) 94%, transparent);
+  border: 1px solid color-mix(in srgb, var(--theme-accent) 34%, var(--border-quiet));
+  border-radius: 12px;
+  outline: none;
+}
+
+.world-install-preview:focus {
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--theme-accent) 28%, transparent);
+}
+
+.world-install-preview--card {
+  margin: 0 15px 15px;
+}
+
+.world-install-preview h3 {
+  margin-top: 5px;
+  font-family: var(--display-font);
+  font-size: 1.35rem;
+}
+
+.world-install-preview > div > p {
+  margin-top: 7px;
+  color: var(--text-secondary);
+  font-size: 0.82rem;
+  line-height: 1.6;
+}
+
+.world-install-preview dl {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 140px), 1fr));
+  gap: 10px;
+}
+
+.world-install-preview dl > div {
+  min-width: 0;
+  padding: 12px 14px;
+  background: rgba(255, 255, 255, 0.025);
+  border: 1px solid var(--border-quiet);
+  border-radius: 10px;
+}
+
+.world-install-preview dt {
+  color: var(--text-muted);
+  font-size: 0.64rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.world-install-preview dd {
+  margin-top: 5px;
+  overflow-wrap: anywhere;
+  font-size: 0.82rem;
+}
+
+.world-install-warning {
+  display: flex;
+  gap: 9px;
+  align-items: flex-start;
+  color: var(--text-secondary);
+  font-size: 0.76rem;
+  line-height: 1.55;
+}
+
+.world-install-warning svg {
+  flex: 0 0 auto;
+  color: var(--theme-accent);
+}
+
+.world-install-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: flex-end;
 }
 
 .world-card-grid {
@@ -925,6 +1022,10 @@ a:focus-visible,
 
 .world-card--available:not(.world-card--active) {
   border-color: color-mix(in srgb, var(--success) 48%, transparent);
+}
+
+.world-card--installed {
+  border-color: color-mix(in srgb, var(--success) 68%, transparent);
 }
 
 .world-card__art {
@@ -1043,6 +1144,12 @@ a:focus-visible,
 
 .world-card--neutral {
   cursor: default;
+}
+
+.world-card__action {
+  position: relative;
+  z-index: 2;
+  margin: 0 15px 15px;
 }
 
 .world-card--neutral:hover {
@@ -1200,6 +1307,44 @@ a:focus-visible,
 .world-detail__meta strong {
   font-size: 0.79rem;
   font-weight: 650;
+}
+
+.world-version-actions {
+  display: grid;
+  gap: 9px;
+  margin-top: 16px;
+}
+
+.world-version-actions > .world-version-action {
+  display: grid;
+  gap: 12px;
+  padding: 10px 12px;
+  background: rgba(255, 255, 255, 0.025);
+  border: 1px solid var(--border-quiet);
+  border-radius: 10px;
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+}
+
+.world-version-action__summary {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.world-version-action .world-install-preview {
+  margin-top: 2px;
+}
+
+.world-version-action .world-package-install-status {
+  margin: 0;
+}
+
+.world-package-install-status--card {
+  position: relative;
+  z-index: 2;
+  margin: 0 15px 15px;
 }
 
 .world-note {
@@ -1939,6 +2084,18 @@ a:focus-visible,
 }
 
 @media (max-width: 520px) {
+  .world-install-preview dl {
+    grid-template-columns: 1fr;
+  }
+
+  .world-install-actions {
+    justify-content: stretch;
+  }
+
+  .world-install-actions .button {
+    flex: 1 1 100%;
+  }
+
   .backup-restore-preview dl {
     grid-template-columns: 1fr;
   }

@@ -51,17 +51,24 @@ async function createInitializedDatabase(
   database.close()
 }
 
-test('creates the database with the initial migration and portable safety settings', async () => {
+test('creates the database with the current migrations and portable safety settings', async () => {
   await withTemporaryDatabase(async (databaseFile, _testRoot, backupsDirectory) => {
     const database = await openSqliteDatabase(databaseFile, backupsDirectory)
 
     try {
       assert.equal(database.location(), databaseFile)
       const migration = database
-        .prepare('SELECT version, name FROM fatebound_schema_migrations')
+        .prepare('SELECT version, name FROM fatebound_schema_migrations ORDER BY version DESC LIMIT 1')
         .get() as { version: number; name: string }
-      assert.equal(migration.version, 1)
-      assert.equal(migration.name, 'initialize_migration_tracking')
+      assert.equal(migration.version, 2)
+      assert.equal(migration.name, 'install_world_versions')
+      assert.ok(
+        database
+          .prepare(
+            "SELECT name FROM sqlite_schema WHERE type = 'table' AND name = 'installed_world_versions'"
+          )
+          .get()
+      )
       assert.equal(
         (database.prepare('PRAGMA journal_mode').get() as PragmaRow).journal_mode,
         'delete'
@@ -98,7 +105,7 @@ test('persists data and does not reapply migrations when reopened', async () => 
             .prepare('SELECT COUNT(*) AS count FROM fatebound_schema_migrations')
             .get() as { count: number }
         ).count,
-        1
+        2
       )
     } finally {
       reopenedConnection.close()
@@ -150,7 +157,7 @@ test('blocks startup before backup or migration when an existing database is mal
     const migrations: readonly SqliteMigration[] = [
       ...SQLITE_MIGRATIONS,
       {
-        version: 2,
+        version: 3,
         name: 'must_not_reach_corrupt_database',
         sql: 'CREATE TABLE unreachable_probe (value TEXT NOT NULL) STRICT;'
       }
@@ -203,7 +210,7 @@ test('applies pending migrations in version order', async () => {
     const migrations: readonly SqliteMigration[] = [
       ...SQLITE_MIGRATIONS,
       {
-        version: 2,
+        version: 3,
         name: 'test_pending_migration',
         sql: 'CREATE TABLE migration_probe (value TEXT NOT NULL) STRICT;'
       }
@@ -218,7 +225,8 @@ test('applies pending migrations in version order', async () => {
         .map((row) => ({ ...row }))
       assert.deepEqual(migrationRows, [
         { version: 1, name: 'initialize_migration_tracking' },
-        { version: 2, name: 'test_pending_migration' }
+        { version: 2, name: 'install_world_versions' },
+        { version: 3, name: 'test_pending_migration' }
       ])
       const probeTable = database
         .prepare("SELECT name FROM sqlite_schema WHERE type = 'table' AND name = ?")
@@ -233,22 +241,25 @@ test('applies pending migrations in version order', async () => {
 test('rolls back a failed migration without recording it', async () => {
   await withTemporaryDatabase(async (databaseFile, _testRoot, backupsDirectory) => {
     const database = await openSqliteDatabase(databaseFile, backupsDirectory)
+    const failedMigration: SqliteMigration = {
+      version: 3,
+      name: 'test_failed_migration',
+      sql: `
+        CREATE TABLE rolled_back_probe (value TEXT NOT NULL) STRICT;
+        THIS IS NOT VALID SQL;
+      `
+    }
     const migrations: readonly SqliteMigration[] = [
       ...SQLITE_MIGRATIONS,
-      {
-        version: 2,
-        name: 'test_failed_migration',
-        sql: `
-          CREATE TABLE rolled_back_probe (value TEXT NOT NULL) STRICT;
-          THIS IS NOT VALID SQL;
-        `
-      }
+      failedMigration
     ]
 
     try {
       assert.throws(
         () => applySqliteMigrations(database, migrations),
-        /SQLite migration 2 \(test_failed_migration\) failed/
+        new RegExp(
+          `SQLite migration ${failedMigration.version} \\(${failedMigration.name}\\) failed`
+        )
       )
       assert.equal(
         (
@@ -256,7 +267,7 @@ test('rolls back a failed migration without recording it', async () => {
             count: number
           }
         ).count,
-        1
+        2
       )
       assert.equal(
         database
@@ -276,7 +287,7 @@ test('creates a verified backup before migrating an existing database', async ()
     const migrations: readonly SqliteMigration[] = [
       ...SQLITE_MIGRATIONS,
       {
-        version: 2,
+        version: 3,
         name: 'protected_migration',
         sql: 'CREATE TABLE protected_probe (value TEXT NOT NULL) STRICT;'
       }
@@ -325,7 +336,7 @@ test('does not migrate when the required pre-migration backup fails', async () =
     const migrations: readonly SqliteMigration[] = [
       ...SQLITE_MIGRATIONS,
       {
-        version: 2,
+        version: 3,
         name: 'blocked_migration',
         sql: 'CREATE TABLE blocked_probe (value TEXT NOT NULL) STRICT;'
       }
@@ -358,7 +369,7 @@ test('does not migrate when the required pre-migration backup fails', async () =
             version: number
           }
         ).version,
-        1
+        2
       )
     } finally {
       database.close()
@@ -372,12 +383,12 @@ test('keeps the pre-migration backup and does not restore automatically after a 
     const migrations: readonly SqliteMigration[] = [
       ...SQLITE_MIGRATIONS,
       {
-        version: 2,
+        version: 3,
         name: 'completed_before_failure',
         sql: 'CREATE TABLE completed_probe (value TEXT NOT NULL) STRICT;'
       },
       {
-        version: 3,
+        version: 4,
         name: 'failing_after_completed',
         sql: 'THIS IS NOT VALID SQL;'
       }
@@ -406,7 +417,7 @@ test('keeps the pre-migration backup and does not restore automatically after a 
             version: number
           }
         ).version,
-        2
+        3
       )
     } finally {
       database.close()
@@ -449,7 +460,7 @@ test('blocks pending migrations when preflight foreign key validation fails', as
     const migrations: readonly SqliteMigration[] = [
       ...SQLITE_MIGRATIONS,
       {
-        version: 2,
+        version: 3,
         name: 'must_not_run',
         sql: 'CREATE TABLE must_not_exist (value TEXT NOT NULL) STRICT;'
       }
@@ -482,7 +493,7 @@ test('rejects a database whose migration history is newer than the application',
     const database = await openSqliteDatabase(databaseFile, backupsDirectory)
     database
       .prepare('INSERT INTO fatebound_schema_migrations (version, name) VALUES (?, ?)')
-      .run(2, 'future_migration')
+      .run(3, 'future_migration')
     database.close()
 
     await assert.rejects(openSqliteDatabase(databaseFile, backupsDirectory), (error: unknown) => {
@@ -491,7 +502,7 @@ test('rejects a database whose migration history is newer than the application',
       assert.ok(error.cause instanceof Error)
       assert.match(
         error.cause.message,
-        /database schema version 2 is newer than this Fatebound build supports/
+        /database schema version 3 is newer than this Fatebound build supports/
       )
       return true
     })

@@ -19,6 +19,31 @@ export const SQLITE_MIGRATIONS: readonly SqliteMigration[] = Object.freeze([
         applied_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
       ) STRICT;
     `
+  }),
+  Object.freeze({
+    version: 2,
+    name: 'install_world_versions',
+    sql: `
+      CREATE TABLE installed_world_versions (
+        world_id TEXT NOT NULL,
+        world_version TEXT NOT NULL,
+        format_version TEXT NOT NULL CHECK (format_version = '1'),
+        profile TEXT NOT NULL CHECK (profile IN ('narrative', 'basic')),
+        package_sha256 TEXT NOT NULL CHECK (
+          length(package_sha256) = 64 AND
+          package_sha256 NOT GLOB '*[^0-9a-f]*'
+        ),
+        package_size_bytes INTEGER NOT NULL CHECK (
+          package_size_bytes > 0 AND package_size_bytes <= 33554432
+        ),
+        storage_slot_id TEXT NOT NULL UNIQUE,
+        installed_at TEXT NOT NULL,
+        PRIMARY KEY (world_id, world_version)
+      ) STRICT;
+
+      CREATE INDEX installed_world_versions_world_id
+        ON installed_world_versions (world_id);
+    `
   })
 ])
 

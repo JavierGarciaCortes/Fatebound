@@ -63,9 +63,35 @@ export const ko = {
   'worlds.add.copyFailed':
     '패키지를 복사할 수 없습니다. 권한과 여유 공간을 확인하세요. 다른 패키지는 변경되지 않았습니다.',
   'worlds.add.inProgress': '이미 세계 패키지를 추가하고 있습니다.',
+  'worlds.install.action': '설치',
+  'worlds.install.processing': '설치 및 검증 중…',
+  'worlds.install.previewEyebrow': '설치 확인',
+  'worlds.install.previewTitle': '설치 전에 이 버전을 확인하세요',
+  'worlds.install.previewBody':
+    'Fatebound가 패키지를 다시 검증하고 포터블 저장소에 관리되는 복사본을 보관합니다.',
+  'worlds.install.previewWorld': '세계',
+  'worlds.install.previewVersion': '버전',
+  'worlds.install.previewLanguages': '포함된 언어',
+  'worlds.install.previewWarning':
+    '설치해도 세계가 활성화되지 않고, 캐릭터나 연대기가 활성화되지 않으며, 규칙이 실행되지 않습니다.',
+  'worlds.install.cancelAction': '취소',
+  'worlds.install.confirmAction': '설치 확인',
+  'worlds.install.success':
+    '{worldId} v{worldVersion}을(를) 설치하고 검증했습니다. 아직 플레이할 수 없습니다.',
+  'worlds.install.alreadyInstalled':
+    '{worldId} v{worldVersion}이(가) 동일한 내용으로 이미 설치되어 있습니다.',
+  'worlds.install.unavailable': '선택한 버전을 검증된 카탈로그에서 더 이상 찾을 수 없습니다.',
+  'worlds.install.changed': '설치 중 패키지가 변경되어 등록하지 않았습니다.',
+  'worlds.install.versionConflict': '같은 식별자와 버전이 다른 내용으로 이미 존재합니다.',
+  'worlds.install.storageUnavailable': '세계 저장소를 안전하게 사용할 수 없습니다.',
+  'worlds.install.copyFailed': '관리되는 복사본을 준비하지 못했습니다. 권한과 여유 공간을 확인하세요.',
+  'worlds.install.databaseUnavailable': 'SQLite에 설치를 등록하지 못했습니다. 설치된 상태로 표시되지 않습니다.',
+  'worlds.install.incomplete': '이 버전의 복사본과 등록이 일치하지 않습니다. 검토가 필요하며 사용하지 않습니다.',
+  'worlds.install.inProgress': '이미 세계를 설치하고 있습니다.',
   'worlds.catalog.refresh': '카탈로그 새로고침',
   'worlds.catalog.refreshing': '새로고침 중…',
-  'worlds.catalog.summary': '사용 가능한 패키지 {packages}개 · 문제 {issues}개',
+  'worlds.catalog.summary':
+    '사용 가능한 버전 {packages}개 · 설치됨 {installed}개 · 문제 {issues}개',
   'worlds.catalog.error':
     '패키지 폴더를 확인할 수 없습니다. 설치된 세계와 데이터는 변경되지 않았습니다.',
   'worlds.catalog.additionalEyebrow': '감지된 패키지',
@@ -81,6 +107,8 @@ export const ko = {
     '파일이 불완전하거나 변경되었거나 지금 읽을 수 없습니다. 복사가 끝난 뒤 다시 새로고침하세요.',
   'worlds.catalog.issue.duplicate':
     '여러 파일이 같은 세계와 버전을 선언하여 해당 릴리스를 제외했습니다.',
+  'worlds.catalog.issue.installation':
+    '설치가 완료되지 않았거나 등록과 일치하지 않아 사용하지 않습니다.',
   'worlds.catalog.scanLimited':
     '안전 탐색 한도에 도달했습니다. 불필요한 파일을 제거하고 다시 새로고침하세요.',
   'worlds.atmosphere': '분위기',
@@ -89,6 +117,8 @@ export const ko = {
     '이 세계에는 아직 규칙이나 플레이 콘텐츠가 없습니다. 현재는 선택한 세계의 비주얼 분위기만 이번 세션에 적용됩니다.',
   'worlds.packageAvailableNote':
     '감지된 버전: {versions}. 패키지는 설치되지 않았으며 v1 형식에는 플레이에 필요한 기계적 기능이 아직 없습니다.',
+  'worlds.installedNote':
+    '확인된 버전: {versions}. 설치된 복사본은 검증되었지만 엔진이 구현될 때까지 플레이할 수 없습니다.',
   'worlds.empty.eyebrow': '선택한 세계 없음',
   'worlds.empty.title': '미래의 분위기를 탐험하세요',
   'worlds.empty.body':

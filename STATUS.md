@@ -12,9 +12,11 @@ La exportación quedó validada con 74/74 tests, lint, typecheck, builds y porta
 
 ## Estado general
 
+**Estado vigente a 17 de octubre de 2026:** las etapas 4A y 4B están implementadas y verificadas. Ronin puede instalarse de forma persistente y mostrar sus tres ilustraciones sin reinicio ni parpadeo inicial, pero sigue sin ser jugable. El motor, Personajes, Crónicas y la IA narrativa permanecen pendientes.
+
 Fatebound 2.0 dispone ya de una primera interfaz visual funcional sobre Electron 44.7.0 y Vue. La shell carga nueve temas visuales y está traducida al español, inglés y coreano, con cambio inmediato y preferencia portable. Sin un mundo activo comienza en Fatebound neutral, el menú muestra solo Mundos y Ajustes reúne idioma, diagnóstico SQLite, exportación y restauración manual de backups.
 
-El producto continúa en fase de fundamentos: el contrato y el validador `.fateworld` v1 conservan el perfil narrativo validado históricamente y reconocen además Basic 1.0.0 con validación mecánica estática cerrada. El equipo comunicó 112 pruebas correctas con una omitida y una comprobación manual satisfactoria del selector, la copia, el SHA-256 y los duplicados para la implementación anterior en NTFS; esas cifras no validan la ampliación actual. La publicación gestionada compatible con FAT32/exFAT y el contrato estricto de operaciones están implementados en código, pero no se han ejecutado en esta tarea. Todavía no existen esquema del juego, mundos instalados, personajes, campañas, ejecución de reglas ni instalación persistente. Ronin, Templario, Ninja, Shaolin, Robot, Soldado, Naves y Mundoplato conservan sus tarjetas; muestran **Próximamente** o **Paquete disponible** según la consulta, sin representar contenido instalado o ejecutable.
+El producto continúa en fase de fundamentos: el contrato y el validador `.fateworld` v1 conservan el perfil narrativo y reconocen Basic 1.0.0 con validación mecánica estática cerrada. Las etapas 3A/3B quedaron verificadas sobre el paquete real `ronin-1.0.0.fateworld`: validación correcta, typecheck correcto, 128 pruebas con 127 superadas y una omitida por las limitaciones de enlaces simbólicos en Windows, lint con código de salida 0 y 3.805 advertencias, build correcto y comprobación visual correcta del estado **Paquete disponible**. Ese cierre corresponde al commit `dbaf503`. La compilación portable de dicho estado no está validada por un fallo previo de memoria durante la conversión del icono. La instalación persistente 4A está implementada en código y pendiente de verificación; todavía no existen personajes, campañas ni ejecución de reglas.
 
 ## Implementado
 
@@ -91,7 +93,7 @@ El producto continúa en fase de fundamentos: el contrato y el validador `.fatew
 - [x] Versiones distintas del mismo mundo conservadas por separado; la identidad siempre procede del manifiesto, nunca del nombre del archivo.
 - [x] Canal sin argumentos `fatebound:worlds:get-package-catalog`, preload tipado y respuesta sin rutas absolutas, trazas ni mensajes internos sin localizar.
 - [x] Asociación exacta de las ocho tarjetas mediante `com.fatebound.worlds.<id-del-tema>`; otros IDs válidos aparecen con presentación neutral sin perder ni sustituir ilustraciones integradas.
-- [x] Actualización manual localizada desde Mundos y estados separados **Próximamente**, **Paquete disponible** e **Instalado**; esta etapa nunca produce el último.
+- [x] Actualización manual localizada desde Mundos y estados separados **Próximamente**, **Paquete disponible** e **Instalado**; el último exige registro SQLite y paquete administrado verificable.
 - [x] Pruebas focalizadas añadidas para carpeta ausente, filtrado directo, versiones, incompatibilidad, duplicados, cambio durante lectura, enlaces cuando el sistema permite crearlos, error IPC sanitizado y preload sin argumentos. No se han ejecutado en esta tarea.
 
 ### Incorporación de paquetes a `worlds/`
@@ -105,8 +107,21 @@ El producto continúa en fase de fundamentos: el contrato y el validador `.fatew
 - [x] Si `ready` llega a existir, el importador no borra el slot ante un error posterior: consulta y revalida el catálogo para resolver el resultado. Restos anteriores y estructuras desconocidas nunca se eliminan automáticamente.
 - [x] Paquetes idénticos del mismo `world.id` + `world.version` tratados como ya disponibles, bytes distintos con esa identidad tratados como conflicto y versiones distintas permitidas.
 - [x] Selección de un archivo ya disponible, manual o gestionado, tratada sin duplicación; las incorporaciones desde la interfaz se serializan.
-- [x] Actualización automática del catálogo tras éxito o coincidencia existente, sin navegación ni cambio de tema y sin acción **Instalar ahora**.
+- [x] Actualización automática del catálogo tras éxito o coincidencia existente, sin navegación ni cambio de tema; la instalación permanece como una acción posterior y separada.
 - [x] Pruebas focalizadas ajustadas para invisibilidad antes de `ready`, validación previa a publicación, paquete gestionado dañado, estructura/enlaces inseguros, conflictos manual-gestionado, fallos antes y después de `ready` y colisión de slot. No se han ejecutado en esta tarea.
+
+### Instalación persistente de versiones de mundo
+
+- [x] Vista previa localizada de mundo, versión e idiomas con cancelación y confirmación explícitas.
+- [x] Canal `fatebound:worlds:install-package` limitado a `worldId` y `worldVersion`; main vuelve a resolver el candidato validado y no acepta rutas, hashes ni metadatos fiables del renderer.
+- [x] Reutilización completa del validador v1 para perfiles narrativo y Basic antes de copiar y antes de registrar el resultado.
+- [x] Copia exclusiva e inmutable en `data/worlds/.fatebound-installed-v1/<uuid>/`, con `owner`, `package.fateworld` y marcador `ready`, sin extraer el ZIP ni modificar el original de `worlds/`.
+- [x] Migración SQLite 2 `install_world_versions`, con clave `world_id + world_version`, perfil, formato, SHA-256, tamaño, slot UUID y fecha; no almacena rutas absolutas ni contenido protegido.
+- [x] Versiones distintas coexistentes, repetición idempotente para los mismos bytes y rechazo de la misma identidad y versión con bytes diferentes.
+- [x] Protocolo recuperable y expresamente no atómico: un slot publicado sin registro queda como huérfano detectable, y un registro sin paquete válido se informa como inconsistente; ninguno aparece como instalado ni se borra o reconstruye automáticamente.
+- [x] Catálogo combinado que conserva **Paquete disponible** para fuentes válidas y solo muestra **Instalado** cuando SQLite y la copia administrada coinciden en estructura, identidad, versión, perfil, tamaño y SHA-256.
+- [x] Ronin puede instalarse y aportar sus tres recursos de presentación, pero permanece no jugable: no se activa navegación a Personajes o Crónicas ni se ejecutan sus operaciones.
+- [x] Pruebas focalizadas añadidas para perfiles narrativo y Basic, varias versiones, idempotencia, persistencia tras reapertura, conflicto, fallo posterior a publicación, paquete referenciado ausente e IPC restringido. No se han ejecutado por restricción expresa.
 
 ### Exportación manual SQLite
 
@@ -132,18 +147,37 @@ El producto continúa en fase de fundamentos: el contrato y el validador `.fatew
 ## Funciones demostrativas o pendientes
 
 - Los ocho mundos siguen siendo un catálogo interno de presentación; las tarjetas no son paquetes `.fateworld`, no aparecen en SQLite y no contienen reglas. Fatebound neutral es la identidad base y no forma parte de esas ocho tarjetas.
-- **Próximamente** indica que no se ha detectado un paquete correspondiente; **Paquete disponible** indica solo una publicación v1 válida en la bandeja. **Instalado** se reserva para una futura versión administrada bajo `data/worlds/`.
+- **Próximamente** indica que no se ha detectado un paquete correspondiente; **Paquete disponible** indica una publicación v1 válida en la bandeja; **Instalado** exige una versión registrada y verificable bajo `data/worlds/`.
 - La selección temática dura solo durante la sesión y comienza de nuevo en Fatebound neutral al abrir la aplicación.
 - Personajes y Crónicas no aparecen en el menú sin un mundo jugable activo; sus vistas estructurales no crean, editan ni persisten datos.
 - Ajustes ofrece idioma, diagnóstico, exportación y restauración manual de backups SQLite; no ofrece exploración general de archivos ni cambio de la raíz activa.
 - La muestra **Ecos de la marea** está destinada a verificar el contrato como artefacto técnico; no está instalada ni se copia automáticamente a la bandeja. Si el usuario la deposita allí, aparece como entrada neutral disponible.
-- No existe todavía vista previa de instalación, instalación persistente, editor de mundos, motor de reglas, campañas jugables o IA. **Añadir mundo** solo incorpora un paquete a la bandeja.
+- No existe todavía editor de mundos, motor de reglas, campañas jugables, carga visual desde paquetes o IA. **Añadir mundo** incorpora un paquete a la bandeja; **Instalar** conserva y registra una versión, pero no la vuelve jugable.
+
+## Etapas 4A y 4B verificadas
+
+4A instala explícitamente paquetes `.fateworld` validados, crea copias administradas por versión, persiste el registro en SQLite y conserva las garantías de integridad, idempotencia y detección de instalaciones incompletas o inconsistentes. 4B sirve `hero`, `card` y `emblem` desde versiones instaladas mediante un protocolo restringido, mantiene el fallback integrado, actualiza las imágenes sin reiniciar y distingue catálogo no consultado, carga, resultado y error para evitar parpadeos iniciales.
+
+Verificación completada el 17 de octubre de 2026: `npm run typecheck` correcto; `npm test` con 136 pruebas superadas, 0 fallidas y 1 omitida por una limitación de Windows; `npm run lint` con 0 errores y 6.748 advertencias; y `npm run build` correcto para main, preload y renderer. La prueba visual aislada de Ronin confirmó confirmación, cancelación, Escape, instalación, cambio inmediato de las tres ilustraciones, persistencia tras reiniciar y ausencia temporal de «Próximamente» o arte antiguo. Personajes y Crónicas continuaron bloqueados. Se conservaron los datos de prueba y se restauraron los datos originales.
+
+## Mundos futuros documentados
+
+- **MadJay:** universo original de supervivencia posapocalíptica de carretera, con desiertos, vehículos, combustible, bandas y asentamientos.
+- **EON PROJECT:** nombre elegido para el mundo de survival horror antes denominado provisionalmente Zona Cero. Un experimento para detener el envejecimiento y alcanzar la vida eterna provoca el colapso de la civilización; combina terror biológico, zombis, mutaciones, laboratorios, supervivencia, refugios y elementos sobrenaturales de fantasía oscura. Su lema conceptual es «La eternidad fue nuestro último error».
+
+Ambos disponen de dirección artística y ficha visual, pero todavía no están implementados como mundos jugables ni forman parte del catálogo de la aplicación. Mundoplato ya pertenece al catálogo actual de ocho mundos y no se duplica.
 
 ## Siguiente tarea prioritaria
 
-**Diseñar la etapa siguiente del motor Basic 1.0.0 sin confundir la validación estática ya implementada con ejecución, instalación o estado de Crónica.**
+**Definir e implementar la gestión de personajes por mundo sin anticipar todavía Crónicas ni la ejecución completa del motor.**
+
+La secuencia posterior prevista, todavía no implementada, continúa con creación y gestión de Crónicas, ciclo de vida de los personajes dentro de ellas, ejecución progresiva del motor Ronin y una interfaz más cercana a un videojuego.
 
 ## Pendientes por fases
+
+### Propuesta futura de organización de Mundos
+
+**Propuesta de diseño todavía no aprobada ni implementada:** cuando crezca el catálogo, estudiar una reorganización que muestre primero los mundos instalados, después los paquetes `.fateworld` válidos disponibles para instalar y mantenga los próximos mundos inicialmente ocultos tras una acción como «Explorar próximos mundos». La exploración deberá estudiar cómo conservar la identidad y las ilustraciones de cada mundo antes y después de instalarlo, sin modificar por ahora el protocolo de imágenes ni la gestión de paquetes. Con un catálogo amplio también podrán contemplarse filtros o búsqueda por ambientación. Esta propuesta no altera la distinción fundamental: **un mundo instalado no es necesariamente un mundo jugable**.
 
 ### Seguridad y recuperación
 
@@ -161,7 +195,6 @@ El producto continúa en fase de fundamentos: el contrato y el validador `.fatew
 
 - Mantener pendiente la recuperación conjunta con paquetes, sin sobrescritura silenciosa.
 - Implementar repositorios sobre la transacción central SQLite.
-- Implementar vista previa, confirmación e instalación inmutable bajo `data/worlds/` reutilizando la bandeja, el catálogo y el validador v1.
 - Definir los vínculos exactos de personajes y crónicas con identidad y versión de mundo.
 - Implementar la ficha base permanente y el progreso independiente por Crónica, impidiendo que una ficha participe en dos Crónicas en curso.
 - Conservar la ocupación tras cerrar la aplicación; liberar la ficha solo al finalizar o abandonar definitivamente, con abandono irreversible e historial consultable.
@@ -233,25 +266,45 @@ Resultados reales comunicados por el usuario:
 
 El equipo comunicó una prueba manual satisfactoria de la incorporación anterior en NTFS, incluido selector, copia, SHA-256 y duplicados. La instalación bajo `data/worlds/` no está implementada.
 
-## Verificación pendiente del catálogo y la incorporación de paquetes
+## Verificación del catálogo y la incorporación de paquetes
 
-En esta tarea se sustituyó la publicación mediante enlace físico por el almacén gestionado y se ajustaron las pruebas focalizadas y la documentación. Por restricción expresa no se ejecutaron `npm test`, lint, typecheck, build, build de Windows, comprobaciones visuales automatizadas ni comandos de Git. Los 112 tests correctos con uno omitido y la prueba manual de selector, copia, SHA-256 y duplicados corresponden al estado anterior comunicado por el usuario; el protocolo `ready` y el catálogo combinado permanecen pendientes de validación por el equipo.
+El cierre de 3B comunicó 128 pruebas con 127 superadas y una omitida, typecheck correcto, lint con código de salida 0, build correcto y comprobación visual satisfactoria de Ronin como **Paquete disponible**. Esos resultados cubren el código del catálogo y la incorporación presente en `dbaf503`. Los ensayos físicos excepcionales indicados a continuación continúan pendientes.
 
 La comprobación manual debe repetir cancelación, carpeta ausente, paquete válido conocido y desconocido, incorporación repetida, selección de un paquete manual o gestionado ya disponible, varias versiones, mismo ID+versión con bytes distintos, ZIP inválido o incompleto, formato incompatible, enlace simbólico o junction, archivo que cambia durante la operación, dos pulsaciones rápidas, permisos insuficientes, espacio agotado y colisión de UUID. Deben probarse una unidad NTFS y unidades FAT32/exFAT reales, observando que un slot sin `ready` no aparece, que uno publicado sí aparece tras reiniciar y que ningún fallo altera el original ni paquetes previos. Las interrupciones físicas antes, durante y después de crear `ready` requieren ensayos específicos; SQLite y `data/worlds/` deben permanecer intactos.
 
-## Verificación pendiente de las etapas 3A y 3B Basic
+## Verificación de las etapas 3A y 3B Basic
 
-Por restricción expresa no se han ejecutado las pruebas nuevas, lint, typecheck, builds, pruebas visuales ni comandos de Git. Deben comprobarse manualmente:
+El equipo verificó el paquete real `ronin-1.0.0.fateworld` con resultado `valid: true`. También comunicó `npm run typecheck` correcto, 128 pruebas con 127 superadas, ninguna fallida y una omitida por las limitaciones de enlaces simbólicos en Windows, lint con código de salida 0 y 3.805 advertencias, build correcto para main, preload y renderer, y comprobación visual correcta en desarrollo. Ronin apareció como **Paquete disponible**, sin instalarse ni habilitar Personajes o Crónicas. `git diff --cached --check` fue correcto y el cierre quedó registrado en `dbaf503`.
 
-- la aceptación continuada de **Ecos de la marea** como perfil narrativo;
-- la aceptación estructural y mecánica estática de una copia `.fateworld` del ZIP fuente de Ronin, sin modificar ni instalar el ZIP de trabajo;
-- los 26 IDs de tabla, sus entradas, los cuatro selectores, `gameplay.tableBindings`, la selección de nombres, los 27 catálogos españoles y las 39 firmas de imagen;
-- las 35 operaciones, sus 334 apariciones anidadas, los 11 eventos y las referencias de tabla y localización del inventario de Ronin;
-- el rechazo de operaciones o eventos desconocidos, parámetros adicionales, variantes inválidas, ramas d6 solapadas o incompletas y referencias mecánicas rotas;
-- el rechazo de motores/versiones no admitidos, perfiles ambiguos, campos extra, rutas o archivos no declarados, IDs duplicados, bindings o catálogos rotos y asociaciones de presentación ausentes;
-- que el catálogo muestre Ronin solo como **Paquete disponible**, conserve sus imágenes integradas y no habilite Personajes, Crónicas, instalación ni acciones de juego.
+Estos resultados no equivalen a ejecutar el motor ni a validar una Crónica real. La compilación portable Windows de este estado sigue sin estar validada: un intento anterior falló por memoria durante la conversión del icono.
 
-La etapa 3B añade validación mecánica estática, pero sus pruebas nuevas no se han ejecutado por restricción expresa. No debe registrarse como ejecución del motor ni como validación de una Crónica real.
+## Verificación completada de la etapa 4A
+
+**Estado vigente desde el 17 de octubre de 2026:** verificación automatizada y visual completada. Las notas posteriores de este apartado se conservan como registro del estado previo al cierre.
+
+El equipo comunicó `npm run typecheck` correcto, 132 pruebas superadas sin fallos y una omitida, lint con cero errores y 6.735 advertencias, y build correcto. La prueba manual inicial instaló Ronin, lo presentó como **Instalado** y mostró el resultado de instalación verificada. La persistencia después de cerrar y reabrir continúa pendiente de comprobación manual.
+
+Antes de cerrar por completo el hito, el equipo debe comprobar manualmente y de una en una:
+
+- migración de una base del esquema 1 al 2 con su copia `pre-migration`, y arranque limpio directo en esquema 2;
+- instalación y reapertura de un paquete narrativo y de Ronin Basic, conservando intacto el original de `worlds/`;
+- coexistencia de versiones, repetición idempotente y rechazo de bytes distintos con el mismo ID y versión;
+- fallos de permisos, espacio, copia, validación y registro SQLite, incluida la detección posterior de slots huérfanos y paquetes referenciados ausentes;
+- estados **Próximamente**, **Paquete disponible** e **Instalado** en español, inglés y coreano, con teclado y foco visibles;
+- que instalar Ronin no habilite Personajes o Crónicas ni ejecute operaciones, y que los recursos integrados permanezcan disponibles como fallback de 4B;
+- cierre o interrupción real antes y después de `ready` y del `COMMIT` SQLite en NTFS, FAT32 y exFAT.
+
+La restauración existente solo cubre SQLite. Restaurar una base que referencia un paquete ausente debe producir una incidencia segura y nunca reconstruirlo ni marcarlo como utilizable. La compilación portable de este estado también permanece pendiente.
+
+## Verificación completada de la etapa 4B
+
+**Estado vigente desde el 17 de octubre de 2026:** carga de imágenes instaladas, fallback, actualización sin reinicio y carga inicial sin parpadeos verificados. Las notas posteriores de este apartado se conservan como registro del estado previo al cierre.
+
+La confirmación de instalación se expande bajo el botón de la versión que origina la acción. Recibe foco, admite Escape, vuelve al botón al cancelar, desplaza el área con respeto a `prefers-reduced-motion` y desaparece al cambiar de mundo o completar la acción. La disposición se adapta a una o tres columnas según el ancho disponible y reutiliza las traducciones existentes.
+
+Una versión Basic instalada y verificada aporta ahora las URLs cerradas de sus asociaciones `hero`, `card` y `emblem`. Main las sirve mediante `fatebound-world-artwork:`, sin rutas físicas ni lectura general, después de comprobar identidad, versión, SHA-256, registro SQLite, slot y manifiesto. Solo extrae las tres entradas declaradas, con CRC, MIME cerrado, `nosniff`, límites v1 y una caché limitada a doce versiones y 64 MiB que se invalida ante cambios del slot. Entre varias versiones, la interfaz usa la última versión instalada con presentación dentro del orden estable del catálogo. Si el protocolo devuelve 404 o el elemento no carga, se usa el recurso integrado del mismo rol.
+
+Las pruebas focalizadas existentes de instalación y shell cubren resolución concurrente y cacheada, MIME, identidad, versión, SHA, rol no declarado, paquete ausente, fallback y ubicación/foco de la confirmación; ambos archivos ya pertenecen a `npm test`. Esta implementación todavía no se ha sometido a tests, lint, typecheck, build ni prueba visual en esta tarea. Deben comprobarse Ronin con sus tres imágenes, reinicio completo, varias versiones, fallbacks por daño o ausencia, foco/teclado, ventanas pequeñas y los tres idiomas. El motor, Personajes y Crónicas continúan pendientes y no se introduce un mundo jugable activo.
 
 ## Migración controlada a Electron 44.7.0
 
@@ -395,3 +448,14 @@ Los recursos gráficos de Ronin presentes en el repositorio no autorizan su dist
 - Implementado el registro cerrado Basic 1.0.0 de 35 operaciones y 11 eventos, con parámetros exactos, condiciones, referencias y recorrido de instrucciones anidadas; no ejecuta mecánicas.
 - Añadidas pruebas focalizadas de operaciones representativas, operación desconocida anidada, parámetros no admitidos y conservación narrativa. No se ejecutaron por restricción expresa de la tarea.
 - Corregida la validación de `npc.select.onEmpty`: `notify_and_skip_without_reroll` permanece ligado a `enemy + spared_recently`, mientras `needs_player_resolution` admite las cinco selecciones históricas con `requireExisting: 'true'` y su combinación cerrada de rol y orden. Añadida cobertura mínima no ejecutada para ambos modos y un caso incoherente.
+
+### 2026-10-17
+
+- Registrado el cierre verificado de 3A/3B en `dbaf503`: Ronin real válido, typecheck y build correctos, 128 pruebas con 127 superadas y una omitida, lint con código de salida 0 y comprobación visual correcta en desarrollo. El portable de ese estado no se considera validado.
+- Añadida la migración 2 `install_world_versions` y el repositorio SQLite mínimo para identidad, versión, formato, perfil, SHA-256, tamaño, slot y fecha.
+- Implementada la copia instalada inmutable bajo `data/worlds/.fatebound-installed-v1/`, con revalidación, publicación mediante `ready`, idempotencia, varias versiones y rechazo de conflictos de bytes.
+- Añadidos la vista previa y confirmación de instalación, el IPC restringido a identidad y versión, el catálogo combinado persistente y los estados localizados en español, inglés y coreano.
+- Conservada la separación entre instalado y jugable: no se ejecuta Basic ni se habilitan Personajes o Crónicas; 4B añadió después una lectura visual limitada que no cambia ese estado.
+- Añadidas pruebas focalizadas de instalación, persistencia, conflicto, fallos parciales e IPC. Por restricción expresa no se ejecutó ningún comando de validación ni Git en esta tarea.
+- Corregidas las fixtures de restauración y las expectativas SQLite desfasadas tras la migración 2, y añadida `world-package-install.test.ts` al comando `npm test`; la repetición comunicada por el equipo terminó con 132 pruebas superadas, ninguna fallida y una omitida.
+- Reubicada la confirmación de instalación junto a su versión y añadida la resolución segura y cacheada de `hero`, `card` y `emblem` desde paquetes Basic instalados; las comprobaciones de 4B quedan pendientes.

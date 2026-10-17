@@ -36,6 +36,7 @@ const brandingDirectory = fileURLToPath(
 )
 const appSource = readFileSync(new URL('./App.vue', import.meta.url), 'utf8')
 const catalogSource = readFileSync(new URL('./builtin-theme-catalog.ts', import.meta.url), 'utf8')
+const rendererIndexSource = readFileSync(new URL('../index.html', import.meta.url), 'utf8')
 
 function loadThemeDefinition(id: BuiltinThemeId): BuiltinThemeDefinition {
   const source = readFileSync(`${themesDirectory}/${id}/theme.yaml`, 'utf8')
@@ -137,10 +138,31 @@ test('detected packages map to built-in cards only through explicit stable world
   assert.equal(resolveKnownWorldPresentationId('other.publisher.ronin'), undefined)
   assert.match(appSource, /window\.api\.worlds\.getPackageCatalog\(\)/)
   assert.match(appSource, /window\.api\.worlds\.addPackage\(\)/)
+  assert.match(appSource, /window\.api\.worlds\.installPackage\(/)
   assert.match(appSource, /worlds\.add\.action/)
+  assert.match(appSource, /worlds\.install\.confirmAction/)
   assert.match(appSource, /common\.packageAvailable/)
   assert.doesNotMatch(appSource, /type="file"/)
-  assert.doesNotMatch(appSource, />\s*(?:Instalar|Install|설치)\s*</)
+})
+
+test('installation confirmation expands beside its release action and manages focus', () => {
+  assert.match(
+    appSource,
+    /class="world-version-action"[\s\S]*?@click="previewWorldPackageInstallation\(packageInfo, \$event\)"[\s\S]*?class="world-install-preview"/
+  )
+  assert.match(appSource, /:ref="setWorldPackageInstallPreview"[\s\S]*?tabindex="-1"/)
+  assert.match(appSource, /@keydown\.esc="cancelWorldPackageInstallation"/)
+  assert.match(appSource, /scrollIntoView\(/)
+  assert.match(appSource, /prefers-reduced-motion: reduce/)
+})
+
+test('installed artwork is preferred per role with a built-in fallback', () => {
+  assert.match(appSource, /installedArtworkPackageForTheme/)
+  assert.match(appSource, /packageInfo\.artwork !== undefined/)
+  assert.match(appSource, /\.at\(-1\)/)
+  assert.match(appSource, /const builtinUrl = theme\.artworkUrls\[role\]/)
+  assert.match(appSource, /event\.currentTarget\.getAttribute\('src'\)/)
+  assert.match(rendererIndexSource, /img-src[^>]*fatebound-world-artwork:/)
 })
 
 test('the integrated catalog loads only allowlisted resources from builtin-themes', () => {
@@ -170,7 +192,7 @@ test('the new Fatebound branding exists and remains a keyboard-capable Home butt
 
 test('future-world cards select atmosphere without offering playable actions', () => {
   assert.match(appSource, /@click="selectTheme\(theme\.id\)"/)
-  assert.doesNotMatch(appSource, />\s*(?:Jugar|Instalar|Abrir mundo)\s*</)
+  assert.doesNotMatch(appSource, />\s*(?:Jugar|Abrir mundo)\s*</)
   assert.deepEqual(
     getContextualNavigationSections(null).map((section) => section.id),
     ['worlds']

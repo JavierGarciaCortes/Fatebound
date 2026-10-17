@@ -1,10 +1,19 @@
-import { app, shell, BrowserWindow, dialog, ipcMain, type OpenDialogOptions } from 'electron'
+import {
+  app,
+  shell,
+  BrowserWindow,
+  dialog,
+  ipcMain,
+  protocol,
+  type OpenDialogOptions
+} from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/branding/fatebound/fatebound-app-icon.png?asset'
 import { initializePortableStorage } from './storage/electron-storage-startup.ts'
 import {
   activateStoragePaths,
+  getActiveStoragePaths,
   hasActiveStoragePaths,
   resolveWorldPackageInboxDirectory
 } from './storage/portable-storage.ts'
@@ -31,11 +40,28 @@ import {
   type ApplicationLanguage
 } from '../shared/application-language.ts'
 import { translate, type MessageKey } from '../shared/i18n/index.ts'
-import { readWorldPackageCatalog } from './worlds/world-package-catalog.ts'
 import { registerWorldPackageCatalogIpc } from './worlds/world-package-catalog-ipc.ts'
 import { addWorldPackageToInbox } from './worlds/world-package-add.ts'
 import { registerWorldPackageAddIpc } from './worlds/world-package-add-ipc.ts'
 import { createWorldPackageOpenDialogOptions } from './worlds/world-package-selector.ts'
+import { readWorldPackageLibraryCatalog } from './worlds/world-package-library.ts'
+import { installWorldPackage } from './worlds/world-package-install.ts'
+import { registerWorldPackageInstallIpc } from './worlds/world-package-install-ipc.ts'
+import { WORLD_PACKAGE_ARTWORK_SCHEME } from '../shared/world-package-artwork.ts'
+import { createInstalledWorldArtworkResolver } from './worlds/world-package-artwork.ts'
+
+protocol.registerSchemesAsPrivileged([
+  {
+    scheme: WORLD_PACKAGE_ARTWORK_SCHEME,
+    privileges: {
+      standard: true,
+      secure: true,
+      supportFetchAPI: false,
+      corsEnabled: false,
+      stream: true
+    }
+  }
+])
 
 let mainWindow: BrowserWindow | null = null
 let shutdownStarted = false
@@ -43,6 +69,9 @@ let shutdownComplete = false
 let automaticBackupWarningVisible = false
 let mainApplicationLanguage: ApplicationLanguage = DEFAULT_APPLICATION_LANGUAGE
 const PORTABLE_SQLITE_VERIFICATION_ARGUMENT = '--verify-portable-sqlite'
+const resolveInstalledWorldArtwork = createInstalledWorldArtworkResolver(
+  () => getActiveStoragePaths().worldsDirectory
+)
 
 function mainT(key: MessageKey): string {
   return translate(mainApplicationLanguage, key)
@@ -145,6 +174,29 @@ function createWindow(): void {
   }
 }
 
+function registerInstalledWorldArtworkProtocol(): void {
+  protocol.handle(WORLD_PACKAGE_ARTWORK_SCHEME, async (request) => {
+    if (request.method !== 'GET') return new Response(null, { status: 405 })
+    try {
+      const artwork = await resolveInstalledWorldArtwork(request.url)
+      if (artwork === undefined) {
+        return new Response(null, { status: 404 })
+      }
+      return new Response(new Uint8Array(artwork.contents), {
+        status: 200,
+        headers: {
+          'Cache-Control': 'no-store',
+          'Content-Type': artwork.mimeType,
+          'X-Content-Type-Options': 'nosniff'
+        }
+      })
+    } catch (error) {
+      console.error('Unable to read verified installed world artwork', error)
+      return new Response(null, { status: 404 })
+    }
+  })
+}
+
 async function startApplication(): Promise<void> {
   const storageResult = await initializePortableStorage()
 
@@ -193,6 +245,7 @@ async function startApplication(): Promise<void> {
     return
   }
 
+  registerInstalledWorldArtworkProtocol()
   createWindow()
 }
 
@@ -232,7 +285,11 @@ function registerApplicationLifecycle(): void {
 
   registerWorldPackageCatalogIpc(
     (channel, handler) => ipcMain.handle(channel, () => handler()),
-    () => readWorldPackageCatalog(getWorldPackageInboxDirectory()),
+    () =>
+      readWorldPackageLibraryCatalog(
+        getWorldPackageInboxDirectory(),
+        getActiveStoragePaths().worldsDirectory
+      ),
     (error) => console.error('Unable to read the Fatebound world package catalog', error)
   )
 
@@ -241,6 +298,21 @@ function registerApplicationLifecycle(): void {
     selectWorldPackageSource,
     (selectedPath) => addWorldPackageToInbox(selectedPath, getWorldPackageInboxDirectory()),
     (error) => console.error('Unable to add the selected Fatebound world package', error)
+  )
+
+  registerWorldPackageInstallIpc(
+    (channel, handler) =>
+      ipcMain.handle(channel, (_event, worldId: unknown, worldVersion: unknown) =>
+        handler(worldId, worldVersion)
+      ),
+    (worldId, worldVersion) =>
+      installWorldPackage(
+        worldId,
+        worldVersion,
+        getWorldPackageInboxDirectory(),
+        getActiveStoragePaths().worldsDirectory
+      ),
+    (error) => console.error('Unable to install the selected Fatebound world package', error)
   )
 
   // This method will be called when Electron has finished

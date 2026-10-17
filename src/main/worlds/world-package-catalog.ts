@@ -301,6 +301,7 @@ async function inspectCandidate(
         languages: validation.package.languages,
         defaultLanguage: validation.package.defaultLanguage,
         formatVersion: validation.package.formatVersion,
+        installationStatus: 'available',
         playable: false
       }
     }

@@ -25,6 +25,7 @@ Este archivo se aplica a todo el repositorio de Fatebound.
 - Expón únicamente contratos IPC mínimos, tipados, validados y controlados mediante el preload.
 - Diseña la interfaz como una experiencia de aventura narrativa —«RPG cinematográfico + diario de aventuras»—, no como un panel empresarial ni como un administrador de base de datos.
 - Mantén la navegación compartida separada del tema declarativo de cada mundo. Un paquete de mundo puede aportar recursos y valores visuales validados, pero nunca código, scripts, CSS arbitrario ni acceso a API nativas.
+- Cuando una tarea trate aspectos visuales específicos de un mundo, consulta únicamente su guía y ficha en `docs/art-direction/`; no cargues todas las referencias para trabajos técnicos no relacionados. `theme.yaml` sigue siendo la fuente técnica de los tokens y colores de interfaz, y ninguna guía autoriza cambios automáticos de código, imágenes aprobadas o mundos instalados.
 - Prioriza legibilidad, contraste, navegación clara, foco visible, sesiones largas y reducción de movimiento sobre efectos decorativos o animaciones prolongadas.
 - Identifica expresamente cualquier tema, mundo, personaje o partida de demostración; no presentes prototipos visuales como contenido jugable ni controles futuros como funcionalidad disponible.
 - Los diagnósticos visibles de almacenamiento deben proceder de consultas mínimas en main mediante IPC/preload seguro. No expongas rutas sensibles innecesarias, SQL, acceso general al sistema de archivos ni la conexión SQLite.

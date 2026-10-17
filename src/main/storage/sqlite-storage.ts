@@ -277,6 +277,26 @@ export async function runActiveSqliteWriteTransaction<T>(
   )
 }
 
+export async function runActiveSqliteReadOperation<T>(
+  operation: (database: DatabaseSync) => T
+): Promise<T> {
+  if (activeRestorePromise) {
+    throw new Error('The Fatebound SQLite database is being restored')
+  }
+
+  const runtime = activeRuntime
+  if (!runtime?.database.isOpen) {
+    throw new Error('The Fatebound SQLite database is not available')
+  }
+
+  return runtime.operations.run(() => {
+    if (!runtime.database.isOpen) {
+      throw new Error('SQLite closed before the read operation completed')
+    }
+    return operation(runtime.database)
+  })
+}
+
 export async function createActiveManualSqliteBackup(
   destinationDirectory: string,
   verifyPublishedBackup: (result: SqliteBackupResult) => Promise<void> = async () => undefined

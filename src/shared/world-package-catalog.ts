@@ -1,3 +1,5 @@
+import type { WorldPackageArtworkUrls } from './world-package-artwork.ts'
+
 export const WORLD_PACKAGE_CATALOG_CHANNEL = 'fatebound:worlds:get-package-catalog'
 
 export const KNOWN_WORLD_PACKAGE_IDS = Object.freeze({
@@ -21,6 +23,8 @@ export interface AvailableWorldPackage {
   readonly languages: readonly string[]
   readonly defaultLanguage: string
   readonly formatVersion: '1'
+  readonly installationStatus: 'available' | 'installed'
+  readonly artwork?: WorldPackageArtworkUrls
   readonly playable: false
 }
 
@@ -28,6 +32,7 @@ export type WorldPackageCatalogIssueKind =
   | 'invalid'
   | 'incompatible'
   | 'duplicate'
+  | 'installation'
 
 export interface WorldPackageCatalogIssue {
   readonly kind: WorldPackageCatalogIssueKind

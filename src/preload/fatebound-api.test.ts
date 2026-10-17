@@ -14,6 +14,7 @@ import {
 } from '../shared/sqlite-safe-restore.ts'
 import { WORLD_PACKAGE_CATALOG_CHANNEL } from '../shared/world-package-catalog.ts'
 import { WORLD_PACKAGE_ADD_CHANNEL } from '../shared/world-package-add.ts'
+import { WORLD_PACKAGE_INSTALL_CHANNEL } from '../shared/world-package-install.ts'
 
 test('the preload API exposes only restricted storage and language operations', async () => {
   const invocations: Array<{ channel: string; args: readonly unknown[] }> = []
@@ -55,6 +56,13 @@ test('the preload API exposes only restricted storage and language operations', 
         worldVersion: '1.0.0'
       }
     }
+    if (channel === WORLD_PACKAGE_INSTALL_CHANNEL) {
+      return {
+        status: 'success',
+        worldId: args[0],
+        worldVersion: args[1]
+      }
+    }
     return expectedResult
   })
 
@@ -67,7 +75,11 @@ test('the preload API exposes only restricted storage and language operations', 
     'cancelSqliteBackupRestore'
   ])
   assert.deepEqual(Object.keys(api.preferences), ['getLanguage', 'setLanguage'])
-  assert.deepEqual(Object.keys(api.worlds), ['getPackageCatalog', 'addPackage'])
+  assert.deepEqual(Object.keys(api.worlds), [
+    'getPackageCatalog',
+    'addPackage',
+    'installPackage'
+  ])
   assert.equal(await api.storage.getDiagnostics(), expectedResult)
   assert.deepEqual(await api.preferences.getLanguage(), {
     status: 'ready',
@@ -93,6 +105,14 @@ test('the preload API exposes only restricted storage and language operations', 
     worldId: 'com.fatebound.worlds.ronin',
     worldVersion: '1.0.0'
   })
+  assert.deepEqual(
+    await api.worlds.installPackage('com.fatebound.worlds.ronin', '1.0.0'),
+    {
+      status: 'success',
+      worldId: 'com.fatebound.worlds.ronin',
+      worldVersion: '1.0.0'
+    }
+  )
   assert.deepEqual(invocations, [
     { channel: STORAGE_DIAGNOSTICS_CHANNEL, args: [] },
     { channel: GET_APPLICATION_LANGUAGE_CHANNEL, args: [] },
@@ -102,6 +122,10 @@ test('the preload API exposes only restricted storage and language operations', 
     { channel: SQLITE_RESTORE_CONFIRM_CHANNEL, args: [] },
     { channel: SQLITE_RESTORE_CANCEL_CHANNEL, args: [] },
     { channel: WORLD_PACKAGE_CATALOG_CHANNEL, args: [] },
-    { channel: WORLD_PACKAGE_ADD_CHANNEL, args: [] }
+    { channel: WORLD_PACKAGE_ADD_CHANNEL, args: [] },
+    {
+      channel: WORLD_PACKAGE_INSTALL_CHANNEL,
+      args: ['com.fatebound.worlds.ronin', '1.0.0']
+    }
   ])
 })

@@ -61,9 +61,41 @@ export const es = {
   'worlds.add.copyFailed':
     'No se pudo copiar el paquete. Comprueba los permisos y el espacio disponible; los demás paquetes no se han modificado.',
   'worlds.add.inProgress': 'Ya hay una incorporación de mundo en curso.',
+  'worlds.install.action': 'Instalar',
+  'worlds.install.processing': 'Instalando y verificando…',
+  'worlds.install.previewEyebrow': 'Confirmación de instalación',
+  'worlds.install.previewTitle': 'Revisa esta versión antes de instalarla',
+  'worlds.install.previewBody':
+    'Fatebound volverá a validar el paquete y conservará una copia administrada en el almacenamiento portable.',
+  'worlds.install.previewWorld': 'Mundo',
+  'worlds.install.previewVersion': 'Versión',
+  'worlds.install.previewLanguages': 'Idiomas incluidos',
+  'worlds.install.previewWarning':
+    'La instalación no activa el mundo, no habilita Personajes o Crónicas y no ejecuta reglas.',
+  'worlds.install.cancelAction': 'Cancelar',
+  'worlds.install.confirmAction': 'Confirmar instalación',
+  'worlds.install.success':
+    '{worldId} v{worldVersion} se ha instalado y verificado. Todavía no es jugable.',
+  'worlds.install.alreadyInstalled':
+    '{worldId} v{worldVersion} ya estaba instalado con el mismo contenido.',
+  'worlds.install.unavailable':
+    'La versión seleccionada ya no está disponible en el catálogo validado.',
+  'worlds.install.changed': 'El paquete cambió durante la instalación y no se registró.',
+  'worlds.install.versionConflict':
+    'Ya existe la misma identidad y versión con contenido diferente.',
+  'worlds.install.storageUnavailable':
+    'El almacenamiento de mundos no está disponible de forma segura.',
+  'worlds.install.copyFailed':
+    'No se pudo preparar la copia administrada. Revisa permisos y espacio disponible.',
+  'worlds.install.databaseUnavailable':
+    'No se pudo registrar la instalación en SQLite. El paquete no se mostrará como instalado.',
+  'worlds.install.incomplete':
+    'La copia y el registro de esta versión no son consistentes. Requiere revisión y no se usará.',
+  'worlds.install.inProgress': 'Ya hay una instalación de mundo en curso.',
   'worlds.catalog.refresh': 'Actualizar catálogo',
   'worlds.catalog.refreshing': 'Actualizando…',
-  'worlds.catalog.summary': '{packages} paquetes disponibles · {issues} incidencias',
+  'worlds.catalog.summary':
+    '{packages} versiones disponibles · {installed} instaladas · {issues} incidencias',
   'worlds.catalog.error':
     'No se pudo consultar la carpeta de paquetes. Los mundos instalados y los datos no se han modificado.',
   'worlds.catalog.additionalEyebrow': 'Paquetes detectados',
@@ -79,6 +111,8 @@ export const es = {
     'El archivo no está completo, ha cambiado o no puede leerse ahora. Vuelve a actualizar cuando termine la copia.',
   'worlds.catalog.issue.duplicate':
     'Varios archivos declaran el mismo mundo y versión; esa publicación se ha omitido.',
+  'worlds.catalog.issue.installation':
+    'Una instalación está incompleta o no coincide con su registro y no se usará.',
   'worlds.catalog.scanLimited':
     'La exploración alcanzó su límite de seguridad. Retira archivos innecesarios y vuelve a actualizar.',
   'worlds.atmosphere': 'Atmósfera',
@@ -87,6 +121,8 @@ export const es = {
     'Este mundo aún no contiene reglas ni contenido jugable. Por ahora, seleccionarlo solo activa su ambientación visual durante la sesión.',
   'worlds.packageAvailableNote':
     'Versiones detectadas: {versions}. El paquete no está instalado y el formato v1 todavía no aporta las capacidades mecánicas necesarias para jugar.',
+  'worlds.installedNote':
+    'Versiones reconocidas: {versions}. La copia instalada está verificada, pero el mundo sigue sin ser jugable hasta que exista su motor.',
   'worlds.empty.eyebrow': 'Sin mundo seleccionado',
   'worlds.empty.title': 'Explora una atmósfera futura',
   'worlds.empty.body':

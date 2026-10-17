@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, ref } from 'vue'
+import { computed, nextTick, ref, type ComponentPublicInstance } from 'vue'
 import type {
   StorageDiagnosticsFailure,
   StorageDiagnosticsResult
@@ -18,6 +18,10 @@ import type {
   WorldPackageAddErrorCode,
   WorldPackageAddResult
 } from '../../shared/world-package-add'
+import type {
+  WorldPackageInstallErrorCode,
+  WorldPackageInstallResult
+} from '../../shared/world-package-install'
 import {
   resolveKnownWorldPresentationId,
   type AvailableWorldPackage,
@@ -60,10 +64,31 @@ const backupRestoreAction = ref<
 const backupRestoreSelecting = ref(false)
 const backupRestoring = ref(false)
 const failedArtwork = ref<readonly string[]>([])
+const loadedArtwork = ref<readonly string[]>([])
 const worldPackageCatalog = ref<WorldPackageCatalogResult | null>(null)
 const worldPackageCatalogLoading = ref(false)
+
+type WorldPackageCatalogPhase = 'not-requested' | 'loading' | 'ready' | 'error'
+
+const worldPackageCatalogPhase = computed<WorldPackageCatalogPhase>(() => {
+  if (worldPackageCatalogLoading.value) {
+    return 'loading'
+  }
+
+  if (worldPackageCatalog.value === null) {
+    return 'not-requested'
+  }
+
+  return worldPackageCatalog.value.status === 'ready' ? 'ready' : 'error'
+})
 const worldPackageAddResult = ref<WorldPackageAddResult | null>(null)
 const worldPackageAdding = ref(false)
+const worldPackageInstallCandidate = ref<AvailableWorldPackage | null>(null)
+const worldPackageInstallResult = ref<WorldPackageInstallResult | null>(null)
+const worldPackageInstalling = ref(false)
+const worldPackageInstallPreview = ref<HTMLElement | null>(null)
+const worldPackageInstallStatus = ref<HTMLElement | null>(null)
+let worldPackageInstallTrigger: HTMLElement | null = null
 
 const activeTheme = computed(() => resolveBuiltinTheme(activeThemeId.value))
 const activeWorldTheme = computed(() =>
@@ -157,7 +182,12 @@ const worldPackageCatalogStatus = computed(() => {
   if (catalog === null) return null
   if (catalog.status === 'error') return t('worlds.catalog.error')
   return t('worlds.catalog.summary', {
-    packages: catalog.packages.length,
+    packages: catalog.packages.filter(
+      (packageInfo) => packageInfo.installationStatus === 'available'
+    ).length,
+    installed: catalog.packages.filter(
+      (packageInfo) => packageInfo.installationStatus === 'installed'
+    ).length,
     issues: catalog.issues.length
   })
 })
@@ -181,8 +211,34 @@ const worldPackageAddMessage = computed(() => {
   return worldPackageAddErrorMessage(result.code)
 })
 const worldPackageAddFailed = computed(() => worldPackageAddResult.value?.status === 'error')
+const worldPackageInstallMessage = computed(() => {
+  if (worldPackageInstalling.value) return t('worlds.install.processing')
+  const result = worldPackageInstallResult.value
+  if (result === null) return null
+  if (result.status === 'success') {
+    return t('worlds.install.success', {
+      worldId: result.worldId,
+      worldVersion: result.worldVersion
+    })
+  }
+  if (result.status === 'already-installed') {
+    return t('worlds.install.alreadyInstalled', {
+      worldId: result.worldId,
+      worldVersion: result.worldVersion
+    })
+  }
+  return worldPackageInstallErrorMessage(result.code)
+})
+const worldPackageInstallFailed = computed(
+  () => worldPackageInstallResult.value?.status === 'error'
+)
 
-type WorldLibraryAvailability = 'upcoming' | 'package-available' | 'installed'
+type WorldLibraryAvailability =
+  | 'loading'
+  | 'catalog-error'
+  | 'upcoming'
+  | 'package-available'
+  | 'installed'
 
 function navigationLabel(sectionId: AppSectionId): string {
   return t(`navigation.${sectionId}.label` as MessageKey)
@@ -215,19 +271,52 @@ function packagesForTheme(themeId: BuiltinThemeId): readonly AvailableWorldPacka
   )
 }
 
+function installedArtworkPackageForTheme(
+  themeId: BuiltinThemeId
+): AvailableWorldPackage | undefined {
+  return packagesForTheme(themeId)
+    .filter(
+      (packageInfo) =>
+        packageInfo.installationStatus === 'installed' && packageInfo.artwork !== undefined
+    )
+    .at(-1)
+}
+
 function worldThemeAvailability(themeId: BuiltinThemeId): WorldLibraryAvailability {
-  const installedWorld = activeInstalledWorld.value
   if (
-    installedWorld !== null &&
-    resolveKnownWorldPresentationId(installedWorld.worldId) === themeId
+    packagesForTheme(themeId).some(
+      (packageInfo) => packageInfo.installationStatus === 'installed'
+    )
   ) {
     return 'installed'
   }
+  if (
+    themeId !== DEFAULT_BUILTIN_THEME_ID &&
+    (worldPackageCatalogPhase.value === 'not-requested' ||
+      worldPackageCatalogPhase.value === 'loading')
+  ) {
+    return 'loading'
+  }
+
+  if (themeId !== DEFAULT_BUILTIN_THEME_ID && worldPackageCatalogPhase.value === 'error') {
+    return 'catalog-error'
+  }
+
   return packagesForTheme(themeId).length > 0 ? 'package-available' : 'upcoming'
 }
 
 function availabilityLabel(availability: WorldLibraryAvailability): string {
+  if (availability === 'loading') {
+    return t('worlds.catalog.refreshing')
+  }
+
+  if (availability === 'catalog-error') {
+    return t('worlds.catalog.error')
+  }
+
   const keys: Readonly<Record<WorldLibraryAvailability, MessageKey>> = {
+    loading: 'worlds.catalog.refreshing',
+    'catalog-error': 'worlds.catalog.error',
     upcoming: 'common.upcoming',
     'package-available': 'common.packageAvailable',
     installed: 'common.installed'
@@ -258,6 +347,7 @@ function catalogIssueFiles(issue: WorldPackageCatalogIssue): string {
 function catalogIssueMessage(issue: WorldPackageCatalogIssue): string {
   if (issue.kind === 'duplicate') return t('worlds.catalog.issue.duplicate')
   if (issue.kind === 'incompatible') return t('worlds.catalog.issue.incompatible')
+  if (issue.kind === 'installation') return t('worlds.catalog.issue.installation')
   return issue.retryable
     ? t('worlds.catalog.issue.temporary')
     : t('worlds.catalog.issue.invalid')
@@ -276,13 +366,33 @@ function worldPackageAddErrorMessage(code: WorldPackageAddErrorCode): string {
   return t(keys[code])
 }
 
+function worldPackageInstallErrorMessage(code: WorldPackageInstallErrorCode): string {
+  const keys: Readonly<Record<WorldPackageInstallErrorCode, MessageKey>> = {
+    'package-unavailable': 'worlds.install.unavailable',
+    'package-changed': 'worlds.install.changed',
+    'version-conflict': 'worlds.install.versionConflict',
+    'storage-unavailable': 'worlds.install.storageUnavailable',
+    'copy-failed': 'worlds.install.copyFailed',
+    'database-unavailable': 'worlds.install.databaseUnavailable',
+    'incomplete-installation': 'worlds.install.incomplete',
+    'install-in-progress': 'worlds.install.inProgress'
+  }
+  return t(keys[code])
+}
+
 function hexToRgb(value: string): string {
   const color = Number.parseInt(value.slice(1), 16)
   return `${(color >> 16) & 255}, ${(color >> 8) & 255}, ${color & 255}`
 }
 
 function selectTheme(themeId: BuiltinThemeId): void {
-  activeThemeId.value = resolveBuiltinThemeId(themeId)
+  const nextThemeId = resolveBuiltinThemeId(themeId)
+  if (nextThemeId !== activeThemeId.value) {
+    worldPackageInstallCandidate.value = null
+    worldPackageInstallResult.value = null
+    worldPackageInstallTrigger = null
+  }
+  activeThemeId.value = nextThemeId
 }
 
 function returnToNeutralTheme(): void {
@@ -290,12 +400,60 @@ function returnToNeutralTheme(): void {
 }
 
 function artworkUrl(theme: BuiltinTheme, role: ThemeArtworkRole): string | undefined {
-  const key = `${theme.id}:${role}`
-  return failedArtwork.value.includes(key) ? undefined : theme.artworkUrls[role]
+  if (
+    !theme.isNeutral &&
+    (worldPackageCatalogPhase.value === 'not-requested' ||
+      worldPackageCatalogPhase.value === 'loading')
+  ) {
+    return undefined
+  }
+
+  const installedUrl = installedArtworkPackageForTheme(theme.id)?.artwork?.[role]
+  if (
+    installedUrl !== undefined &&
+    !failedArtwork.value.includes(`${theme.id}:${role}:${installedUrl}`)
+  ) {
+    return installedUrl
+  }
+  const builtinUrl = theme.artworkUrls[role]
+  return builtinUrl === undefined ||
+    failedArtwork.value.includes(`${theme.id}:${role}:${builtinUrl}`)
+    ? undefined
+    : builtinUrl
 }
 
-function markArtworkUnavailable(themeId: BuiltinThemeId, role: ThemeArtworkRole): void {
-  const key = `${themeId}:${role}`
+function artworkEventUrl(event: Event): string | undefined {
+  const target = event.currentTarget
+  return target instanceof HTMLImageElement ? target.getAttribute('src') ?? undefined : undefined
+}
+
+function markArtworkLoaded(event: Event): void {
+  const url = artworkEventUrl(event)
+  if (url && !loadedArtwork.value.includes(url)) {
+    loadedArtwork.value = [...loadedArtwork.value, url]
+  }
+}
+
+function isInstalledArtworkPending(theme: BuiltinTheme, role: ThemeArtworkRole): boolean {
+  const installedUrl = installedArtworkPackageForTheme(theme.id)?.artwork?.[role]
+  return Boolean(
+    installedUrl &&
+      artworkUrl(theme, role) === installedUrl &&
+      !loadedArtwork.value.includes(installedUrl),
+  )
+}
+
+function markArtworkUnavailable(
+  themeId: BuiltinThemeId,
+  role: ThemeArtworkRole,
+  event: Event
+): void {
+  const failedUrl =
+    event.currentTarget instanceof HTMLImageElement
+      ? event.currentTarget.getAttribute('src') ?? undefined
+      : undefined
+  if (failedUrl === undefined) return
+  const key = `${themeId}:${role}:${failedUrl}`
   if (!failedArtwork.value.includes(key)) failedArtwork.value = [...failedArtwork.value, key]
 }
 
@@ -322,7 +480,9 @@ async function loadWorldPackageCatalog(): Promise<void> {
   worldPackageCatalogLoading.value = true
 
   try {
-    worldPackageCatalog.value = await window.api.worlds.getPackageCatalog()
+    const catalog = await window.api.worlds.getPackageCatalog()
+    worldPackageCatalog.value = catalog
+    if (catalog.status === 'ready') failedArtwork.value = []
   } catch {
     worldPackageCatalog.value = { status: 'error', code: 'catalog-unavailable' }
   } finally {
@@ -346,6 +506,97 @@ async function addWorldPackage(): Promise<void> {
     worldPackageAddResult.value = { status: 'error', code: 'copy-failed' }
   } finally {
     worldPackageAdding.value = false
+  }
+}
+
+function isWorldPackageInstallCandidate(packageInfo: AvailableWorldPackage): boolean {
+  const candidate = worldPackageInstallCandidate.value
+  return (
+    candidate !== null &&
+    candidate.worldId === packageInfo.worldId &&
+    candidate.worldVersion === packageInfo.worldVersion
+  )
+}
+
+function isWorldPackageInstallMessageFor(packageInfo: AvailableWorldPackage): boolean {
+  if (isWorldPackageInstallCandidate(packageInfo)) return true
+  const result = worldPackageInstallResult.value
+  return (
+    result !== null &&
+    (result.status === 'success' || result.status === 'already-installed') &&
+    result.worldId === packageInfo.worldId &&
+    result.worldVersion === packageInfo.worldVersion
+  )
+}
+
+function scrollInstallationElement(element: HTMLElement): void {
+  const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  element.scrollIntoView({ behavior: reducedMotion ? 'auto' : 'smooth', block: 'nearest' })
+}
+
+function setWorldPackageInstallPreview(
+  element: Element | ComponentPublicInstance | null
+): void {
+  worldPackageInstallPreview.value = element instanceof HTMLElement ? element : null
+}
+
+function setWorldPackageInstallStatus(
+  element: Element | ComponentPublicInstance | null
+): void {
+  worldPackageInstallStatus.value = element instanceof HTMLElement ? element : null
+}
+
+async function previewWorldPackageInstallation(
+  packageInfo: AvailableWorldPackage,
+  event?: Event
+): Promise<void> {
+  if (packageInfo.installationStatus !== 'available' || worldPackageInstalling.value) return
+  worldPackageInstallTrigger =
+    event?.currentTarget instanceof HTMLElement ? event.currentTarget : null
+  worldPackageInstallCandidate.value = packageInfo
+  worldPackageInstallResult.value = null
+  await nextTick()
+  if (worldPackageInstallPreview.value !== null) {
+    scrollInstallationElement(worldPackageInstallPreview.value)
+    worldPackageInstallPreview.value.focus({ preventScroll: true })
+  }
+}
+
+async function cancelWorldPackageInstallation(): Promise<void> {
+  if (worldPackageInstalling.value) return
+  const trigger = worldPackageInstallTrigger
+  worldPackageInstallCandidate.value = null
+  worldPackageInstallResult.value = null
+  worldPackageInstallTrigger = null
+  await nextTick()
+  trigger?.focus()
+}
+
+async function confirmWorldPackageInstallation(): Promise<void> {
+  const candidate = worldPackageInstallCandidate.value
+  if (candidate === null || worldPackageInstalling.value) return
+
+  worldPackageInstalling.value = true
+  worldPackageInstallResult.value = null
+  try {
+    const result = await window.api.worlds.installPackage(
+      candidate.worldId,
+      candidate.worldVersion
+    )
+    worldPackageInstallResult.value = result
+    if (result.status === 'success' || result.status === 'already-installed') {
+      worldPackageInstallCandidate.value = null
+      await loadWorldPackageCatalog()
+    }
+  } catch {
+    worldPackageInstallResult.value = { status: 'error', code: 'storage-unavailable' }
+  } finally {
+    worldPackageInstalling.value = false
+    await nextTick()
+    if (worldPackageInstallStatus.value !== null) {
+      scrollInstallationElement(worldPackageInstallStatus.value)
+      worldPackageInstallStatus.value.focus({ preventScroll: true })
+    }
   }
 }
 
@@ -532,8 +783,13 @@ async function cancelSqliteBackupRestore(): Promise<void> {
             <img
               v-else-if="artworkUrl(activeTheme, 'emblem')"
               :src="artworkUrl(activeTheme, 'emblem')"
+              :style="{
+                opacity: isInstalledArtworkPending(activeTheme, 'emblem') ? '0' : '1',
+                transition: 'opacity 160ms ease-out',
+              }"
               alt=""
-              @error="markArtworkUnavailable(activeTheme.id, 'emblem')"
+              @load="markArtworkLoaded"
+              @error="markArtworkUnavailable(activeTheme.id, 'emblem', $event)"
             />
             <AppIcon v-else name="sparkles" />
           </span>
@@ -604,8 +860,13 @@ async function cancelSqliteBackupRestore(): Promise<void> {
                 v-if="artworkUrl(activeTheme, 'hero')"
                 :key="activeTheme.id"
                 :src="artworkUrl(activeTheme, 'hero')"
+                :style="{
+                  opacity: isInstalledArtworkPending(activeTheme, 'hero') ? '0' : '1',
+                  transition: 'opacity 160ms ease-out',
+                }"
                 alt=""
-                @error="markArtworkUnavailable(activeTheme.id, 'hero')"
+                @load="markArtworkLoaded"
+                @error="markArtworkUnavailable(activeTheme.id, 'hero', $event)"
               />
               <div v-else class="artwork-fallback artwork-fallback--hero">
                 <AppIcon name="sparkles" />
@@ -742,7 +1003,8 @@ async function cancelSqliteBackupRestore(): Promise<void> {
               class="world-card"
               :class="{
                 'world-card--active': activeTheme.id === theme.id,
-                'world-card--available': worldThemeAvailability(theme.id) === 'package-available'
+                'world-card--available': worldThemeAvailability(theme.id) === 'package-available',
+                'world-card--installed': worldThemeAvailability(theme.id) === 'installed'
               }"
               :style="{ '--card-accent': theme.visual.colors.primary }"
               type="button"
@@ -752,9 +1014,14 @@ async function cancelSqliteBackupRestore(): Promise<void> {
               <span class="world-card__art" aria-hidden="true">
                 <img
                   v-if="artworkUrl(theme, 'card')"
-                  :src="artworkUrl(theme, 'card')"
+                      :src="artworkUrl(theme, 'card')"
+                      :style="{
+                        opacity: isInstalledArtworkPending(theme, 'card') ? '0' : '1',
+                        transition: 'opacity 160ms ease-out',
+                      }"
                   alt=""
-                  @error="markArtworkUnavailable(theme.id, 'card')"
+                      @load="markArtworkLoaded"
+                      @error="markArtworkUnavailable(theme.id, 'card', $event)"
                 />
                 <span v-else class="artwork-fallback">
                   <AppIcon name="sparkles" />
@@ -762,9 +1029,14 @@ async function cancelSqliteBackupRestore(): Promise<void> {
                 <img
                   v-if="artworkUrl(theme, 'emblem')"
                   class="world-card__emblem"
-                  :src="artworkUrl(theme, 'emblem')"
+                      :src="artworkUrl(theme, 'emblem')"
+                      :style="{
+                        opacity: isInstalledArtworkPending(theme, 'emblem') ? '0' : '1',
+                        transition: 'opacity 160ms ease-out',
+                      }"
                   alt=""
-                  @error="markArtworkUnavailable(theme.id, 'emblem')"
+                      @load="markArtworkLoaded"
+                      @error="markArtworkUnavailable(theme.id, 'emblem', $event)"
                 />
               </span>
               <span class="world-card__body">
@@ -781,9 +1053,14 @@ async function cancelSqliteBackupRestore(): Promise<void> {
               <img
                 v-if="artworkUrl(activeWorldTheme, 'emblem')"
                 class="world-detail__emblem"
-                :src="artworkUrl(activeWorldTheme, 'emblem')"
+                    :src="artworkUrl(activeWorldTheme, 'emblem')"
+                    :style="{
+                      opacity: isInstalledArtworkPending(activeWorldTheme, 'emblem') ? '0' : '1',
+                      transition: 'opacity 160ms ease-out',
+                    }"
+                    @load="markArtworkLoaded"
                 alt=""
-                @error="markArtworkUnavailable(activeWorldTheme.id, 'emblem')"
+                @error="markArtworkUnavailable(activeWorldTheme.id, 'emblem', $event)"
               />
               <div v-else class="artwork-fallback artwork-fallback--emblem">
                 <AppIcon name="sparkles" />
@@ -807,12 +1084,107 @@ async function cancelSqliteBackupRestore(): Promise<void> {
               </div>
               <p v-if="selectedThemePackages.length > 0" class="world-note">
                 {{
-                  t('worlds.packageAvailableNote', {
+                  t(
+                    worldThemeAvailability(activeWorldTheme.id) === 'installed'
+                      ? 'worlds.installedNote'
+                      : 'worlds.packageAvailableNote',
+                    {
                     versions: packageVersions(selectedThemePackages)
-                  })
+                    }
+                  )
                 }}
               </p>
               <p v-else class="world-note">{{ t('worlds.note') }}</p>
+              <div v-if="selectedThemePackages.length > 0" class="world-version-actions">
+                <div
+                  v-for="packageInfo in selectedThemePackages"
+                  :key="`${packageInfo.worldId}@${packageInfo.worldVersion}`"
+                  class="world-version-action"
+                >
+                  <div class="world-version-action__summary">
+                    <span>v{{ packageInfo.worldVersion }}</span>
+                    <span v-if="packageInfo.installationStatus === 'installed'">
+                      {{ t('common.installed') }}
+                    </span>
+                    <button
+                      v-else
+                      class="button button--primary button--compact"
+                      type="button"
+                      :disabled="worldPackageInstalling"
+                      :aria-expanded="isWorldPackageInstallCandidate(packageInfo)"
+                      aria-controls="world-install-preview"
+                      @click="previewWorldPackageInstallation(packageInfo, $event)"
+                    >
+                      {{ t('worlds.install.action') }}
+                    </button>
+                  </div>
+                  <article
+                    v-if="isWorldPackageInstallCandidate(packageInfo)"
+                    :ref="setWorldPackageInstallPreview"
+                    class="world-install-preview"
+                    id="world-install-preview"
+                    tabindex="-1"
+                    aria-labelledby="world-install-preview-title"
+                    @keydown.esc="cancelWorldPackageInstallation"
+                  >
+                    <div>
+                      <span class="eyebrow">{{ t('worlds.install.previewEyebrow') }}</span>
+                      <h3 id="world-install-preview-title">{{ t('worlds.install.previewTitle') }}</h3>
+                      <p>{{ t('worlds.install.previewBody') }}</p>
+                    </div>
+                    <dl>
+                      <div>
+                        <dt>{{ t('worlds.install.previewWorld') }}</dt>
+                        <dd>{{ packageTitle(packageInfo) }}</dd>
+                      </div>
+                      <div>
+                        <dt>{{ t('worlds.install.previewVersion') }}</dt>
+                        <dd>{{ packageInfo.worldVersion }}</dd>
+                      </div>
+                      <div>
+                        <dt>{{ t('worlds.install.previewLanguages') }}</dt>
+                        <dd>{{ packageLanguages(packageInfo) }}</dd>
+                      </div>
+                    </dl>
+                    <p class="world-install-warning">
+                      <AppIcon name="shield" />
+                      <span>{{ t('worlds.install.previewWarning') }}</span>
+                    </p>
+                    <div class="world-install-actions">
+                      <button
+                        class="button button--secondary"
+                        type="button"
+                        :disabled="worldPackageInstalling"
+                        @click="cancelWorldPackageInstallation"
+                      >
+                        {{ t('worlds.install.cancelAction') }}
+                      </button>
+                      <button
+                        class="button button--primary"
+                        type="button"
+                        :disabled="worldPackageInstalling"
+                        @click="confirmWorldPackageInstallation"
+                      >
+                        {{
+                          worldPackageInstalling
+                            ? t('worlds.install.processing')
+                            : t('worlds.install.confirmAction')
+                        }}
+                      </button>
+                    </div>
+                  </article>
+                  <p
+                    v-if="worldPackageInstallMessage && isWorldPackageInstallMessageFor(packageInfo)"
+                    :ref="setWorldPackageInstallStatus"
+                    class="world-package-install-status"
+                    :class="{ 'world-package-install-status--error': worldPackageInstallFailed }"
+                    tabindex="-1"
+                    aria-live="polite"
+                  >
+                    {{ worldPackageInstallMessage }}
+                  </p>
+                </div>
+              </div>
             </div>
           </article>
 
@@ -846,10 +1218,86 @@ async function cancelSqliteBackupRestore(): Promise<void> {
                   <span class="artwork-fallback"><AppIcon name="worlds" /></span>
                 </span>
                 <span class="world-card__body">
-                  <small>{{ t('common.packageAvailable') }}</small>
+                  <small>{{ availabilityLabel(packageInfo.installationStatus === 'installed' ? 'installed' : 'package-available') }}</small>
                   <strong>{{ packageTitle(packageInfo) }}</strong>
                   <span>v{{ packageInfo.worldVersion }} · {{ packageLanguages(packageInfo) }}</span>
                 </span>
+                <button
+                  v-if="packageInfo.installationStatus === 'available'"
+                  class="button button--primary button--compact world-card__action"
+                  type="button"
+                  :disabled="worldPackageInstalling"
+                  :aria-expanded="isWorldPackageInstallCandidate(packageInfo)"
+                  aria-controls="world-install-preview"
+                  @click="previewWorldPackageInstallation(packageInfo, $event)"
+                >
+                  {{ t('worlds.install.action') }}
+                </button>
+                <article
+                  v-if="isWorldPackageInstallCandidate(packageInfo)"
+                  :ref="setWorldPackageInstallPreview"
+                  class="world-install-preview world-install-preview--card"
+                  id="world-install-preview"
+                  tabindex="-1"
+                  aria-labelledby="world-install-preview-title"
+                  @keydown.esc="cancelWorldPackageInstallation"
+                >
+                  <div>
+                    <span class="eyebrow">{{ t('worlds.install.previewEyebrow') }}</span>
+                    <h3 id="world-install-preview-title">{{ t('worlds.install.previewTitle') }}</h3>
+                    <p>{{ t('worlds.install.previewBody') }}</p>
+                  </div>
+                  <dl>
+                    <div>
+                      <dt>{{ t('worlds.install.previewWorld') }}</dt>
+                      <dd>{{ packageTitle(packageInfo) }}</dd>
+                    </div>
+                    <div>
+                      <dt>{{ t('worlds.install.previewVersion') }}</dt>
+                      <dd>{{ packageInfo.worldVersion }}</dd>
+                    </div>
+                    <div>
+                      <dt>{{ t('worlds.install.previewLanguages') }}</dt>
+                      <dd>{{ packageLanguages(packageInfo) }}</dd>
+                    </div>
+                  </dl>
+                  <p class="world-install-warning">
+                    <AppIcon name="shield" />
+                    <span>{{ t('worlds.install.previewWarning') }}</span>
+                  </p>
+                  <div class="world-install-actions">
+                    <button
+                      class="button button--secondary"
+                      type="button"
+                      :disabled="worldPackageInstalling"
+                      @click="cancelWorldPackageInstallation"
+                    >
+                      {{ t('worlds.install.cancelAction') }}
+                    </button>
+                    <button
+                      class="button button--primary"
+                      type="button"
+                      :disabled="worldPackageInstalling"
+                      @click="confirmWorldPackageInstallation"
+                    >
+                      {{
+                        worldPackageInstalling
+                          ? t('worlds.install.processing')
+                          : t('worlds.install.confirmAction')
+                      }}
+                    </button>
+                  </div>
+                </article>
+                <p
+                  v-if="worldPackageInstallMessage && isWorldPackageInstallMessageFor(packageInfo)"
+                  :ref="setWorldPackageInstallStatus"
+                  class="world-package-install-status world-package-install-status--card"
+                  :class="{ 'world-package-install-status--error': worldPackageInstallFailed }"
+                  tabindex="-1"
+                  aria-live="polite"
+                >
+                  {{ worldPackageInstallMessage }}
+                </p>
               </article>
             </div>
           </section>
